@@ -20,9 +20,36 @@ const FACES: FaceDef[] = [
   { dir: [0, 0, -1], kind: 'side', shade: 0.65, v: [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]] },
 ];
 
+/** Egy geometria csúcsadatai, amíg épül */
+class Buffers {
+  pos: number[] = [];
+  uvs: number[] = [];
+  col: number[] = [];
+  idx: number[] = [];
+
+  toGeometry(): THREE.BufferGeometry | null {
+    if (!this.idx.length) return null;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uvs, 2));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
+    g.setIndex(this.idx);
+    g.computeBoundingSphere();
+    return g;
+  }
+}
+
+export interface ChunkGeometry {
+  /** szilárd blokkok (átlátszatlan, a levél alphaTest-tel) */
+  solid: THREE.BufferGeometry | null;
+  /** víz: külön, mert átlátszó anyaggal rajzoljuk */
+  water: THREE.BufferGeometry | null;
+}
+
 /** Egy chunk geometriája (a csúcsok chunk-helyi koordinátákban). Csak a látható lapokat rajzolja. */
-export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): THREE.BufferGeometry | null {
-  const pos: number[] = [], uvs: number[] = [], col: number[] = [], idx: number[] = [];
+export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): ChunkGeometry {
+  const solid = new Buffers();
+  const water = new Buffers();
   const ox = chunk.cx * CS, oz = chunk.cz * CS;
 
   for (let y = 0; y < CH; y++) {
@@ -31,30 +58,30 @@ export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): TH
         const id = chunk.get(x, y, z);
         if (id === AIR) continue;
         const def = BLOCKS[id];
+        const liquid = id === B.WATER;
+        const buf = liquid ? water : solid;
         for (const f of FACES) {
           const nid = world.getBlock(ox + x + f.dir[0], y + f.dir[1], oz + z + f.dir[2]);
-          if (isOpaque(nid) || (id === B.LEAVES && nid === B.LEAVES)) continue;
+          if (liquid) {
+            // a víz csak a levegővel (és a lombbal) érintkező lapját rajzoljuk
+            if (nid === B.WATER || isOpaque(nid)) continue;
+          } else if (isOpaque(nid) || (id === B.LEAVES && nid === B.LEAVES)) {
+            continue;
+          }
 
           const [u0, v0, u1, v1] = atlas.uv(def[f.kind]);
           const tint = def.tint?.[f.kind] ?? [1, 1, 1];
-          const base = pos.length / 3;
+          const base = buf.pos.length / 3;
           for (const v of f.v) {
-            pos.push(x + v[0], y + v[1], z + v[2]);
-            col.push(f.shade * tint[0], f.shade * tint[1], f.shade * tint[2]);
+            buf.pos.push(x + v[0], y + v[1], z + v[2]);
+            buf.col.push(f.shade * tint[0], f.shade * tint[1], f.shade * tint[2]);
           }
-          uvs.push(u0, v0, u1, v0, u1, v1, u0, v1);
-          idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+          buf.uvs.push(u0, v0, u1, v0, u1, v1, u0, v1);
+          buf.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
         }
       }
     }
   }
 
-  if (!idx.length) return null;
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  g.setIndex(idx);
-  g.computeBoundingSphere();
-  return g;
+  return { solid: solid.toGeometry(), water: water.toGeometry() };
 }

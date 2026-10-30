@@ -8,7 +8,26 @@ const COLS = 4;
 const FALLBACK: Record<TexName, string> = {
   grass_top: '#8a8a8a', grass_side: '#6b5a3a', dirt: '#7a5636', stone: '#8d8d8d', sand: '#dbd0a0',
   log_side: '#6a4e2c', log_top: '#a98a55', planks: '#b08b52', leaves: '#9a9a9a', cobblestone: '#767676',
+  water: '#3b68d4',
 };
+
+/** A víz csempéjét mi rajzoljuk: kék alap, halvány, pixeles hullámokkal */
+function drawWater(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.fillStyle = FALLBACK.water;
+  ctx.fillRect(x, y, TILE, TILE);
+  for (let py = 0; py < TILE; py += 2) {
+    for (let px = 0; px < TILE; px += 2) {
+      const n = Math.sin(px * 1.7 + py * 0.9) + Math.cos(py * 1.3 - px * 0.6);
+      if (n > 1.1) {
+        ctx.fillStyle = 'rgba(255,255,255,0.14)';
+        ctx.fillRect(x + px, y + py, 2, 2);
+      } else if (n < -1.1) {
+        ctx.fillStyle = 'rgba(0,0,40,0.14)';
+        ctx.fillRect(x + px, y + py, 2, 2);
+      }
+    }
+  }
+}
 
 export interface Atlas {
   texture: THREE.CanvasTexture;
@@ -41,6 +60,10 @@ export async function buildAtlas(): Promise<Atlas> {
   await Promise.all(
     TEXTURE_NAMES.map(async (name, i) => {
       const x = (i % COLS) * TILE, y = Math.floor(i / COLS) * TILE;
+      if (name === 'water') {
+        drawWater(ctx, x, y);
+        return;
+      }
       const img = await loadImage(`${import.meta.env.BASE_URL}textures/${name}.png`);
       if (img) {
         // felső négyzet: az animált csíkokat is kezeli, és más felbontásnál is jó
@@ -64,7 +87,7 @@ export async function buildAtlas(): Promise<Atlas> {
   return {
     texture,
     canvas,
-    usingPack: found === TEXTURE_NAMES.length,
+    usingPack: found === TEXTURE_NAMES.length - 1, // a víz nem a csomagból jön
     cell(name) {
       const i = idx(name);
       return [(i % COLS) * TILE, Math.floor(i / COLS) * TILE];
