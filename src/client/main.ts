@@ -1,9 +1,10 @@
 import './style.css';
 import * as THREE from 'three';
-import { B, BLOCKS, HOTBAR } from '../shared/blocks';
+import { B, BLOCKS, HOTBAR, type RGB } from '../shared/blocks';
 import { raycast, type RayHit } from '../shared/raycast';
-import { CH, CS, World } from '../shared/world';
+import { CH, CS, SEA_LEVEL, World } from '../shared/world';
 import { buildAtlas } from './atlas';
+import { DAY_SECONDS, START_TIME, skyAt } from './daynight';
 import { Input } from './input';
 import { buildChunkGeometry } from './mesher';
 import { EYE, Player } from './player';
@@ -11,6 +12,7 @@ import { clearSave, loadSave, loadSettings, writeSave, writeSettings, type SaveD
 
 const SKY = 0x8fb8ff;
 const TILE = 32;
+const SKY_DIST = 300; // a nap, a hold és a csillagok távolsága (a kamera far értéke 400)
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -22,10 +24,42 @@ async function main(): Promise<void> {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(SKY);
+  const bgColor = new THREE.Color(SKY);
+  scene.background = bgColor;
+  const fog = new THREE.Fog(SKY, 50, 90); // a távolságát minden képkockán beállítjuk
+  scene.fog = fog;
   const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 400);
   camera.rotation.order = 'YXZ';
   const material = new THREE.MeshBasicMaterial({ map: atlas.texture, vertexColors: true, alphaTest: 0.5 });
+  // a víz átlátszó, és alulról is látszik a felszíne
+  const waterMaterial = new THREE.MeshBasicMaterial({
+    map: atlas.texture, vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide,
+  });
+
+  // ég: nap, hold, csillagok (a kamerával együtt mozognak)
+  const sun = new THREE.Mesh(
+    new THREE.PlaneGeometry(60, 60),
+    new THREE.MeshBasicMaterial({ color: 0xfff2b0, fog: false, side: THREE.DoubleSide }),
+  );
+  const moon = new THREE.Mesh(
+    new THREE.PlaneGeometry(40, 40),
+    new THREE.MeshBasicMaterial({ color: 0xdfe6f5, fog: false, side: THREE.DoubleSide }),
+  );
+  const starPos = new Float32Array(400 * 3);
+  for (let i = 0; i < 400; i++) {
+    const zz = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, r = Math.sqrt(1 - zz * zz);
+    starPos.set([r * Math.cos(a) * SKY_DIST, zz * SKY_DIST, r * Math.sin(a) * SKY_DIST], i * 3);
+  }
+  const starGeo = new THREE.BufferGeometry();
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  const starMat = new THREE.PointsMaterial({
+    color: 0xffffff, size: 2, sizeAttenuation: false, transparent: true, depthWrite: false, fog: false,
+  });
+  const stars = new THREE.Points(starGeo, starMat);
+  for (const o of [sun, moon, stars]) {
+    o.frustumCulled = false;
+    scene.add(o);
+  }
 
   const highlight = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004, 1.004, 1.004)),
@@ -47,37 +81,50 @@ async function main(): Promise<void> {
   if (input.touch) document.body.classList.add('touch');
   const settings = loadSettings({ renderDistance: input.touch ? 4 : 6, sensitivity: 1 });
 
+  let fogFar = 100;
   const applySettings = () => {
     input.sensitivity = settings.sensitivity;
-    const far = settings.renderDistance * CS;
-    scene.fog = new THREE.Fog(SKY, far * 0.55, far * 0.95);
+    fogFar = settings.renderDistance * CS;
   };
 
   // ---------- világ ----------
   let world: World;
   let player: Player;
-  const meshes = new Map<string, THREE.Mesh>();
+  /** chunkonként két mesh: a szilárd blokkoké és a vízé */
+  const meshes = new Map<string, THREE.Mesh[]>();
   const built = new Set<string>();
   let started = false;
+  let timeOfDay = START_TIME;
   const spawn = { x: 8, z: 8 };
+
+  const dropMeshes = (key: string) => {
+    const list = meshes.get(key);
+    if (!list) return;
+    for (const m of list) {
+      scene.remove(m);
+      m.geometry.dispose();
+    }
+    meshes.delete(key);
+  };
 
   const rebuild = (cx: number, cz: number) => {
     const chunk = world.getChunk(cx, cz);
     if (!chunk) return;
     const key = World.key(cx, cz);
-    const old = meshes.get(key);
-    if (old) {
-      scene.remove(old);
-      old.geometry.dispose();
-      meshes.delete(key);
-    }
+    dropMeshes(key);
     const g = buildChunkGeometry(world, chunk, atlas);
-    if (g) {
-      const m = new THREE.Mesh(g, material);
+    const list: THREE.Mesh[] = [];
+    const add = (geo: THREE.BufferGeometry | null, mat: THREE.Material, renderOrder: number) => {
+      if (!geo) return;
+      const m = new THREE.Mesh(geo, mat);
       m.position.set(cx * CS, 0, cz * CS);
+      m.renderOrder = renderOrder;
       scene.add(m);
-      meshes.set(key, m);
-    }
+      list.push(m);
+    };
+    add(g.solid, material, 0);
+    add(g.water, waterMaterial, 1);
+    if (list.length) meshes.set(key, list);
     built.add(key);
   };
 
@@ -130,30 +177,32 @@ async function main(): Promise<void> {
     for (const [key, c] of world.chunks) {
       const dx = c.cx - ccx, dz = c.cz - ccz;
       if (dx * dx + dz * dz <= (r + 3) * (r + 3)) continue;
-      const m = meshes.get(key);
-      if (m) {
-        scene.remove(m);
-        m.geometry.dispose();
-        meshes.delete(key);
-      }
+      dropMeshes(key);
       built.delete(key);
       world.chunks.delete(key); // a módosítások megmaradnak, újratöltéskor visszakerülnek
     }
   };
 
   const clearWorld = () => {
-    for (const m of meshes.values()) {
-      scene.remove(m);
-      m.geometry.dispose();
-    }
-    meshes.clear();
+    for (const key of [...meshes.keys()]) dropMeshes(key);
     built.clear();
+  };
+
+  /** Szárazföldet keres a kezdőpont körül, hogy ne a tenger közepén induljon a játékos */
+  const findSpawn = (w: World) => {
+    const cands: [number, number][] = [];
+    for (let dz = -96; dz <= 96; dz += 8) for (let dx = -96; dx <= 96; dx += 8) cands.push([8 + dx, 8 + dz]);
+    cands.sort((a, b) => Math.hypot(a[0] - 8, a[1] - 8) - Math.hypot(b[0] - 8, b[1] - 8));
+    const land = cands.find(([x, z]) => w.heightAt(x, z) > SEA_LEVEL + 1);
+    [spawn.x, spawn.z] = land ?? [8, 8];
   };
 
   const startWorld = (seed: number, save: SaveData | null) => {
     clearWorld();
     world = new World(seed);
     if (save) world.importEdits(save.edits);
+    timeOfDay = save?.time ?? START_TIME;
+    findSpawn(world);
     player = new Player(world);
     stream(spawn.x, spawn.z, 2, Infinity, Infinity);
 
@@ -172,7 +221,7 @@ async function main(): Promise<void> {
   const saveGame = () => {
     if (!started) return;
     const p = player.pos;
-    writeSave({ seed: world.seed, edits: world.exportEdits(), pos: [p.x, p.y, p.z], yaw: player.yaw, pitch: player.pitch });
+    writeSave({ seed: world.seed, edits: world.exportEdits(), pos: [p.x, p.y, p.z], yaw: player.yaw, pitch: player.pitch, time: timeOfDay });
   };
 
   // ---------- hotbar ----------
@@ -338,6 +387,31 @@ async function main(): Promise<void> {
       cx = spawn.x;
       cz = spawn.z;
     }
+
+    // ---------- nappal-éjszaka, ég, víz alatti köd ----------
+    timeOfDay = (timeOfDay + dt / DAY_SECONDS) % 1;
+    const sky = skyAt(timeOfDay);
+    const underwater = state === 'playing' && player.headUnderwater;
+    const k = Math.pow((sky.light[0] + sky.light[1] + sky.light[2]) / 3, 0.45);
+    const bg: RGB = underwater ? [0.1 * k, 0.28 * k, 0.6 * k] : sky.sky;
+    bgColor.setRGB(bg[0], bg[1], bg[2], THREE.SRGBColorSpace);
+    fog.color.copy(bgColor);
+    fog.near = underwater ? 0.5 : fogFar * 0.55;
+    fog.far = underwater ? 24 : fogFar * 0.95;
+    material.color.setRGB(sky.light[0], sky.light[1], sky.light[2]);
+    waterMaterial.color.copy(material.color);
+
+    const cp = camera.position;
+    const [sx, sy, sz] = sky.sunDir;
+    sun.position.set(cp.x + sx * SKY_DIST, cp.y + sy * SKY_DIST, cp.z + sz * SKY_DIST);
+    sun.lookAt(cp);
+    sun.visible = sky.elevation > -0.2 && !underwater;
+    moon.position.set(cp.x - sx * SKY_DIST, cp.y - sy * SKY_DIST, cp.z - sz * SKY_DIST);
+    moon.lookAt(cp);
+    moon.visible = sky.elevation < 0.2 && !underwater;
+    stars.position.copy(cp);
+    starMat.opacity = sky.stars;
+    stars.visible = sky.stars > 0.01 && !underwater;
 
     stream(cx, cz, settings.renderDistance, 4, 2);
     if (frame % 60 === 0) unload(cx, cz, settings.renderDistance);

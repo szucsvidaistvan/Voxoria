@@ -2,7 +2,7 @@ import { AIR, B } from './blocks';
 
 export const CS = 16; // chunk szélesség (X és Z)
 export const CH = 64; // világ magassága
-export const SEA_LEVEL = 24;
+export const SEA_LEVEL = 28; // a terep kb. 17%-át önti el a víz
 
 function hash2(x: number, z: number, s: number): number {
   let h = Math.imul(x, 374761393) ^ Math.imul(z, 668265263) ^ Math.imul(s, 1442695041);
@@ -142,6 +142,8 @@ export class World {
           else id = beach ? B.SAND : B.GRASS;
           c.set(x, y, z, id);
         }
+        // tenger és tavak: a tengerszint alatti oszlopokat víz tölti fel
+        for (let y = h + 1; y <= SEA_LEVEL; y++) c.set(x, y, z, B.WATER);
         // fák: csak a chunk belsejében, hogy ne lógjanak át a szomszédba
         if (!beach && x >= 2 && x <= 13 && z >= 2 && z <= 13 && hash2(wx, wz, this.seed + 99) < 0.012) {
           this.placeTree(c, x, h + 1, z, 4 + Math.floor(hash2(wx, wz, this.seed + 7) * 2));

@@ -7,6 +7,8 @@ export interface SaveData {
   pos: [number, number, number];
   yaw: number;
   pitch: number;
+  /** napszak 0..1 (a régi mentésekben nincs) */
+  time?: number;
 }
 
 export interface Settings {

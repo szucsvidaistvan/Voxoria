@@ -53,7 +53,7 @@ A világ állapota és a megjelenítés külön van választva. Ez teszi lehető
 - [x] Chunk-alapú terep, fák, blokk lerakás és bontás
 - [x] Főmenü, beállítások, mentés (localStorage)
 - [x] Telefonos vezérlés
-- [ ] Nappal-éjszaka, víz
+- [x] Nappal-éjszaka (8 perces nap, nap, hold, csillagok), víz (úszás, víz alatti köd)
 - [ ] Mentés IndexedDB-be (nagy világokhoz)
 - [ ] Szerver (Node.js + WebSocket), közös világ
 - [ ] RPG-rendszerek (karakter, küldetések, NPC-k)

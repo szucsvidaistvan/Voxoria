@@ -4,13 +4,14 @@ export type FaceKind = 'top' | 'bottom' | 'side';
 export const TEXTURE_NAMES = [
   'grass_top', 'grass_side', 'dirt', 'stone', 'sand',
   'log_side', 'log_top', 'planks', 'leaves', 'cobblestone',
+  'water', // nincs a textúracsomagban, az atlas maga rajzolja
 ] as const;
 export type TexName = (typeof TEXTURE_NAMES)[number];
 
 export const AIR = 0;
 export const B = {
   GRASS: 1, DIRT: 2, STONE: 3, SAND: 4,
-  LOG: 5, PLANKS: 6, LEAVES: 7, COBBLE: 8,
+  LOG: 5, PLANKS: 6, LEAVES: 7, COBBLE: 8, WATER: 9,
 } as const;
 
 export interface BlockDef {
@@ -37,6 +38,7 @@ export const BLOCKS: Record<number, BlockDef> = {
     tint: { top: LEAF_TINT, bottom: LEAF_TINT, side: LEAF_TINT },
   },
   [B.COBBLE]: { name: 'Kavics', top: 'cobblestone', bottom: 'cobblestone', side: 'cobblestone' },
+  [B.WATER]: { name: 'Víz', top: 'water', bottom: 'water', side: 'water' },
 };
 
 /** A játékos által lerakható blokkok (hotbar sorrend) */
@@ -46,5 +48,10 @@ export const HOTBAR: number[] = [
 
 /** Átlátszatlan blokk: eltakarja a mögötte lévő lapokat */
 export function isOpaque(id: number): boolean {
-  return id !== AIR && id !== B.LEAVES;
+  return id !== AIR && id !== B.LEAVES && id !== B.WATER;
+}
+
+/** Szilárd blokk: ütközik vele a játékos, és a sugár megáll rajta (a víz nem az) */
+export function isSolid(id: number): boolean {
+  return id !== AIR && id !== B.WATER;
 }

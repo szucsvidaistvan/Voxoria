@@ -1,4 +1,4 @@
-import { AIR } from './blocks';
+import { isSolid } from './blocks';
 import type { World } from './world';
 
 export interface RayHit {
@@ -24,7 +24,7 @@ export function raycast(
   let px = x, py = y, pz = z, t = 0;
 
   while (t <= maxDist) {
-    if (world.getBlock(x, y, z) !== AIR) return { x, y, z, px, py, pz };
+    if (isSolid(world.getBlock(x, y, z))) return { x, y, z, px, py, pz };
     px = x; py = y; pz = z;
     if (tmx < tmy && tmx < tmz) { x += sx; t = tmx; tmx += tdx; }
     else if (tmy < tmz) { y += sy; t = tmy; tmy += tdy; }
