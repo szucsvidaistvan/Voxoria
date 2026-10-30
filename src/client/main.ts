@@ -1,4 +1,3 @@
-
 import './style.css';
 import * as THREE from 'three';
 import { B, BLOCKS, HOTBAR } from '../shared/blocks';
