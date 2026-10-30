@@ -350,6 +350,3 @@ main().catch((err) => {
   console.error(err);
   document.body.insertAdjacentHTML('beforeend', '<p style="position:fixed;inset:1rem;color:#fff">Hiba történt az indításkor. Nézd meg a böngésző konzolját.</p>');
 });
-=======
-
->>>>>>> main
