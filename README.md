@@ -1,0 +1,59 @@
+# Kockavilág
+
+Böngészős, Minecraft-szerű kockajáték (munkacím). Gépen és telefonon is fut, később közös (co-op) játékkal.
+
+**Technológia:** TypeScript, Three.js, Vite.
+
+## Indítás
+
+```bash
+npm install
+npm run dev
+```
+
+Nyisd meg a kiírt címet (általában http://localhost:5173). Telefonról ugyanazon a hálózaton a gép IP-címén éred el (`npm run dev -- --host`).
+
+## Textúrák (Dokucraft High)
+
+A zipben a 10 használt textúra már benne van a `public/textures` mappában, így a játék rögtön azokkal indul. A textúracsomag viszont **nincs a git repóban**. A Dokucraft licence szerint nem szabad engedély nélkül tárolni vagy tükrözni, ezért a `public/textures/*.png` a `.gitignore`-ban van. Ha a repót GitHub Pages-re teszed, a textúrák sem kerülhetnek fel oda. Az engedélyt a [dokucraft.co.uk/license](https://dokucraft.co.uk/license) oldalon és a készítőknél tudod tisztázni.
+
+Ha újra kell csomagolni őket a letöltött zipből:
+
+```bash
+npm run textures -- /elérési/út/26_3-Dokucraft-High.zip
+```
+
+Ez a 10 használt blokk-textúrát a `public/textures` mappába másolja. Ha nincsenek ott, a játék egyszerű színekkel indul.
+
+## Irányítás
+
+| | Gép | Telefon |
+|---|---|---|
+| Mozgás | WASD | bal oldali joystick |
+| Nézelődés | egér | húzás a jobb oldalon |
+| Ugrás | szóköz | Ugrás gomb |
+| Bontás / építés | bal / jobb egérgomb | Bont / Épít gomb |
+| Blokkválasztás | 1–8, görgő | koppintás a hotbaron |
+| Menü | Esc | Menü gomb |
+
+## Felépítés
+
+```
+src/
+  shared/   világlogika: blokkok, chunkok, terepgenerálás, sugárkövetés
+            (nincs benne three.js, a szerver is ezt használja majd)
+  client/   renderelés, mesh-építés, mozgás, bemenet, menü, mentés
+scripts/    textúra-kicsomagoló
+```
+
+A világ állapota és a megjelenítés külön van választva. Ez teszi lehetővé, hogy a co-op szerver később ugyanazt a világkódot futtassa.
+
+## Terv
+
+- [x] Chunk-alapú terep, fák, blokk lerakás és bontás
+- [x] Főmenü, beállítások, mentés (localStorage)
+- [x] Telefonos vezérlés
+- [ ] Nappal-éjszaka, víz
+- [ ] Mentés IndexedDB-be (nagy világokhoz)
+- [ ] Szerver (Node.js + WebSocket), közös világ
+- [ ] RPG-rendszerek (karakter, küldetések, NPC-k)
