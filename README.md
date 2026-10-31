@@ -13,35 +13,20 @@ npm run dev
 
 Nyisd meg a kiírt címet (általában http://localhost:5173). Telefonról ugyanazon a hálózaton a gép IP-címén éred el (`npm run dev -- --host`).
 
-## Textúrák (saját blokklap)
+## Textúrák (Dokucraft High)
 
-A játék a textúralapokból (IMG_8114–8120) kivágott textúrákat használja, ezek a repóban vannak (`public/textures`, `public/generated`), így a GitHub Pages oldalon is működnek. Újragenerálás:
-
-```
-python3 scripts/slice-textures.py /elérési/út/a_textúralapok_mappája
-```
-
-## Textúrák (Dokucraft High, opcionális)
-
-A textúracsomag **nincs a git repóban**. A Dokucraft licence szerint nem szabad engedély nélkül tárolni vagy tükrözni, ezért a `public/textures/*.png` a `.gitignore`-ban van. Ha a repót GitHub Pages-re teszed, a textúrák sem kerülhetnek fel oda, az oldal egyszerű színekkel fut. Az engedélyt a [dokucraft.co.uk/license](https://dokucraft.co.uk/license) oldalon és a készítőknél tudod tisztázni.
-
-A használt textúrákat a letöltött zipből másold ki a gépeden:
+A játék a Dokucraft High (v26.3) textúráit használja, a készítők jóváhagyásával (dokucraft.co.uk). A kicsomagolt textúrák a repóban vannak (`public/textures`, `public/generated`), így a GitHub Pages oldalon is működnek. Frissítés másik csomagverzióra (gépen):
 
 ```bash
-npm run textures -- /elérési/út/26.3-Dokucraft-High.zip
+npm run textures -- /elérési/út/csomag.zip
+npm run blocks -- /elérési/út/csomag.zip
 ```
 
-Ez a 20 alap blokk-textúrát (köztük a vizet, az érceket és a homokkövet) a `public/textures` mappába másolja. Ha nincsenek ott, a játék egyszerű színekkel indul.
+Az első a 20 alap blokk-textúrát másolja a `public/textures` mappába, a második a csomag teljes blokklistáját (kb. 660 teljes kocka és 340 egyéb alakú blokk) a `public/generated/blocks.json` fájlba és a `public/textures/mc` mappába. A blokkok az **E** billentyűvel (telefonon a **Blokkok** gombbal) megnyíló kereshető listában jelennek meg. Az azonosítók a blokkok névsorából jönnek (100-tól), ezért másik csomagnál a régi mentésekben lévő extra blokkok eltűnhetnek.
 
-### Az összes blokk
+### Saját blokklap (korábbi textúrák)
 
-A csomag teljes blokklistáját (kb. 550 teljes kocka) ez állítja elő:
-
-```bash
-npm run blocks -- /elérési/út/26.3-Dokucraft-High.zip
-```
-
-A parancs a `public/generated/blocks.json` fájlt és a `public/textures/mc` mappát hozza létre (mindkettő a `.gitignore`-ban van). A játék induláskor betölti őket, és a blokkok az **E** billentyűvel (telefonon a **Blokkok** gombbal) megnyíló kereshető listában jelennek meg. A kiválasztott blokk a hotbar aktív helyére kerül. Az azonosítók a blokkok névsorából jönnek (100-tól), ezért ugyanazzal a csomaggal mindig ugyanazok. Másik csomagnál a régi mentésekben lévő extra blokkok eltűnhetnek.
+A korábbi, saját textúralapokból kivágott textúrákat a `scripts/slice-textures.py` és a `scripts/slice-sheet.py` állította elő. Ezek a Dokucraft váltása előtt a repóban voltak.
 
 ## Irányítás
 
