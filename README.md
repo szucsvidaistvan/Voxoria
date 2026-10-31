@@ -1,6 +1,6 @@
-# Kockavilág
+# Voxoria
 
-Böngészős, Minecraft-szerű kockajáték (munkacím). Gépen és telefonon is fut, később közös (co-op) játékkal.
+Böngészős, Minecraft-szerű kockajáték. Gépen és telefonon is fut, később közös (co-op) játékkal.
 
 **Technológia:** TypeScript, Three.js, Vite.
 
@@ -13,7 +13,15 @@ npm run dev
 
 Nyisd meg a kiírt címet (általában http://localhost:5173). Telefonról ugyanazon a hálózaton a gép IP-címén éred el (`npm run dev -- --host`).
 
-## Textúrák (Dokucraft High)
+## Textúrák (saját blokklap)
+
+A játék a saját izometrikus blokklapból kivágott textúrákat használja, ezek a repóban vannak (`public/textures`, `public/generated`), így a GitHub Pages oldalon is működnek. Újragenerálás:
+
+```
+python3 scripts/slice-sheet.py /elérési/út/blokklap.png
+```
+
+## Textúrák (Dokucraft High, opcionális)
 
 A textúracsomag **nincs a git repóban**. A Dokucraft licence szerint nem szabad engedély nélkül tárolni vagy tükrözni, ezért a `public/textures/*.png` a `.gitignore`-ban van. Ha a repót GitHub Pages-re teszed, a textúrák sem kerülhetnek fel oda, az oldal egyszerű színekkel fut. Az engedélyt a [dokucraft.co.uk/license](https://dokucraft.co.uk/license) oldalon és a készítőknél tudod tisztázni.
 
