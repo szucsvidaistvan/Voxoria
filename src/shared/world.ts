@@ -135,11 +135,14 @@ export class World {
         const wx = ox + x, wz = oz + z;
         const h = Math.min(this.heightAt(wx, wz), CH - 12);
         const beach = h <= SEA_LEVEL;
+        // a tengerfenéken kavicsfoltok vannak (alacsony frekvenciájú zaj dönti el, hol)
+        const gravelBed = beach && h < SEA_LEVEL - 1 && valueNoise(wx / 6, wz / 6, this.seed + 31) > 0.6;
         for (let y = 0; y <= h; y++) {
           let id: number;
-          if (y < h - 3) id = B.STONE;
-          else if (y < h) id = beach ? B.SAND : B.DIRT;
-          else id = beach ? B.SAND : B.GRASS;
+          if (y === 0) id = B.BEDROCK;
+          else if (y < h - 3) id = this.stoneOrOre(wx, y, wz);
+          else if (y < h) id = gravelBed ? B.GRAVEL : beach ? (y < h - 1 ? B.SANDSTONE : B.SAND) : B.DIRT;
+          else id = gravelBed ? B.GRAVEL : beach ? B.SAND : B.GRASS;
           c.set(x, y, z, id);
         }
         // tenger és tavak: a tengerszint alatti oszlopokat víz tölti fel
@@ -152,6 +155,16 @@ export class World {
     }
     const edits = this.edits.get(World.key(c.cx, c.cz));
     if (edits) for (const [i, id] of edits) c.data[i] = id;
+  }
+
+  /** Kő, vagy ritkán érc. Minél mélyebben vagyunk, annál értékesebb érc fordul elő (egy blokkos telérek). */
+  private stoneOrOre(wx: number, y: number, wz: number): number {
+    const r = hash2(wx, wz + y * 40503, this.seed + 500);
+    if (y < 10 && r < 0.0015) return B.DIAMOND_ORE;
+    if (y < 18 && r < 0.004) return B.GOLD_ORE;
+    if (y < 30 && r < 0.010) return B.IRON_ORE;
+    if (r < 0.020) return B.COAL_ORE;
+    return B.STONE;
   }
 
   private placeTree(c: Chunk, x: number, y: number, z: number, trunk: number): void {

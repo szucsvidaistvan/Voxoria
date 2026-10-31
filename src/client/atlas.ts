@@ -9,6 +9,8 @@ const FALLBACK: Record<TexName, string> = {
   grass_top: '#8a8a8a', grass_side: '#6b5a3a', dirt: '#7a5636', stone: '#8d8d8d', sand: '#dbd0a0',
   log_side: '#6a4e2c', log_top: '#a98a55', planks: '#b08b52', leaves: '#9a9a9a', cobblestone: '#767676',
   water: '#3b68d4',
+  bedrock: '#3a3a3a', gravel: '#837f7d', sandstone: '#d8cc98', sandstone_top: '#dbd0a0', sandstone_bottom: '#cfc28c',
+  coal_ore: '#4a4a4a', iron_ore: '#b49a86', gold_ore: '#d4b84a', diamond_ore: '#5ac8c8',
 };
 
 /** A víz csempéjét mi rajzoljuk: kék alap, halvány, pixeles hullámokkal */
@@ -60,15 +62,13 @@ export async function buildAtlas(): Promise<Atlas> {
   await Promise.all(
     TEXTURE_NAMES.map(async (name, i) => {
       const x = (i % COLS) * TILE, y = Math.floor(i / COLS) * TILE;
-      if (name === 'water') {
-        drawWater(ctx, x, y);
-        return;
-      }
       const img = await loadImage(`${import.meta.env.BASE_URL}textures/${name}.png`);
       if (img) {
         // felső négyzet: az animált csíkokat is kezeli, és más felbontásnál is jó
         ctx.drawImage(img, 0, 0, img.width, img.width, x, y, TILE, TILE);
         found++;
+      } else if (name === 'water') {
+        drawWater(ctx, x, y);
       } else {
         ctx.fillStyle = FALLBACK[name];
         ctx.fillRect(x, y, TILE, TILE);
@@ -87,7 +87,7 @@ export async function buildAtlas(): Promise<Atlas> {
   return {
     texture,
     canvas,
-    usingPack: found === TEXTURE_NAMES.length - 1, // a víz nem a csomagból jön
+    usingPack: found === TEXTURE_NAMES.length,
     cell(name) {
       const i = idx(name);
       return [(i % COLS) * TILE, Math.floor(i / COLS) * TILE];

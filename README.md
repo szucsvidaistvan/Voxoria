@@ -15,15 +15,15 @@ Nyisd meg a kiírt címet (általában http://localhost:5173). Telefonról ugyan
 
 ## Textúrák (Dokucraft High)
 
-A zipben a 10 használt textúra már benne van a `public/textures` mappában, így a játék rögtön azokkal indul. A textúracsomag viszont **nincs a git repóban**. A Dokucraft licence szerint nem szabad engedély nélkül tárolni vagy tükrözni, ezért a `public/textures/*.png` a `.gitignore`-ban van. Ha a repót GitHub Pages-re teszed, a textúrák sem kerülhetnek fel oda. Az engedélyt a [dokucraft.co.uk/license](https://dokucraft.co.uk/license) oldalon és a készítőknél tudod tisztázni.
+A textúracsomag **nincs a git repóban**. A Dokucraft licence szerint nem szabad engedély nélkül tárolni vagy tükrözni, ezért a `public/textures/*.png` a `.gitignore`-ban van. Ha a repót GitHub Pages-re teszed, a textúrák sem kerülhetnek fel oda, az oldal egyszerű színekkel fut. Az engedélyt a [dokucraft.co.uk/license](https://dokucraft.co.uk/license) oldalon és a készítőknél tudod tisztázni.
 
-Ha újra kell csomagolni őket a letöltött zipből:
+A használt textúrákat a letöltött zipből másold ki a gépeden:
 
 ```bash
-npm run textures -- /elérési/út/26_3-Dokucraft-High.zip
+npm run textures -- /elérési/út/26.3-Dokucraft-High.zip
 ```
 
-Ez a 10 használt blokk-textúrát a `public/textures` mappába másolja. Ha nincsenek ott, a játék egyszerű színekkel indul.
+Ez a 20 használt blokk-textúrát (köztük a vizet, az érceket és a homokkövet) a `public/textures` mappába másolja. Ha nincsenek ott, a játék egyszerű színekkel indul.
 
 ## Irányítás
 
