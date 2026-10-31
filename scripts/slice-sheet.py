@@ -2,7 +2,7 @@
 """Használat: python3 scripts/slice-sheet.py <blokklap.png>
 
 Az izometrikus blokklapból (8 oszlop, blokkonként egy kocka + felirat) kivágja minden kocka
-felső és oldalsó lapját 32x32-es lapos textúrának, és létrehozza:
+felső és oldalsó lapját 64x64-es lapos textúrának, és létrehozza:
   public/textures/<alapnév>.png     az alapblokkok textúrái
   public/textures/mc/<név>_top|_side.png   a többi blokk textúrái
   public/generated/blocks.json      a blokklista (src/shared/blocks.ts tölti be)
@@ -13,8 +13,8 @@ from PIL import Image
 
 SRC = sys.argv[1]
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-T = 32
-Q = 8  # túlmintavételezés a szebb leképezéshez
+T = 64
+Q = 4  # túlmintavételezés a szebb leképezéshez
 
 NAMES = """grass_block dirt stone cobblestone sand gravel clay bedrock
 snow ice netherrack obsidian glowstone stone_bricks bricks glass

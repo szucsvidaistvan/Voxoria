@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { B, BLOCKS, HOTBAR, placeableBlocks, registerGenerated, type GeneratedPack, type RGB } from '../shared/blocks';
 import { raycast, type RayHit } from '../shared/raycast';
 import { CH, CS, SEA_LEVEL, World } from '../shared/world';
-import { buildAtlas } from './atlas';
+import { buildAtlas, TILE } from './atlas';
 import { DAY_SECONDS, START_TIME, skyAt } from './daynight';
 import { Input } from './input';
 import { buildChunkGeometry } from './mesher';
@@ -11,7 +11,6 @@ import { EYE, Player } from './player';
 import { clearSave, loadSave, loadSettings, writeSave, writeSettings, type SaveData } from './save';
 
 const SKY = 0x8fb8ff;
-const TILE = 32;
 const SKY_DIST = 300; // a nap, a hold és a csillagok távolsága (a kamera far értéke 400)
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -321,6 +320,10 @@ async function main(): Promise<void> {
     refreshMenu();
   };
   input.onPause = pause;
+  // ha a böngésző nem adta meg az egérzárat (pl. gyors újrakérés után), egy kattintás visszaadja
+  canvas.addEventListener('click', () => {
+    if (state === 'playing' && !input.touch && !input.locked) input.lock();
+  });
 
   // ---------- kreatív inventory ----------
   const invEl = $('inventory'), invGrid = $('inv-grid'), invInfo = $('inv-info');

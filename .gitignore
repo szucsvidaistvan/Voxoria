@@ -1,6 +1,4 @@
 node_modules/
 dist/
-# Dokucraft textúrák: a licenc miatt nem kerülhetnek a repóba
-public/textures/*.png
-public/textures/mc/
-public/generated/
+# A public/textures és public/generated a saját blokklapból készül (scripts/slice-sheet.py), ezek a repóban vannak.
+# Dokucraft textúrát ne commitolj ide.

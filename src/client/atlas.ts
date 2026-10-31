@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 import { BASE_TEXTURES, extraTextures, type TexName } from '../shared/blocks';
 
-const TILE = 32;
-const MAX_COLS = 32;
+/** egy textúra felbontása (pixel) */
+export const TILE = 64;
+/** a csempék körüli perem: a mipmapelés és a sima szűrés miatt nem szivároghat át a szomszéd */
+const PAD = 4;
+const CELL = TILE + PAD * 2;
+const MAX_COLS = 16;
 
 // Ha a textúracsomag nincs kicsomagolva, ezekkel a színekkel indul a játék
 const FALLBACK: Record<string, string> = {
@@ -58,10 +62,11 @@ export async function buildAtlas(): Promise<Atlas> {
   const cols = Math.min(MAX_COLS, names.length);
   const rows = Math.ceil(names.length / cols);
   const canvas = document.createElement('canvas');
-  canvas.width = cols * TILE;
-  canvas.height = rows * TILE;
+  canvas.width = cols * CELL;
+  canvas.height = rows * CELL;
   const ctx = canvas.getContext('2d')!;
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
 
   const index = new Map<TexName, number>();
   names.forEach((n, i) => index.set(n, i));
@@ -70,7 +75,7 @@ export async function buildAtlas(): Promise<Atlas> {
   const base = import.meta.env.BASE_URL;
   await Promise.all(
     names.map(async (name, i) => {
-      const x = (i % cols) * TILE, y = Math.floor(i / cols) * TILE;
+      const x = (i % cols) * CELL + PAD, y = Math.floor(i / cols) * CELL + PAD;
       const url = isBase.has(name) ? `${base}textures/${name}.png` : `${base}textures/mc/${name}.png`;
       const img = await loadImage(url);
       if (img) {
@@ -83,14 +88,20 @@ export async function buildAtlas(): Promise<Atlas> {
         ctx.fillStyle = FALLBACK[name] ?? FALLBACK_EXTRA;
         ctx.fillRect(x, y, TILE, TILE);
       }
+      // perem: a csempe szélső pixelsorait kimásoljuk kifelé
+      ctx.drawImage(canvas, x, y, TILE, 1, x, y - PAD, TILE, PAD);
+      ctx.drawImage(canvas, x, y + TILE - 1, TILE, 1, x, y + TILE, TILE, PAD);
+      ctx.drawImage(canvas, x, y - PAD, 1, TILE + PAD * 2, x - PAD, y - PAD, PAD, TILE + PAD * 2);
+      ctx.drawImage(canvas, x + TILE - 1, y - PAD, 1, TILE + PAD * 2, x + TILE, y - PAD, PAD, TILE + PAD * 2);
     }),
   );
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.generateMipmaps = false;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.anisotropy = 8;
 
   const W = canvas.width, H = canvas.height;
   const at = (n: TexName) => index.get(n) ?? 0;
@@ -100,13 +111,12 @@ export async function buildAtlas(): Promise<Atlas> {
     usingPack: baseFound === BASE_TEXTURES.length,
     cell(name) {
       const i = at(name);
-      return [(i % cols) * TILE, Math.floor(i / cols) * TILE];
+      return [(i % cols) * CELL + PAD, Math.floor(i / cols) * CELL + PAD];
     },
     uv(name) {
       const i = at(name);
-      const x = (i % cols) * TILE, y = Math.floor(i / cols) * TILE;
-      // fél pixeles behúzás, hogy ne szivárogjon át a szomszéd csempe
-      return [(x + 0.5) / W, 1 - (y + TILE - 0.5) / H, (x + TILE - 0.5) / W, 1 - (y + 0.5) / H];
+      const x = (i % cols) * CELL + PAD, y = Math.floor(i / cols) * CELL + PAD;
+      return [x / W, 1 - (y + TILE) / H, (x + TILE) / W, 1 - y / H];
     },
   };
 }

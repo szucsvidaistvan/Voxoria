@@ -66,7 +66,12 @@ export class Input {
     document.addEventListener('keydown', (e) => {
       if (!this.enabled) return;
       if (e.code === 'Space') { this.jump = true; e.preventDefault(); }
-      if (e.code === 'KeyE' && !e.repeat) { this.onInventory(); return; }
+      if (e.code === 'KeyE') {
+        // a main.ts záró kezelője ne kapja meg ugyanezt a leütést, különben azonnal bezárná az inventoryt
+        e.stopImmediatePropagation();
+        if (!e.repeat) this.onInventory();
+        return;
+      }
       const d = /^Digit([1-9])$/.exec(e.code);
       if (d && Number(d[1]) <= this.slots) this.select(Number(d[1]) - 1);
       this.keys.add(e.code);
