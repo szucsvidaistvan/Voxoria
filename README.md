@@ -23,7 +23,17 @@ A használt textúrákat a letöltött zipből másold ki a gépeden:
 npm run textures -- /elérési/út/26.3-Dokucraft-High.zip
 ```
 
-Ez a 20 használt blokk-textúrát (köztük a vizet, az érceket és a homokkövet) a `public/textures` mappába másolja. Ha nincsenek ott, a játék egyszerű színekkel indul.
+Ez a 20 alap blokk-textúrát (köztük a vizet, az érceket és a homokkövet) a `public/textures` mappába másolja. Ha nincsenek ott, a játék egyszerű színekkel indul.
+
+### Az összes blokk
+
+A csomag teljes blokklistáját (kb. 550 teljes kocka) ez állítja elő:
+
+```bash
+npm run blocks -- /elérési/út/26.3-Dokucraft-High.zip
+```
+
+A parancs a `public/generated/blocks.json` fájlt és a `public/textures/mc` mappát hozza létre (mindkettő a `.gitignore`-ban van). A játék induláskor betölti őket, és a blokkok az **E** billentyűvel (telefonon a **Blokkok** gombbal) megnyíló kereshető listában jelennek meg. A kiválasztott blokk a hotbar aktív helyére kerül. Az azonosítók a blokkok névsorából jönnek (100-tól), ezért ugyanazzal a csomaggal mindig ugyanazok. Másik csomagnál a régi mentésekben lévő extra blokkok eltűnhetnek.
 
 ## Irányítás
 
@@ -34,6 +44,7 @@ Ez a 20 használt blokk-textúrát (köztük a vizet, az érceket és a homokkö
 | Ugrás | szóköz | Ugrás gomb |
 | Bontás / építés | bal / jobb egérgomb | Bont / Épít gomb |
 | Blokkválasztás | 1–8, görgő | koppintás a hotbaron |
+| Blokklista | E | Blokkok gomb |
 | Menü | Esc | Menü gomb |
 
 ## Felépítés
@@ -54,6 +65,9 @@ A világ állapota és a megjelenítés külön van választva. Ez teszi lehető
 - [x] Főmenü, beállítások, mentés (localStorage)
 - [x] Telefonos vezérlés
 - [x] Nappal-éjszaka (8 perces nap, nap, hold, csillagok), víz (úszás, víz alatti köd)
+- [x] Blokkregiszter (két bájtos azonosító), kereshető kreatív inventory
+- [ ] Nem kocka alakú blokkok (lépcső, lap, növény, kerítés, ajtó), almappás textúrák (deepslate, hó, tnt)
+- [ ] Inventory, életerő, készítés
 - [ ] Mentés IndexedDB-be (nagy világokhoz)
 - [ ] Szerver (Node.js + WebSocket), közös világ
 - [ ] RPG-rendszerek (karakter, küldetések, NPC-k)
