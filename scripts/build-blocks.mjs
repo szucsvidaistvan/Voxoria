@@ -3,11 +3,11 @@
 // A csomag blockstates- és models-fájljaiból kiolvassa az összes blokkot, és létrehozza:
 //   public/generated/blocks.json   a blokkok listája, lapok textúrái, alakja
 //   public/textures/mc/*.png       a blokkok által használt textúrák
-// Mindkettő a .gitignore-ban van (a Dokucraft licence miatt nem kerülhet a repóba).
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readZip } from './lib-zip.mjs';
+import { transparentFraction } from './lib-png.mjs';
 
 const zipPath = process.argv[2];
 if (!zipPath || !existsSync(zipPath)) {
@@ -50,6 +50,11 @@ function tex(textures, ref, depth = 0) {
   if (ref[0] === '#') return tex(textures, textures[ref.slice(1)], depth + 1);
   return strip(ref);
 }
+
+/** Textúra-hivatkozás a modell lapjának uv-jával: ha a lap csak a textúra egy részét használja
+ *  (pl. a Dokucraft pss_cube modellje a 2x2-es lap bal felső negyedét), akkor "id@u0,v0,u1,v1" */
+const ref = (id, uv) =>
+  !uv || (uv[0] === 0 && uv[1] === 0 && uv[2] === 16 && uv[3] === 16) ? id : `${id}@${uv.join(',')}`;
 
 const pick = (textures, keys) => {
   for (const k of keys) {
@@ -113,7 +118,10 @@ function describe(name, bs) {
   }
   if (isFullCube(m.elements)) {
     const faces = m.elements[0].faces ?? {};
-    const of = (k) => tex(t, faces[k]?.texture);
+    const of = (k) => {
+      const id = faces[k] ? tex(t, faces[k].texture) : null;
+      return id ? ref(id, faces[k].uv) : null;
+    };
     const side = of('north') ?? of('east') ?? of('south') ?? of('west');
     const top = of('up'), bottom = of('down');
     if (top && side) return { name, kind: 'cube', top, bottom: bottom ?? side, side, tinted };
@@ -136,23 +144,64 @@ function describe(name, bs) {
 
 const blocks = [];
 const skipped = [];
+const have = new Set();
+const add = (d) => { blocks.push(d); have.add(d.name); };
+const baseOf = (id) => id.split('@')[0];
+
+// 1. blokkok blockstate-tel
 for (const file of zip.names) {
   const m = file.match(/^assets\/minecraft\/blockstates\/([^/]+)\.json$/);
   if (!m) continue;
   const bs = zip.json(file);
   const d = bs ? describe(m[1], bs) : null;
-  if (d) blocks.push(d); else skipped.push(m[1]);
+  if (d) add(d); else skipped.push(m[1]);
 }
 
-// Azok az alap blokkok, amiknek a blockstate-je a Minecraftban van (deszka, ércek, üveg ...):
-// a textúrák nevéből találjuk ki őket. Az egyértelműen nem blokk-textúrákat kihagyjuk.
+// 2. blokkok, amiknek nincs blockstate-jük (a Minecraftban vannak), de a csomag felülírja a modelljüket
+//    (pl. az ércek és az ásványblokkok: diamond_ore, emerald_block ...). A modelljüket ugyanúgy feloldjuk.
+for (const file of zip.names) {
+  const m = file.match(/^assets\/minecraft\/models\/block\/([a-z0-9_]+)\.json$/);
+  if (!m || have.has(m[1])) continue;
+  const d = describe(m[1], { variants: { '': { model: `block/${m[1]}` } } });
+  if (d && d.kind === 'cube' && [d.top, d.bottom, d.side].every((x) => x && zip.has(`${A}textures/${baseOf(x)}.png`))) add(d);
+}
+
+// 3. a többi alap blokk (andesite, bricks, wool ...): a textúrák nevéből találjuk ki a kockát.
+//    Az egyértelműen nem teljes kocka textúrákat (állapotok, rétegek, növények, apró részek) kihagyjuk.
 const NOT_A_BLOCK = /(_top|_bottom|_side|_front|_back|_end|_inside|_overlay|_particle|_stage\d*|_double|_underwater|_sign|_hanging_sign|_shelf|_pane|_pane_top|_still|_flow|_lit|_on|_off|_open|_closed|_snow|_0|_1|_2|_3|_4|_5|_6|_7|_8|_9|_dust|_item|_bud)$/;
-const have = new Set(blocks.map((b) => b.name));
+const NOT_A_CUBE = new RegExp([
+  '_(e|emissive|fire|flame|inner|insides?|fan|bars?|chain|roots?|pot|cross|tendril|powered|active|inactive|ominous|ejecting|triggered|crafting|conditional|base|mount|wheel|saw|body|sides|ends|stem|stems|small|tall|hanging|ground|nylium_side)$',
+  'candle|chain|lantern|torch|rail|lily|lilypad|kelp|vine|sapling|flower|petals|egg|pointed_dripstone',
+  '^(crafter|vault|test|structure_block|respawn_anchor|cartography|command_block|chain_command_block|repeating_command_block|jigsaw|trial_spawner)',
+  'seagrass|fern|bush|_plant|moss_carpet|redstone_dust|propagule|bamboo_(large|small|single|stalk)|spore|eyeblossom|leaf_litter|resin_clump|sea_pickle',
+  'lectern|loom|grindstone|stonecutter|lever|end_rod|lightning_rod|campfire|hopper|piston|jukebox|cauldron|composter|brewing|dragon_egg|bell_|anvil|beacon|conduit|barrier',
+  'amethyst_cluster|chorus|heavy_core|pressure_plate|snow_layer|nether_portal|ladder|straw_bed|wall_(post|railing|small)|glow_lichen|sculk_(vein|sensor|catalyst)',
+  'farmland|dripstone_(down|up)|hardened_clay|rail_model|_moist|_ready|_compost|weeping|twisting|hanging_moss|golden_dandelion|firefly|wildflowers|nether_sprouts|short_dry|tall_dry',
+  'coral_fan|coral$|glass_insides|honey_block_outer|jack_o_lantern|carved_pumpkin|sniffer|turtle|oak_pressure',
+].join('|'));
 for (const file of zip.names) {
   const m = file.match(/^assets\/minecraft\/textures\/block\/([a-z0-9_]+)\.png$/);
-  if (!m || have.has(m[1]) || NOT_A_BLOCK.test(m[1])) continue;
+  if (!m || have.has(m[1]) || NOT_A_BLOCK.test(m[1]) || NOT_A_CUBE.test(m[1])) continue;
   const c = textureCube(m[1]);
-  if (c) { blocks.push({ name: m[1], kind: 'cube', ...c, tinted: false }); have.add(m[1]); }
+  if (c) add({ name: m[1], kind: 'cube', ...c, tinted: false });
+}
+
+// 4. lyukas textúrájú "kockák" kiszűrése (a nem kocka alakú blokkok textúrái átlátszó pixeleket tartalmaznak).
+//    Az eleve átlátszó blokkok (lomb, üveg, jég ...) maradnak.
+const SEE_THROUGH = /(leaves|glass|ice$|slime|honey|frosted|cobweb|spawner)/;
+function holes(id) {
+  const data = zip.read(`${A}textures/${baseOf(id)}.png`);
+  if (!data) return 0;
+  const w = data.readUInt32BE(16);
+  const uv = id.includes('@') ? id.split('@')[1].split(',').map(Number) : [0, 0, 16, 16];
+  const px = (v) => Math.round((v / 16) * w);
+  return transparentFraction(data, px(uv[0]), px(uv[1]), px(uv[2]), px(uv[3]));
+}
+const dropped = [];
+for (let i = blocks.length - 1; i >= 0; i--) {
+  const b = blocks[i];
+  if (b.kind !== 'cube' || SEE_THROUGH.test(b.name)) continue;
+  if (Math.max(holes(b.top), holes(b.side), holes(b.bottom)) > 0.04) { dropped.push(b.name); blocks.splice(i, 1); }
 }
 blocks.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -171,10 +220,12 @@ mkdirSync(outGen, { recursive: true });
 
 const textureKeys = [];
 const missing = [];
+const written = new Set();
 for (const id of [...used].sort()) {
-  const data = zip.read(`${A}textures/${id}.png`);
+  const base = baseOf(id);
+  const data = zip.read(`${A}textures/${base}.png`);
   if (!data) { missing.push(id); continue; }
-  writeFileSync(resolve(outTex, `${flat(id)}.png`), data);
+  if (!written.has(base)) { writeFileSync(resolve(outTex, `${flat(base)}.png`), data); written.add(base); }
   textureKeys.push(flat(id));
 }
 
@@ -191,4 +242,5 @@ const cubes = blocks.filter((b) => b.kind === 'cube').length;
 console.log(`${blocks.length} blokk: ${cubes} teljes kocka, ${blocks.length - cubes} egyéb alakú.`);
 console.log(`${textureKeys.length} textúra kimásolva ide: public/textures/mc`);
 if (missing.length) console.warn(`Hiányzó textúra (${missing.length}): ${missing.slice(0, 8).join(', ')}${missing.length > 8 ? ' ...' : ''}`);
+if (dropped.length) console.warn(`Kihagyott lyukas textúrájú blokk (${dropped.length}): ${dropped.slice(0, 12).join(', ')}${dropped.length > 12 ? ' ...' : ''}`);
 if (skipped.length) console.warn(`Kihagyott blokk (${skipped.length}): ${skipped.slice(0, 8).join(', ')}${skipped.length > 8 ? ' ...' : ''}`);

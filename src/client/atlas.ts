@@ -20,6 +20,9 @@ const FALLBACK: Record<string, string> = {
 };
 const FALLBACK_EXTRA = '#8a8a8a';
 
+/** Alap textúrák, amik a Dokucraftban 2x2-es lapok (pss_cube): csak a bal felső negyedük a látható kép */
+const BASE_CROP: Record<string, string> = { diamond_ore: '0,0,8,8' };
+
 /** A víz csempéjét mi rajzoljuk: kék alap, halvány, pixeles hullámokkal */
 function drawWater(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   ctx.fillStyle = FALLBACK.water;
@@ -78,11 +81,19 @@ export async function buildAtlas(): Promise<Atlas> {
   await Promise.all(
     names.map(async (name, i) => {
       const x = (i % cols) * CELL + PAD, y = Math.floor(i / cols) * CELL + PAD;
-      const url = isBase.has(name) ? `${base}textures/${name}.png` : `${base}textures/mc/${name}.png`;
+      // "név@u0,v0,u1,v1": a modell lapja a textúrának csak egy részét használja (pl. a pss_cube a 2x2-es lap bal felső negyedét)
+      const [file, crop = BASE_CROP[name]] = name.split('@');
+      const url = isBase.has(name) ? `${base}textures/${file}.png` : `${base}textures/mc/${file}.png`;
       const img = await loadImage(url);
       if (img) {
-        // felső négyzet: az animált csíkokat is kezeli, és más felbontásnál is jó
-        ctx.drawImage(img, 0, 0, img.width, img.width, x, y, TILE, TILE);
+        if (crop) {
+          const [u0, v0, u1, v1] = crop.split(',').map(Number);
+          const w = img.width;
+          ctx.drawImage(img, (u0 / 16) * w, (v0 / 16) * w, ((u1 - u0) / 16) * w, ((v1 - v0) / 16) * w, x, y, TILE, TILE);
+        } else {
+          // felső négyzet: az animált csíkokat is kezeli, és más felbontásnál is jó
+          ctx.drawImage(img, 0, 0, img.width, img.width, x, y, TILE, TILE);
+        }
         if (isBase.has(name)) baseFound++;
       } else if (name === 'water') {
         drawWater(ctx, x, y);

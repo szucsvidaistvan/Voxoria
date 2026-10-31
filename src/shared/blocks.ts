@@ -93,7 +93,7 @@ const BASE_KEYS = new Set([
 ]);
 
 /** Nem valódi, lerakható blokkok: állapot- és részletek, amiknek van textúrájuk, de nem kocka */
-const NOT_PLACEABLE = /(_on|_off|_lit|_inner|_pot|_line\d*|_west|_east|_north|_south|_up|_down|_e|_w|_n|_s|_stage\d+|_cracked|_not_cracked.*|_overlay|_particle|_dust|_plant|_roots?|_vines?|_fan|_sapling|_carpet|_pane|_bud|_item)$|^(comparator|repeater|redstone_dust|water_|lava_|fire_(?!coral_block)|tripwire|torch|lantern|candle|cake|conduit|beacon)/;
+const NOT_PLACEABLE = /(_horizontal|_snow|_side2|_alt|_in|_vertical|_double|_on|_off|_lit|_inner|_pot|_line\d*|_west|_east|_north|_south|_up|_down|_e|_w|_n|_s|_stage\d+|_cracked|_not_cracked.*|_overlay|_particle|_dust|_plant|_roots?|_vines?|_fan|_sapling|_carpet|_pane|_bud|_item)$|^(creaking_heart_|tuff_2|comparator|repeater|redstone_dust|water_|lava_|fire_(?!coral_block)|tripwire|torch|lantern|candle|cake|conduit|beacon)/;
 
 /** Átlátszó vagy lyukas blokkok */
 const SEE_THROUGH = /(leaves|glass|ice$|slime|honey|frosted|cobweb|spawner|trial_spawner)/;
