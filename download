@@ -1,4 +1,0 @@
-node_modules/
-dist/
-# A public/textures és public/generated a saját blokklapból készül (scripts/slice-sheet.py), ezek a repóban vannak.
-# Dokucraft textúrát ne commitolj ide.
