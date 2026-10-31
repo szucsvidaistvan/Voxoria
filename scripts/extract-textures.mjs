@@ -17,6 +17,16 @@ const MAP = {
   planks: 'block/oak_planks.png',
   leaves: 'block/leaves/oak_leaves.png',
   cobblestone: 'block/cobblestone.png',
+  water: 'block/water_still.png',
+  bedrock: 'block/bedrock.png',
+  gravel: 'block/gravel.png',
+  sandstone: 'block/sandstone.png',
+  sandstone_top: 'block/sandstone_top.png',
+  sandstone_bottom: 'block/sandstone_bottom.png',
+  coal_ore: 'block/coal_ore.png',
+  iron_ore: 'block/iron_ore.png',
+  gold_ore: 'block/gold_ore.png',
+  diamond_ore: 'block/diamond_ore.png',
 };
 
 const zipPath = process.argv[2];

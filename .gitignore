@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# Dokucraft textúrák: a licenc miatt nem kerülhetnek a repóba
+public/textures/*.png
