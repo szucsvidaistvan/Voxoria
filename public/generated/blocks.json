@@ -1,442 +1,298 @@
 {
  "textures": [
-  "clay_top",
-  "clay_side",
-  "snow_top",
-  "snow_side",
-  "ice_top",
-  "ice_side",
-  "netherrack_top",
-  "netherrack_side",
-  "obsidian_top",
-  "obsidian_side",
-  "glowstone_top",
-  "glowstone_side",
-  "stone_bricks_top",
-  "stone_bricks_side",
-  "bricks_top",
-  "bricks_side",
-  "white_wool_top",
-  "white_wool_side",
-  "redstone_ore_top",
-  "redstone_ore_side",
-  "lapis_ore_top",
-  "lapis_ore_side",
-  "emerald_ore_top",
-  "emerald_ore_side",
-  "copper_ore_top",
-  "copper_ore_side",
-  "deepslate_coal_ore_top",
-  "deepslate_coal_ore_side",
-  "deepslate_iron_ore_top",
-  "deepslate_iron_ore_side",
-  "deepslate_gold_ore_top",
-  "deepslate_gold_ore_side",
-  "deepslate_diamond_ore_top",
-  "deepslate_diamond_ore_side",
-  "iron_block_top",
-  "iron_block_side",
-  "gold_block_top",
-  "gold_block_side",
-  "diamond_block_top",
-  "diamond_block_side",
-  "coal_block_top",
-  "coal_block_side",
-  "emerald_block_top",
-  "emerald_block_side",
-  "lapis_block_top",
-  "lapis_block_side",
-  "redstone_block_top",
-  "redstone_block_side",
-  "copper_block_top",
-  "copper_block_side",
-  "spruce_planks_top",
-  "spruce_planks_side",
-  "birch_planks_top",
-  "birch_planks_side",
-  "jungle_planks_top",
-  "jungle_planks_side",
-  "acacia_planks_top",
-  "acacia_planks_side",
-  "dark_oak_planks_top",
-  "dark_oak_planks_side",
-  "spruce_log_top",
-  "spruce_log_side",
-  "birch_log_top",
-  "birch_log_side",
-  "jungle_log_top",
-  "jungle_log_side",
+  "acacia_leaves",
+  "acacia_log",
   "acacia_log_top",
-  "acacia_log_side",
-  "dark_oak_log_top",
-  "dark_oak_log_side",
-  "spruce_leaves_top",
-  "spruce_leaves_side",
-  "birch_leaves_top",
-  "birch_leaves_side",
-  "jungle_leaves_top",
-  "jungle_leaves_side",
-  "acacia_leaves_top",
-  "acacia_leaves_side",
-  "dark_oak_leaves_top",
-  "dark_oak_leaves_side",
-  "cactus_top",
+  "acacia_planks",
+  "birch_leaves",
+  "birch_log",
+  "birch_log_top",
+  "birch_planks",
+  "bookshelf",
+  "bookshelf_ends",
+  "bricks",
+  "cactus_bottom",
   "cactus_side",
-  "tnt_top",
-  "tnt_side",
-  "pumpkin_top",
-  "pumpkin_side",
-  "melon_top",
-  "melon_side",
-  "hay_block_top",
-  "hay_block_side",
-  "mycelium_top",
-  "mycelium_side",
-  "bookshelf_top",
-  "bookshelf_side",
-  "crafting_table_top",
+  "cactus_top",
+  "clay",
+  "coal_block",
+  "copper_block",
+  "copper_ore",
   "crafting_table_side",
-  "furnace_top",
+  "crafting_table_top",
+  "dark_oak_leaves",
+  "dark_oak_log",
+  "dark_oak_log_top",
+  "dark_oak_planks",
+  "deepslate_coal_ore",
+  "deepslate_copper_ore",
+  "deepslate_diamond_ore",
+  "deepslate_emerald_ore",
+  "deepslate_gold_ore",
+  "deepslate_iron_ore",
+  "deepslate_lapis_ore",
+  "deepslate_redstone_ore",
+  "diamond_block",
+  "diorite",
+  "dirt",
+  "emerald_block",
+  "emerald_ore",
+  "end_stone",
   "furnace_side",
-  "lava_top",
-  "lava_side"
+  "furnace_top",
+  "glowstone",
+  "gold_block",
+  "hay_block_side",
+  "hay_block_top",
+  "ice",
+  "iron_block",
+  "jungle_leaves",
+  "jungle_log",
+  "jungle_log_top",
+  "jungle_planks",
+  "lapis_block",
+  "lapis_ore",
+  "lava_still",
+  "melon_side",
+  "melon_top",
+  "moss_block",
+  "mossy_cobblestone",
+  "mycelium_side",
+  "mycelium_top",
+  "netherrack",
+  "oak_planks",
+  "obsidian",
+  "packed_ice",
+  "pumpkin_side",
+  "pumpkin_top",
+  "red_sand",
+  "red_wool",
+  "redstone_block",
+  "redstone_ore",
+  "smooth_stone",
+  "snow",
+  "spruce_leaves",
+  "spruce_log",
+  "spruce_log_top",
+  "spruce_planks",
+  "stone_bricks",
+  "terracotta",
+  "tnt_bottom",
+  "tnt_side",
+  "tnt_top",
+  "white_wool",
+  "yellow_wool"
  ],
  "blocks": [
   {
-   "name": "clay",
+   "name": "acacia_leaves",
    "kind": "cube",
-   "top": "clay_top",
-   "bottom": "clay_top",
-   "side": "clay_side"
-  },
-  {
-   "name": "snow",
-   "kind": "cube",
-   "top": "snow_top",
-   "bottom": "snow_top",
-   "side": "snow_side"
-  },
-  {
-   "name": "ice",
-   "kind": "cube",
-   "top": "ice_top",
-   "bottom": "ice_top",
-   "side": "ice_side"
-  },
-  {
-   "name": "netherrack",
-   "kind": "cube",
-   "top": "netherrack_top",
-   "bottom": "netherrack_top",
-   "side": "netherrack_side"
-  },
-  {
-   "name": "obsidian",
-   "kind": "cube",
-   "top": "obsidian_top",
-   "bottom": "obsidian_top",
-   "side": "obsidian_side"
-  },
-  {
-   "name": "glowstone",
-   "kind": "cube",
-   "top": "glowstone_top",
-   "bottom": "glowstone_top",
-   "side": "glowstone_side"
-  },
-  {
-   "name": "stone_bricks",
-   "kind": "cube",
-   "top": "stone_bricks_top",
-   "bottom": "stone_bricks_top",
-   "side": "stone_bricks_side"
-  },
-  {
-   "name": "bricks",
-   "kind": "cube",
-   "top": "bricks_top",
-   "bottom": "bricks_top",
-   "side": "bricks_side"
-  },
-  {
-   "name": "white_wool",
-   "kind": "cube",
-   "top": "white_wool_top",
-   "bottom": "white_wool_top",
-   "side": "white_wool_side"
-  },
-  {
-   "name": "redstone_ore",
-   "kind": "cube",
-   "top": "redstone_ore_top",
-   "bottom": "redstone_ore_top",
-   "side": "redstone_ore_side"
-  },
-  {
-   "name": "lapis_ore",
-   "kind": "cube",
-   "top": "lapis_ore_top",
-   "bottom": "lapis_ore_top",
-   "side": "lapis_ore_side"
-  },
-  {
-   "name": "emerald_ore",
-   "kind": "cube",
-   "top": "emerald_ore_top",
-   "bottom": "emerald_ore_top",
-   "side": "emerald_ore_side"
-  },
-  {
-   "name": "copper_ore",
-   "kind": "cube",
-   "top": "copper_ore_top",
-   "bottom": "copper_ore_top",
-   "side": "copper_ore_side"
-  },
-  {
-   "name": "deepslate_coal_ore",
-   "kind": "cube",
-   "top": "deepslate_coal_ore_top",
-   "bottom": "deepslate_coal_ore_top",
-   "side": "deepslate_coal_ore_side"
-  },
-  {
-   "name": "deepslate_iron_ore",
-   "kind": "cube",
-   "top": "deepslate_iron_ore_top",
-   "bottom": "deepslate_iron_ore_top",
-   "side": "deepslate_iron_ore_side"
-  },
-  {
-   "name": "deepslate_gold_ore",
-   "kind": "cube",
-   "top": "deepslate_gold_ore_top",
-   "bottom": "deepslate_gold_ore_top",
-   "side": "deepslate_gold_ore_side"
-  },
-  {
-   "name": "deepslate_diamond_ore",
-   "kind": "cube",
-   "top": "deepslate_diamond_ore_top",
-   "bottom": "deepslate_diamond_ore_top",
-   "side": "deepslate_diamond_ore_side"
-  },
-  {
-   "name": "iron_block",
-   "kind": "cube",
-   "top": "iron_block_top",
-   "bottom": "iron_block_top",
-   "side": "iron_block_side"
-  },
-  {
-   "name": "gold_block",
-   "kind": "cube",
-   "top": "gold_block_top",
-   "bottom": "gold_block_top",
-   "side": "gold_block_side"
-  },
-  {
-   "name": "diamond_block",
-   "kind": "cube",
-   "top": "diamond_block_top",
-   "bottom": "diamond_block_top",
-   "side": "diamond_block_side"
-  },
-  {
-   "name": "coal_block",
-   "kind": "cube",
-   "top": "coal_block_top",
-   "bottom": "coal_block_top",
-   "side": "coal_block_side"
-  },
-  {
-   "name": "emerald_block",
-   "kind": "cube",
-   "top": "emerald_block_top",
-   "bottom": "emerald_block_top",
-   "side": "emerald_block_side"
-  },
-  {
-   "name": "lapis_block",
-   "kind": "cube",
-   "top": "lapis_block_top",
-   "bottom": "lapis_block_top",
-   "side": "lapis_block_side"
-  },
-  {
-   "name": "redstone_block",
-   "kind": "cube",
-   "top": "redstone_block_top",
-   "bottom": "redstone_block_top",
-   "side": "redstone_block_side"
-  },
-  {
-   "name": "copper_block",
-   "kind": "cube",
-   "top": "copper_block_top",
-   "bottom": "copper_block_top",
-   "side": "copper_block_side"
-  },
-  {
-   "name": "spruce_planks",
-   "kind": "cube",
-   "top": "spruce_planks_top",
-   "bottom": "spruce_planks_top",
-   "side": "spruce_planks_side"
-  },
-  {
-   "name": "birch_planks",
-   "kind": "cube",
-   "top": "birch_planks_top",
-   "bottom": "birch_planks_top",
-   "side": "birch_planks_side"
-  },
-  {
-   "name": "jungle_planks",
-   "kind": "cube",
-   "top": "jungle_planks_top",
-   "bottom": "jungle_planks_top",
-   "side": "jungle_planks_side"
-  },
-  {
-   "name": "acacia_planks",
-   "kind": "cube",
-   "top": "acacia_planks_top",
-   "bottom": "acacia_planks_top",
-   "side": "acacia_planks_side"
-  },
-  {
-   "name": "dark_oak_planks",
-   "kind": "cube",
-   "top": "dark_oak_planks_top",
-   "bottom": "dark_oak_planks_top",
-   "side": "dark_oak_planks_side"
-  },
-  {
-   "name": "spruce_log",
-   "kind": "cube",
-   "top": "spruce_log_top",
-   "bottom": "spruce_log_top",
-   "side": "spruce_log_side"
-  },
-  {
-   "name": "birch_log",
-   "kind": "cube",
-   "top": "birch_log_top",
-   "bottom": "birch_log_top",
-   "side": "birch_log_side"
-  },
-  {
-   "name": "jungle_log",
-   "kind": "cube",
-   "top": "jungle_log_top",
-   "bottom": "jungle_log_top",
-   "side": "jungle_log_side"
+   "top": "acacia_leaves",
+   "bottom": "acacia_leaves",
+   "side": "acacia_leaves"
   },
   {
    "name": "acacia_log",
    "kind": "cube",
    "top": "acacia_log_top",
    "bottom": "acacia_log_top",
-   "side": "acacia_log_side"
+   "side": "acacia_log"
+  },
+  {
+   "name": "acacia_planks",
+   "kind": "cube",
+   "top": "acacia_planks",
+   "bottom": "acacia_planks",
+   "side": "acacia_planks"
+  },
+  {
+   "name": "birch_leaves",
+   "kind": "cube",
+   "top": "birch_leaves",
+   "bottom": "birch_leaves",
+   "side": "birch_leaves"
+  },
+  {
+   "name": "birch_log",
+   "kind": "cube",
+   "top": "birch_log_top",
+   "bottom": "birch_log_top",
+   "side": "birch_log"
+  },
+  {
+   "name": "birch_planks",
+   "kind": "cube",
+   "top": "birch_planks",
+   "bottom": "birch_planks",
+   "side": "birch_planks"
+  },
+  {
+   "name": "bookshelf",
+   "kind": "cube",
+   "top": "bookshelf_ends",
+   "bottom": "bookshelf_ends",
+   "side": "bookshelf"
+  },
+  {
+   "name": "bricks",
+   "kind": "cube",
+   "top": "bricks",
+   "bottom": "bricks",
+   "side": "bricks"
+  },
+  {
+   "name": "cactus",
+   "kind": "cube",
+   "top": "cactus_top",
+   "bottom": "cactus_bottom",
+   "side": "cactus_side"
+  },
+  {
+   "name": "clay",
+   "kind": "cube",
+   "top": "clay",
+   "bottom": "clay",
+   "side": "clay"
+  },
+  {
+   "name": "coal_block",
+   "kind": "cube",
+   "top": "coal_block",
+   "bottom": "coal_block",
+   "side": "coal_block"
+  },
+  {
+   "name": "copper_block",
+   "kind": "cube",
+   "top": "copper_block",
+   "bottom": "copper_block",
+   "side": "copper_block"
+  },
+  {
+   "name": "copper_ore",
+   "kind": "cube",
+   "top": "copper_ore",
+   "bottom": "copper_ore",
+   "side": "copper_ore"
+  },
+  {
+   "name": "crafting_table",
+   "kind": "cube",
+   "top": "crafting_table_top",
+   "bottom": "oak_planks",
+   "side": "crafting_table_side"
+  },
+  {
+   "name": "dark_oak_leaves",
+   "kind": "cube",
+   "top": "dark_oak_leaves",
+   "bottom": "dark_oak_leaves",
+   "side": "dark_oak_leaves"
   },
   {
    "name": "dark_oak_log",
    "kind": "cube",
    "top": "dark_oak_log_top",
    "bottom": "dark_oak_log_top",
-   "side": "dark_oak_log_side"
+   "side": "dark_oak_log"
   },
   {
-   "name": "spruce_leaves",
+   "name": "dark_oak_planks",
    "kind": "cube",
-   "top": "spruce_leaves_top",
-   "bottom": "spruce_leaves_top",
-   "side": "spruce_leaves_side"
+   "top": "dark_oak_planks",
+   "bottom": "dark_oak_planks",
+   "side": "dark_oak_planks"
   },
   {
-   "name": "birch_leaves",
+   "name": "deepslate_coal_ore",
    "kind": "cube",
-   "top": "birch_leaves_top",
-   "bottom": "birch_leaves_top",
-   "side": "birch_leaves_side"
+   "top": "deepslate_coal_ore",
+   "bottom": "deepslate_coal_ore",
+   "side": "deepslate_coal_ore"
   },
   {
-   "name": "jungle_leaves",
+   "name": "deepslate_copper_ore",
    "kind": "cube",
-   "top": "jungle_leaves_top",
-   "bottom": "jungle_leaves_top",
-   "side": "jungle_leaves_side"
+   "top": "deepslate_copper_ore",
+   "bottom": "deepslate_copper_ore",
+   "side": "deepslate_copper_ore"
   },
   {
-   "name": "acacia_leaves",
+   "name": "deepslate_diamond_ore",
    "kind": "cube",
-   "top": "acacia_leaves_top",
-   "bottom": "acacia_leaves_top",
-   "side": "acacia_leaves_side"
+   "top": "deepslate_diamond_ore",
+   "bottom": "deepslate_diamond_ore",
+   "side": "deepslate_diamond_ore"
   },
   {
-   "name": "dark_oak_leaves",
+   "name": "deepslate_emerald_ore",
    "kind": "cube",
-   "top": "dark_oak_leaves_top",
-   "bottom": "dark_oak_leaves_top",
-   "side": "dark_oak_leaves_side"
+   "top": "deepslate_emerald_ore",
+   "bottom": "deepslate_emerald_ore",
+   "side": "deepslate_emerald_ore"
   },
   {
-   "name": "cactus",
+   "name": "deepslate_gold_ore",
    "kind": "cube",
-   "top": "cactus_top",
-   "bottom": "cactus_top",
-   "side": "cactus_side"
+   "top": "deepslate_gold_ore",
+   "bottom": "deepslate_gold_ore",
+   "side": "deepslate_gold_ore"
   },
   {
-   "name": "tnt",
+   "name": "deepslate_iron_ore",
    "kind": "cube",
-   "top": "tnt_top",
-   "bottom": "tnt_top",
-   "side": "tnt_side"
+   "top": "deepslate_iron_ore",
+   "bottom": "deepslate_iron_ore",
+   "side": "deepslate_iron_ore"
   },
   {
-   "name": "pumpkin",
+   "name": "deepslate_lapis_ore",
    "kind": "cube",
-   "top": "pumpkin_top",
-   "bottom": "pumpkin_top",
-   "side": "pumpkin_side"
+   "top": "deepslate_lapis_ore",
+   "bottom": "deepslate_lapis_ore",
+   "side": "deepslate_lapis_ore"
   },
   {
-   "name": "melon",
+   "name": "deepslate_redstone_ore",
    "kind": "cube",
-   "top": "melon_top",
-   "bottom": "melon_top",
-   "side": "melon_side"
+   "top": "deepslate_redstone_ore",
+   "bottom": "deepslate_redstone_ore",
+   "side": "deepslate_redstone_ore"
   },
   {
-   "name": "hay_block",
+   "name": "diamond_block",
    "kind": "cube",
-   "top": "hay_block_top",
-   "bottom": "hay_block_top",
-   "side": "hay_block_side"
+   "top": "diamond_block",
+   "bottom": "diamond_block",
+   "side": "diamond_block"
   },
   {
-   "name": "mycelium",
+   "name": "diorite",
    "kind": "cube",
-   "top": "mycelium_top",
-   "bottom": "mycelium_top",
-   "side": "mycelium_side"
+   "top": "diorite",
+   "bottom": "diorite",
+   "side": "diorite"
   },
   {
-   "name": "bookshelf",
+   "name": "emerald_block",
    "kind": "cube",
-   "top": "bookshelf_top",
-   "bottom": "bookshelf_top",
-   "side": "bookshelf_side"
+   "top": "emerald_block",
+   "bottom": "emerald_block",
+   "side": "emerald_block"
   },
   {
-   "name": "crafting_table",
+   "name": "emerald_ore",
    "kind": "cube",
-   "top": "crafting_table_top",
-   "bottom": "crafting_table_top",
-   "side": "crafting_table_side"
+   "top": "emerald_ore",
+   "bottom": "emerald_ore",
+   "side": "emerald_ore"
+  },
+  {
+   "name": "end_stone",
+   "kind": "cube",
+   "top": "end_stone",
+   "bottom": "end_stone",
+   "side": "end_stone"
   },
   {
    "name": "furnace",
@@ -446,11 +302,235 @@
    "side": "furnace_side"
   },
   {
+   "name": "glowstone",
+   "kind": "cube",
+   "top": "glowstone",
+   "bottom": "glowstone",
+   "side": "glowstone"
+  },
+  {
+   "name": "gold_block",
+   "kind": "cube",
+   "top": "gold_block",
+   "bottom": "gold_block",
+   "side": "gold_block"
+  },
+  {
+   "name": "hay_block",
+   "kind": "cube",
+   "top": "hay_block_top",
+   "bottom": "hay_block_top",
+   "side": "hay_block_side"
+  },
+  {
+   "name": "ice",
+   "kind": "cube",
+   "top": "ice",
+   "bottom": "ice",
+   "side": "ice"
+  },
+  {
+   "name": "iron_block",
+   "kind": "cube",
+   "top": "iron_block",
+   "bottom": "iron_block",
+   "side": "iron_block"
+  },
+  {
+   "name": "jungle_leaves",
+   "kind": "cube",
+   "top": "jungle_leaves",
+   "bottom": "jungle_leaves",
+   "side": "jungle_leaves"
+  },
+  {
+   "name": "jungle_log",
+   "kind": "cube",
+   "top": "jungle_log_top",
+   "bottom": "jungle_log_top",
+   "side": "jungle_log"
+  },
+  {
+   "name": "jungle_planks",
+   "kind": "cube",
+   "top": "jungle_planks",
+   "bottom": "jungle_planks",
+   "side": "jungle_planks"
+  },
+  {
+   "name": "lapis_block",
+   "kind": "cube",
+   "top": "lapis_block",
+   "bottom": "lapis_block",
+   "side": "lapis_block"
+  },
+  {
+   "name": "lapis_ore",
+   "kind": "cube",
+   "top": "lapis_ore",
+   "bottom": "lapis_ore",
+   "side": "lapis_ore"
+  },
+  {
    "name": "lava",
    "kind": "cube",
-   "top": "lava_top",
-   "bottom": "lava_top",
-   "side": "lava_side"
+   "top": "lava_still",
+   "bottom": "lava_still",
+   "side": "lava_still"
+  },
+  {
+   "name": "melon",
+   "kind": "cube",
+   "top": "melon_top",
+   "bottom": "melon_top",
+   "side": "melon_side"
+  },
+  {
+   "name": "moss_block",
+   "kind": "cube",
+   "top": "moss_block",
+   "bottom": "moss_block",
+   "side": "moss_block"
+  },
+  {
+   "name": "mossy_cobblestone",
+   "kind": "cube",
+   "top": "mossy_cobblestone",
+   "bottom": "mossy_cobblestone",
+   "side": "mossy_cobblestone"
+  },
+  {
+   "name": "mycelium",
+   "kind": "cube",
+   "top": "mycelium_top",
+   "bottom": "dirt",
+   "side": "mycelium_side"
+  },
+  {
+   "name": "netherrack",
+   "kind": "cube",
+   "top": "netherrack",
+   "bottom": "netherrack",
+   "side": "netherrack"
+  },
+  {
+   "name": "obsidian",
+   "kind": "cube",
+   "top": "obsidian",
+   "bottom": "obsidian",
+   "side": "obsidian"
+  },
+  {
+   "name": "packed_ice",
+   "kind": "cube",
+   "top": "packed_ice",
+   "bottom": "packed_ice",
+   "side": "packed_ice"
+  },
+  {
+   "name": "pumpkin",
+   "kind": "cube",
+   "top": "pumpkin_top",
+   "bottom": "pumpkin_top",
+   "side": "pumpkin_side"
+  },
+  {
+   "name": "red_sand",
+   "kind": "cube",
+   "top": "red_sand",
+   "bottom": "red_sand",
+   "side": "red_sand"
+  },
+  {
+   "name": "red_wool",
+   "kind": "cube",
+   "top": "red_wool",
+   "bottom": "red_wool",
+   "side": "red_wool"
+  },
+  {
+   "name": "redstone_block",
+   "kind": "cube",
+   "top": "redstone_block",
+   "bottom": "redstone_block",
+   "side": "redstone_block"
+  },
+  {
+   "name": "redstone_ore",
+   "kind": "cube",
+   "top": "redstone_ore",
+   "bottom": "redstone_ore",
+   "side": "redstone_ore"
+  },
+  {
+   "name": "smooth_stone",
+   "kind": "cube",
+   "top": "smooth_stone",
+   "bottom": "smooth_stone",
+   "side": "smooth_stone"
+  },
+  {
+   "name": "snow",
+   "kind": "cube",
+   "top": "snow",
+   "bottom": "snow",
+   "side": "snow"
+  },
+  {
+   "name": "spruce_leaves",
+   "kind": "cube",
+   "top": "spruce_leaves",
+   "bottom": "spruce_leaves",
+   "side": "spruce_leaves"
+  },
+  {
+   "name": "spruce_log",
+   "kind": "cube",
+   "top": "spruce_log_top",
+   "bottom": "spruce_log_top",
+   "side": "spruce_log"
+  },
+  {
+   "name": "spruce_planks",
+   "kind": "cube",
+   "top": "spruce_planks",
+   "bottom": "spruce_planks",
+   "side": "spruce_planks"
+  },
+  {
+   "name": "stone_bricks",
+   "kind": "cube",
+   "top": "stone_bricks",
+   "bottom": "stone_bricks",
+   "side": "stone_bricks"
+  },
+  {
+   "name": "terracotta",
+   "kind": "cube",
+   "top": "terracotta",
+   "bottom": "terracotta",
+   "side": "terracotta"
+  },
+  {
+   "name": "tnt",
+   "kind": "cube",
+   "top": "tnt_top",
+   "bottom": "tnt_bottom",
+   "side": "tnt_side"
+  },
+  {
+   "name": "white_wool",
+   "kind": "cube",
+   "top": "white_wool",
+   "bottom": "white_wool",
+   "side": "white_wool"
+  },
+  {
+   "name": "yellow_wool",
+   "kind": "cube",
+   "top": "yellow_wool",
+   "bottom": "yellow_wool",
+   "side": "yellow_wool"
   }
  ]
 }

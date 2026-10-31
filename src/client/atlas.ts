@@ -7,6 +7,8 @@ export const TILE = 64;
 const PAD = 4;
 const CELL = TILE + PAD * 2;
 const MAX_COLS = 16;
+/** true: közelről elmosódó, sima textúrák; false: éles pixelek (a textúracsomag eredeti kinézete) */
+const SMOOTH = false;
 
 // Ha a textúracsomag nincs kicsomagolva, ezekkel a színekkel indul a játék
 const FALLBACK: Record<string, string> = {
@@ -98,7 +100,7 @@ export async function buildAtlas(): Promise<Atlas> {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.magFilter = THREE.LinearFilter;
+  texture.magFilter = SMOOTH ? THREE.LinearFilter : THREE.NearestFilter;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.generateMipmaps = true;
   texture.anisotropy = 8;

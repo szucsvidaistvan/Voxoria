@@ -15,10 +15,10 @@ Nyisd meg a kiírt címet (általában http://localhost:5173). Telefonról ugyan
 
 ## Textúrák (saját blokklap)
 
-A játék a saját izometrikus blokklapból kivágott textúrákat használja, ezek a repóban vannak (`public/textures`, `public/generated`), így a GitHub Pages oldalon is működnek. Újragenerálás:
+A játék a textúralapokból (IMG_8114–8120) kivágott textúrákat használja, ezek a repóban vannak (`public/textures`, `public/generated`), így a GitHub Pages oldalon is működnek. Újragenerálás:
 
 ```
-python3 scripts/slice-sheet.py /elérési/út/blokklap.png
+python3 scripts/slice-textures.py /elérési/út/a_textúralapok_mappája
 ```
 
 ## Textúrák (Dokucraft High, opcionális)

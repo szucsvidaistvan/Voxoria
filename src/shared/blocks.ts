@@ -39,11 +39,11 @@ export interface BlockDef {
   key?: string;
 }
 
-export const GRASS_TINT: RGB = [0.55, 0.85, 0.35];
-export const LEAF_TINT: RGB = [0.40, 0.75, 0.30];
+const GRASS_TINT: RGB = [0.55, 0.85, 0.35];
+const LEAF_TINT: RGB = [0.40, 0.75, 0.30];
 
 export const BLOCKS: Record<number, BlockDef> = {
-  [B.GRASS]: { name: 'Fű', top: 'grass_top', bottom: 'dirt', side: 'grass_side' },
+  [B.GRASS]: { name: 'Fű', top: 'grass_top', bottom: 'dirt', side: 'grass_side', tint: { top: GRASS_TINT } },
   [B.DIRT]: { name: 'Föld', top: 'dirt', bottom: 'dirt', side: 'dirt' },
   [B.STONE]: { name: 'Kő', top: 'stone', bottom: 'stone', side: 'stone' },
   [B.SAND]: { name: 'Homok', top: 'sand', bottom: 'sand', side: 'sand' },
@@ -51,6 +51,7 @@ export const BLOCKS: Record<number, BlockDef> = {
   [B.PLANKS]: { name: 'Deszka', top: 'planks', bottom: 'planks', side: 'planks' },
   [B.LEAVES]: {
     name: 'Lomb', top: 'leaves', bottom: 'leaves', side: 'leaves', opaque: false,
+    tint: { top: LEAF_TINT, bottom: LEAF_TINT, side: LEAF_TINT },
   },
   [B.COBBLE]: { name: 'Kavics', top: 'cobblestone', bottom: 'cobblestone', side: 'cobblestone' },
   [B.WATER]: { name: 'Víz', top: 'water', bottom: 'water', side: 'water', opaque: false },
@@ -97,6 +98,9 @@ const NOT_PLACEABLE = /(_on|_off|_lit|_inner|_pot|_line\d*|_west|_east|_north|_s
 /** Átlátszó vagy lyukas blokkok */
 const SEE_THROUGH = /(leaves|glass|ice$|slime|honey|frosted|cobweb|spawner|trial_spawner)/;
 
+/** Szürke textúrák, amiket színezni kell */
+const LEAF_LIKE = /leaves|vine/;
+
 /** A regisztráció eredménye: azonosító → generált blokk, és a plusz textúrák */
 export const extraTextures: TexName[] = [];
 
@@ -117,6 +121,7 @@ export function registerGenerated(pack: GeneratedPack): number[] {
   for (const b of cubes) {
     if (next > MAX_BLOCK_ID) break;
     const name = b.name.replace(/_/g, ' ');
+    const leafy = LEAF_LIKE.test(b.name);
     BLOCKS[next] = {
       name: name.charAt(0).toUpperCase() + name.slice(1),
       key: b.name,
@@ -124,8 +129,9 @@ export function registerGenerated(pack: GeneratedPack): number[] {
       bottom: b.bottom!,
       side: b.side!,
       opaque: !SEE_THROUGH.test(b.name),
-      // a színes textúrákat nem színezzük (a GRASS_TINT / LEAF_TINT csak szürke textúrákhoz kell)
-      tint: undefined,
+      tint: leafy
+        ? { top: LEAF_TINT, bottom: LEAF_TINT, side: LEAF_TINT }
+        : b.tinted ? { top: GRASS_TINT } : undefined,
     };
     tex.add(b.top!); tex.add(b.bottom!); tex.add(b.side!);
     ids.push(next++);
