@@ -1,6 +1,6 @@
 import './style.css';
 import * as THREE from 'three';
-import { B, BLOCKS, HOTBAR, placeableBlocks, registerGenerated, type GeneratedPack, type RGB } from '../shared/blocks';
+import { B, BLOCKS, HOTBAR, placeableBlocks, type RGB } from '../shared/blocks';
 import { raycast, type RayHit } from '../shared/raycast';
 import { CH, CS, SEA_LEVEL, World } from '../shared/world';
 import { buildAtlas } from './atlas';
@@ -16,20 +16,8 @@ const SKY_DIST = 300; // a nap, a hold és a csillagok távolsága (a kamera far
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-/** A `npm run blocks` által készített blokklista betöltése. Ha nincs, csak az alapblokkok vannak. */
-async function loadGenerated(): Promise<number> {
-  try {
-    const res = await fetch(`${import.meta.env.BASE_URL}generated/blocks.json`);
-    if (!res.ok) return 0;
-    return registerGenerated((await res.json()) as GeneratedPack).length;
-  } catch {
-    return 0; // nincs fájl (a dev szerver ilyenkor HTML-t ad vissza, ami nem JSON)
-  }
-}
-
 async function main(): Promise<void> {
-  const extraCount = await loadGenerated();
-  const atlas = await buildAtlas();
+  const atlas = buildAtlas();
 
   // ---------- renderelés ----------
   const canvas = $<HTMLCanvasElement>('game');
@@ -362,7 +350,7 @@ async function main(): Promise<void> {
       it.el.hidden = !ok;
       if (ok) shown++;
     }
-    invInfo.textContent = `${shown} blokk` + (extraCount ? '' : ' (a teljes lista a textúracsomag kicsomagolása után jelenik meg, lásd a README-t)');
+    invInfo.textContent = `${shown} blokk`;
   };
   invSearch.addEventListener('input', filterInventory);
 
@@ -431,7 +419,6 @@ async function main(): Promise<void> {
   $('controls').textContent = input.touch
     ? 'Bal oldalon a joystick, a jobb oldalon húzással nézel körül. A gombokkal bontasz, építesz és ugrasz.'
     : 'WASD mozgás, szóköz ugrás, bal gomb bont, jobb gomb épít, 1–8 vagy görgő a blokkválasztáshoz, Esc a menühöz.';
-  $('pack-note').hidden = atlas.usingPack;
 
   // ---------- indulás ----------
   const existing = loadSave();

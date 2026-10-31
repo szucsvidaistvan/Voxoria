@@ -1,17 +1,12 @@
+import { EXTRA_BLOCKS, TEXTURE_NAMES } from './catalog';
+
 export type RGB = [number, number, number];
 export type FaceKind = 'top' | 'bottom' | 'side';
 
-/** Textúra neve. Az alapblokkoké a `public/textures/<név>.png`, a generált blokkoké a `public/textures/mc/<név>.png` */
+/** Textúra neve (a rajzolási recept a catalog.ts-ben van) */
 export type TexName = string;
 
-/** Az alapblokkok textúrái (a világgenerálás ezeket használja) */
-export const BASE_TEXTURES: TexName[] = [
-  'grass_top', 'grass_side', 'dirt', 'stone', 'sand',
-  'log_side', 'log_top', 'planks', 'leaves', 'cobblestone',
-  'water', // ha a csomag nincs kicsomagolva, az atlas maga rajzolja
-  'bedrock', 'gravel', 'sandstone', 'sandstone_top', 'sandstone_bottom',
-  'coal_ore', 'iron_ore', 'gold_ore', 'diamond_ore',
-];
+export { TEXTURE_NAMES };
 
 export const AIR = 0;
 export const B = {
@@ -21,7 +16,7 @@ export const B = {
   COAL_ORE: 13, IRON_ORE: 14, GOLD_ORE: 15, DIAMOND_ORE: 16,
 } as const;
 
-/** A generált blokkok azonosítói ettől indulnak; az 1..99 az alapblokkoké */
+/** A katalógus blokkjainak azonosítói ettől indulnak; az 1..99 az alapblokkoké */
 export const FIRST_EXTRA_ID = 100;
 /** A chunkok Uint16Array-ben tárolnak, ez a felső határ */
 export const MAX_BLOCK_ID = 65535;
@@ -33,10 +28,8 @@ export interface BlockDef {
   side: TexName;
   /** Szürke textúrák színezése (a Minecraft is így csinálja a fűvel és a levéllel) */
   tint?: Partial<Record<FaceKind, RGB>>;
-  /** false: átlátszó vagy lyukas (lomb, üveg), nem takarja el a mögötte lévő lapokat */
+  /** false: átlátszó vagy lyukas (lomb, üveg, víz), nem takarja el a mögötte lévő lapokat */
   opaque?: boolean;
-  /** a Minecraftbeli azonosító (csak a generált blokkoknál) */
-  key?: string;
 }
 
 const GRASS_TINT: RGB = [0.55, 0.85, 0.35];
@@ -64,84 +57,19 @@ export const BLOCKS: Record<number, BlockDef> = {
   [B.DIAMOND_ORE]: { name: 'Gyémántérc', top: 'diamond_ore', bottom: 'diamond_ore', side: 'diamond_ore' },
 };
 
+// a katalógus blokkjai: a sorrend adja az azonosítót, ezért a mentések stabilak maradnak
+EXTRA_BLOCKS.forEach((b, i) => {
+  const id = FIRST_EXTRA_ID + i;
+  if (id > MAX_BLOCK_ID) return;
+  BLOCKS[id] = { name: b.name, top: b.top, bottom: b.bottom, side: b.side, opaque: b.opaque };
+});
+
 /** A játékos által lerakható blokkok kezdő hotbarja */
 export const HOTBAR: number[] = [
   B.GRASS, B.DIRT, B.STONE, B.COBBLE, B.SAND, B.LOG, B.PLANKS, B.LEAVES,
 ];
 
-// ---------- generált blokkok ----------
-
-/** A `scripts/build-blocks.mjs` által készített blocks.json egy bejegyzése */
-export interface GeneratedBlock {
-  name: string;
-  kind: 'cube' | 'shape';
-  top?: string;
-  bottom?: string;
-  side?: string;
-  tinted?: boolean;
-}
-
-export interface GeneratedPack {
-  textures: string[];
-  blocks: GeneratedBlock[];
-}
-
-/** Ezekhez az alapblokkok tartoznak, a generált listából kihagyjuk őket */
-const BASE_KEYS = new Set([
-  'grass_block', 'dirt', 'stone', 'sand', 'oak_log', 'oak_planks', 'oak_leaves', 'cobblestone',
-  'bedrock', 'gravel', 'sandstone', 'coal_ore', 'iron_ore', 'gold_ore', 'diamond_ore',
-]);
-
-/** Nem valódi, lerakható blokkok: állapot- és részletek, amiknek van textúrájuk, de nem kocka */
-const NOT_PLACEABLE = /(_on|_off|_lit|_inner|_pot|_line\d*|_west|_east|_north|_south|_up|_down|_e|_w|_n|_s|_stage\d+|_cracked|_not_cracked.*|_overlay|_particle|_dust|_plant|_roots?|_vines?|_fan|_sapling|_carpet|_pane|_bud|_item)$|^(comparator|repeater|redstone_dust|water_|lava_|fire_(?!coral_block)|tripwire|torch|lantern|candle|cake|conduit|beacon)/;
-
-/** Átlátszó vagy lyukas blokkok */
-const SEE_THROUGH = /(leaves|glass|ice$|slime|honey|frosted|cobweb|spawner|trial_spawner)/;
-
-/** Szürke textúrák, amiket színezni kell */
-const LEAF_LIKE = /leaves|vine/;
-
-/** A regisztráció eredménye: azonosító → generált blokk, és a plusz textúrák */
-export const extraTextures: TexName[] = [];
-
-/**
- * A generált blokkok regisztrálása. Az azonosítók a blokkok névsorából adódnak (FIRST_EXTRA_ID-től),
- * ezért ugyanazon textúracsomaggal mindig ugyanazok. Csak a teljes kockákat vesszük fel.
- * Visszaadja a felvett azonosítókat névsorban.
- */
-export function registerGenerated(pack: GeneratedPack): number[] {
-  const ids: number[] = [];
-  let next = FIRST_EXTRA_ID;
-  const tex = new Set<string>();
-  const cubes = pack.blocks
-    .filter((b) => b.kind === 'cube' && b.top && b.bottom && b.side)
-    .filter((b) => !BASE_KEYS.has(b.name) && !NOT_PLACEABLE.test(b.name))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  for (const b of cubes) {
-    if (next > MAX_BLOCK_ID) break;
-    const name = b.name.replace(/_/g, ' ');
-    const leafy = LEAF_LIKE.test(b.name);
-    BLOCKS[next] = {
-      name: name.charAt(0).toUpperCase() + name.slice(1),
-      key: b.name,
-      top: b.top!,
-      bottom: b.bottom!,
-      side: b.side!,
-      opaque: !SEE_THROUGH.test(b.name),
-      tint: leafy
-        ? { top: LEAF_TINT, bottom: LEAF_TINT, side: LEAF_TINT }
-        : b.tinted ? { top: GRASS_TINT } : undefined,
-    };
-    tex.add(b.top!); tex.add(b.bottom!); tex.add(b.side!);
-    ids.push(next++);
-  }
-  extraTextures.length = 0;
-  extraTextures.push(...[...tex].filter((t) => pack.textures.includes(t)).sort());
-  return ids;
-}
-
-/** Az összes ismert blokk azonosítója, a levegő és a folyadékok nélkül (a kreatív inventoryhoz) */
+/** Az összes ismert blokk azonosítója, a víz nélkül (a kreatív inventoryhoz) */
 export function placeableBlocks(): number[] {
   return Object.keys(BLOCKS).map(Number).filter((id) => id !== B.WATER).sort((a, b) => a - b);
 }
@@ -149,7 +77,7 @@ export function placeableBlocks(): number[] {
 /** Átlátszatlan blokk: eltakarja a mögötte lévő lapokat */
 export function isOpaque(id: number): boolean {
   const def = BLOCKS[id];
-  // ismeretlen azonosító (pl. másik textúracsomaggal mentett blokk): nem takar el semmit
+  // ismeretlen azonosító (pl. régi mentésből): nem takar el semmit
   return def ? def.opaque !== false : false;
 }
 
