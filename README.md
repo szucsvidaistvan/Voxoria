@@ -13,35 +13,20 @@ npm run dev
 
 Nyisd meg a kiírt címet (általában http://localhost:5173). Telefonról ugyanazon a hálózaton a gép IP-címén éred el (`npm run dev -- --host`).
 
-## Textúrák (saját blokklap)
+## Textúrák (Dokucraft High)
 
-A játék a textúralapokból (IMG_8114–8120) kivágott textúrákat használja, ezek a repóban vannak (`public/textures`, `public/generated`), így a GitHub Pages oldalon is működnek. Újragenerálás:
+A játék a [Dokucraft High](https://dokucraft.co.uk/resource-packs/high) textúracsomagot használja (v26.3, 32×32). A használatára a készítők engedélyét kaptuk, ezért a kinyert textúrák a repóban vannak (`public/textures`, `public/generated`), és a GitHub Pages oldalon is működnek. Dokucraft © a készítői, az engedélyt a [dokucraft.co.uk/license](https://dokucraft.co.uk/license) oldal írja le. A textúrák csak ebben a játékban használhatók, ne tedd fel őket máshová.
 
-```
-python3 scripts/slice-textures.py /elérési/út/a_textúralapok_mappája
-```
-
-## Textúrák (Dokucraft High, opcionális)
-
-A textúracsomag **nincs a git repóban**. A Dokucraft licence szerint nem szabad engedély nélkül tárolni vagy tükrözni, ezért a `public/textures/*.png` a `.gitignore`-ban van. Ha a repót GitHub Pages-re teszed, a textúrák sem kerülhetnek fel oda, az oldal egyszerű színekkel fut. Az engedélyt a [dokucraft.co.uk/license](https://dokucraft.co.uk/license) oldalon és a készítőknél tudod tisztázni.
-
-A használt textúrákat a letöltött zipből másold ki a gépeden:
+Újragenerálás a letöltött zipből (Node 18 vagy újabb, külön csomag nem kell):
 
 ```bash
-npm run textures -- /elérési/út/26.3-Dokucraft-High.zip
+node scripts/extract-textures.mjs /elérési/út/26.3-Dokucraft-High.zip   # a 20 alap textúra
+node scripts/build-blocks.mjs /elérési/út/26.3-Dokucraft-High.zip       # a többi blokk és a blocks.json
 ```
 
-Ez a 20 alap blokk-textúrát (köztük a vizet, az érceket és a homokkövet) a `public/textures` mappába másolja. Ha nincsenek ott, a játék egyszerű színekkel indul.
+A második parancs a csomag blokkállapotaiból és textúráiból összeállítja a kocka alakú blokkok listáját (kb. 460 blokk), a nem kocka alakúakat (lépcső, növény, fáklya, sín) egyelőre kihagyja. A `--shapes` kapcsoló ezek adatait is kiírja a későbbi rendereléshez.
 
-### Az összes blokk
-
-A csomag teljes blokklistáját (kb. 550 teljes kocka) ez állítja elő:
-
-```bash
-npm run blocks -- /elérési/út/26.3-Dokucraft-High.zip
-```
-
-A parancs a `public/generated/blocks.json` fájlt és a `public/textures/mc` mappát hozza létre (mindkettő a `.gitignore`-ban van). A játék induláskor betölti őket, és a blokkok az **E** billentyűvel (telefonon a **Blokkok** gombbal) megnyíló kereshető listában jelennek meg. A kiválasztott blokk a hotbar aktív helyére kerül. Az azonosítók a blokkok névsorából jönnek (100-tól), ezért ugyanazzal a csomaggal mindig ugyanazok. Másik csomagnál a régi mentésekben lévő extra blokkok eltűnhetnek.
+A blokkok az **E** billentyűvel (telefonon a **Blokkok** gombbal) megnyíló kereshető listában jelennek meg, a választott blokk a hotbar aktív helyére kerül. Az azonosítók a blokkok névsorából jönnek (100-tól), ezért ugyanazzal a csomaggal mindig ugyanazok, de ha a lista változik (új csomag, szűrő), a régi mentésekben lévő extra blokkok elcsúszhatnak.
 
 ## Irányítás
 
@@ -62,7 +47,7 @@ src/
   shared/   világlogika: blokkok, chunkok, terepgenerálás, sugárkövetés
             (nincs benne three.js, a szerver is ezt használja majd)
   client/   renderelés, mesh-építés, mozgás, bemenet, menü, mentés
-scripts/    textúra-kicsomagoló
+scripts/    textúra- és blokklista-generátor (a Dokucraft zipből)
 ```
 
 A világ állapota és a megjelenítés külön van választva. Ez teszi lehetővé, hogy a co-op szerver később ugyanazt a világkódot futtassa.
@@ -74,7 +59,8 @@ A világ állapota és a megjelenítés külön van választva. Ez teszi lehető
 - [x] Telefonos vezérlés
 - [x] Nappal-éjszaka (8 perces nap, nap, hold, csillagok), víz (úszás, víz alatti köd)
 - [x] Blokkregiszter (két bájtos azonosító), kereshető kreatív inventory
-- [ ] Nem kocka alakú blokkok (lépcső, lap, növény, kerítés, ajtó), almappás textúrák (deepslate, hó, tnt)
+- [x] Dokucraft High textúrák, kb. 460 kocka alakú blokk
+- [ ] Nem kocka alakú blokkok (lépcső, lap, növény, kerítés, ajtó)
 - [ ] Inventory, életerő, készítés
 - [ ] Mentés IndexedDB-be (nagy világokhoz)
 - [ ] Szerver (Node.js + WebSocket), közös világ

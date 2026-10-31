@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { unzipSync } from 'fflate';
+import { readZip } from './lib-zip.mjs';
 
 // játékbeli név -> útvonal a csomagban (assets/minecraft/textures/ alatt)
 const MAP = {
@@ -40,14 +40,11 @@ const outDir = resolve(root, 'public/textures');
 mkdirSync(outDir, { recursive: true });
 
 const prefix = 'assets/minecraft/textures/';
-const wanted = new Set(Object.values(MAP).map((p) => prefix + p));
-const files = unzipSync(new Uint8Array(readFileSync(zipPath)), {
-  filter: (f) => wanted.has(f.name),
-});
+const zip = readZip(zipPath);
 
 let ok = 0;
 for (const [name, path] of Object.entries(MAP)) {
-  const data = files[prefix + path];
+  const data = zip.read(prefix + path);
   if (!data) {
     console.warn(`Hiányzik: ${path}`);
     continue;

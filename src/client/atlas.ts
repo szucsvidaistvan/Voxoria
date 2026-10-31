@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { BASE_TEXTURES, extraTextures, type TexName } from '../shared/blocks';
 
 /** egy textúra felbontása (pixel) */
-export const TILE = 64;
+export const TILE = 32;
 /** a csempék körüli perem: a mipmapelés és a sima szűrés miatt nem szivároghat át a szomszéd */
 const PAD = 4;
 const CELL = TILE + PAD * 2;
@@ -67,8 +67,7 @@ export async function buildAtlas(): Promise<Atlas> {
   canvas.width = cols * CELL;
   canvas.height = rows * CELL;
   const ctx = canvas.getContext('2d')!;
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
+  ctx.imageSmoothingEnabled = false; // a csomag 32×32-es, éles pixelekkel
 
   const index = new Map<TexName, number>();
   names.forEach((n, i) => index.set(n, i));
@@ -81,8 +80,10 @@ export async function buildAtlas(): Promise<Atlas> {
       const url = isBase.has(name) ? `${base}textures/${name}.png` : `${base}textures/mc/${name}.png`;
       const img = await loadImage(url);
       if (img) {
-        // felső négyzet: az animált csíkokat is kezeli, és más felbontásnál is jó
-        ctx.drawImage(img, 0, 0, img.width, img.width, x, y, TILE, TILE);
+        // felső négyzet: az animált csíkokat is kezeli. A Dokucraft néhány textúrája (64×64) négy részből áll,
+        // ezekből a bal felső negyed a valódi textúra, a többi shader-adat.
+        const src = img.width === TILE * 2 ? TILE : img.width;
+        ctx.drawImage(img, 0, 0, src, src, x, y, TILE, TILE);
         if (isBase.has(name)) baseFound++;
       } else if (name === 'water') {
         drawWater(ctx, x, y);
