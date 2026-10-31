@@ -33,7 +33,8 @@ function fbm(x: number, z: number, s: number): number {
 }
 
 export class Chunk {
-  data = new Uint8Array(CS * CH * CS);
+  /** két bájtos blokkazonosítók (65535 különböző blokk) */
+  data = new Uint16Array(CS * CH * CS);
   constructor(public cx: number, public cz: number) {}
   get(x: number, y: number, z: number): number {
     return this.data[(y * CS + z) * CS + x];

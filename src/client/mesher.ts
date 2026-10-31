@@ -58,6 +58,7 @@ export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): Ch
         const id = chunk.get(x, y, z);
         if (id === AIR) continue;
         const def = BLOCKS[id];
+        if (!def) continue; // ismeretlen blokk: nem rajzoljuk
         const liquid = id === B.WATER;
         const buf = liquid ? water : solid;
         for (const f of FACES) {
@@ -65,7 +66,7 @@ export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): Ch
           if (liquid) {
             // a víz csak a levegővel (és a lombbal) érintkező lapját rajzoljuk
             if (nid === B.WATER || isOpaque(nid)) continue;
-          } else if (isOpaque(nid) || (id === B.LEAVES && nid === B.LEAVES)) {
+          } else if (isOpaque(nid) || (!isOpaque(id) && nid === id)) {
             continue;
           }
 

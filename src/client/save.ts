@@ -9,6 +9,8 @@ export interface SaveData {
   pitch: number;
   /** napszak 0..1 (a régi mentésekben nincs) */
   time?: number;
+  /** a hotbar blokkjai (a régi mentésekben nincs) */
+  hotbar?: number[];
 }
 
 export interface Settings {

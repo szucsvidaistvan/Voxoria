@@ -16,6 +16,7 @@ export class Input {
 
   onHotbar: (i: number) => void = () => {};
   onPause: () => void = () => {};
+  onInventory: () => void = () => {};
 
   private keys = new Set<string>();
   private joy = { x: 0, y: 0 };
@@ -65,6 +66,7 @@ export class Input {
     document.addEventListener('keydown', (e) => {
       if (!this.enabled) return;
       if (e.code === 'Space') { this.jump = true; e.preventDefault(); }
+      if (e.code === 'KeyE' && !e.repeat) { this.onInventory(); return; }
       const d = /^Digit([1-9])$/.exec(e.code);
       if (d && Number(d[1]) <= this.slots) this.select(Number(d[1]) - 1);
       this.keys.add(e.code);
@@ -174,5 +176,6 @@ export class Input {
     press('btn-break', () => { this.breakQueued = true; });
     press('btn-place', () => { this.placeQueued = true; });
     press('btn-menu', () => this.onPause());
+    press('btn-inv', () => this.onInventory());
   }
 }

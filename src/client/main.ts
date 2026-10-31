@@ -1,6 +1,6 @@
 import './style.css';
 import * as THREE from 'three';
-import { B, BLOCKS, HOTBAR, type RGB } from '../shared/blocks';
+import { B, BLOCKS, HOTBAR, placeableBlocks, registerGenerated, type GeneratedPack, type RGB } from '../shared/blocks';
 import { raycast, type RayHit } from '../shared/raycast';
 import { CH, CS, SEA_LEVEL, World } from '../shared/world';
 import { buildAtlas } from './atlas';
@@ -16,7 +16,19 @@ const SKY_DIST = 300; // a nap, a hold és a csillagok távolsága (a kamera far
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
+/** A `npm run blocks` által készített blokklista betöltése. Ha nincs, csak az alapblokkok vannak. */
+async function loadGenerated(): Promise<number> {
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}generated/blocks.json`);
+    if (!res.ok) return 0;
+    return registerGenerated((await res.json()) as GeneratedPack).length;
+  } catch {
+    return 0; // nincs fájl (a dev szerver ilyenkor HTML-t ad vissza, ami nem JSON)
+  }
+}
+
 async function main(): Promise<void> {
+  const extraCount = await loadGenerated();
   const atlas = await buildAtlas();
 
   // ---------- renderelés ----------
@@ -77,7 +89,8 @@ async function main(): Promise<void> {
   resize();
 
   // ---------- bemenet és beállítások ----------
-  const input = new Input(canvas, HOTBAR.length);
+  const hotbar = [...HOTBAR];
+  const input = new Input(canvas, hotbar.length);
   if (input.touch) document.body.classList.add('touch');
   const settings = loadSettings({ renderDistance: input.touch ? 4 : 6, sensitivity: 1 });
 
@@ -202,6 +215,11 @@ async function main(): Promise<void> {
     world = new World(seed);
     if (save) world.importEdits(save.edits);
     timeOfDay = save?.time ?? START_TIME;
+    if (save?.hotbar && save.hotbar.length === hotbar.length) {
+      // csak a most is ismert blokkokat állítjuk vissza (másik textúracsomagnál az azonosítók eltérhetnek)
+      save.hotbar.forEach((id, i) => { if (BLOCKS[id]) hotbar[i] = id; });
+      hotbar.forEach((_, i) => paintSlot(i));
+    }
     findSpawn(world);
     player = new Player(world);
     stream(spawn.x, spawn.z, 2, Infinity, Infinity);
@@ -221,20 +239,16 @@ async function main(): Promise<void> {
   const saveGame = () => {
     if (!started) return;
     const p = player.pos;
-    writeSave({ seed: world.seed, edits: world.exportEdits(), pos: [p.x, p.y, p.z], yaw: player.yaw, pitch: player.pitch, time: timeOfDay });
+    writeSave({ seed: world.seed, edits: world.exportEdits(), pos: [p.x, p.y, p.z], yaw: player.yaw, pitch: player.pitch, time: timeOfDay, hotbar: [...hotbar] });
   };
 
   // ---------- hotbar ----------
-  const hotbarEl = $('hotbar');
-  const slotEls: HTMLElement[] = [];
-  HOTBAR.forEach((id, i) => {
+  /** A blokk ikonja: az oldallap textúrája az atlaszból, színezéssel */
+  const drawIcon = (c: HTMLCanvasElement, id: number) => {
     const def = BLOCKS[id];
-    const slot = document.createElement('div');
-    slot.className = 'slot';
-    slot.title = def.name;
-    const c = document.createElement('canvas');
-    c.width = c.height = TILE;
     const ctx = c.getContext('2d')!;
+    ctx.clearRect(0, 0, TILE, TILE);
+    if (!def) return;
     const [sx, sy] = atlas.cell(def.side);
     ctx.drawImage(atlas.canvas, sx, sy, TILE, TILE, 0, 0, TILE, TILE);
     const tint = def.tint?.side;
@@ -242,7 +256,22 @@ async function main(): Promise<void> {
       ctx.globalCompositeOperation = 'multiply';
       ctx.fillStyle = `rgb(${tint.map((v) => Math.round(v * 255)).join(',')})`;
       ctx.fillRect(0, 0, TILE, TILE);
+      ctx.globalCompositeOperation = 'source-over';
     }
+  };
+
+  const hotbarEl = $('hotbar');
+  const slotEls: HTMLElement[] = [];
+  const slotCanvases: HTMLCanvasElement[] = [];
+  const paintSlot = (i: number) => {
+    slotEls[i].title = BLOCKS[hotbar[i]]?.name ?? '';
+    drawIcon(slotCanvases[i], hotbar[i]);
+  };
+  hotbar.forEach((_, i) => {
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    const c = document.createElement('canvas');
+    c.width = c.height = TILE;
     slot.appendChild(c);
     slot.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
@@ -251,13 +280,15 @@ async function main(): Promise<void> {
     });
     hotbarEl.appendChild(slot);
     slotEls.push(slot);
+    slotCanvases.push(c);
+    paintSlot(i);
   });
   const selectSlot = (i: number) => slotEls.forEach((el, n) => el.classList.toggle('selected', n === i));
   input.onHotbar = selectSlot;
   selectSlot(0);
 
   // ---------- menü ----------
-  type State = 'menu' | 'playing';
+  type State = 'menu' | 'playing' | 'inventory';
   let state: State = 'menu';
   const menu = $('menu'), hud = $('hud');
   const btnContinue = $('btn-continue'), btnNew = $('btn-new'), btnSettings = $('btn-settings');
@@ -290,6 +321,79 @@ async function main(): Promise<void> {
     refreshMenu();
   };
   input.onPause = pause;
+
+  // ---------- kreatív inventory ----------
+  const invEl = $('inventory'), invGrid = $('inv-grid'), invInfo = $('inv-info');
+  const invSearch = $<HTMLInputElement>('inv-search');
+  type InvItem = { id: number; el: HTMLButtonElement; text: string };
+  let invItems: InvItem[] = [];
+
+  const buildInventory = () => {
+    const frag = document.createDocumentFragment();
+    invItems = placeableBlocks().map((id) => {
+      const def = BLOCKS[id];
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'inv-item';
+      el.title = def.name;
+      el.setAttribute('aria-label', def.name);
+      const c = document.createElement('canvas');
+      c.width = c.height = TILE;
+      drawIcon(c, id);
+      el.appendChild(c);
+      el.addEventListener('click', () => {
+        hotbar[input.hotbar] = id;
+        paintSlot(input.hotbar);
+        closeInventory();
+      });
+      frag.appendChild(el);
+      return { id, el, text: `${def.name} ${def.key ?? ''}`.toLowerCase() };
+    });
+    invGrid.replaceChildren(frag);
+  };
+
+  const filterInventory = () => {
+    const q = invSearch.value.trim().toLowerCase().replace(/\s+/g, '_');
+    const words = q.split('_').filter(Boolean);
+    let shown = 0;
+    for (const it of invItems) {
+      const hay = it.text.replace(/\s+/g, '_');
+      const ok = words.every((w) => hay.includes(w));
+      it.el.hidden = !ok;
+      if (ok) shown++;
+    }
+    invInfo.textContent = `${shown} blokk` + (extraCount ? '' : ' (a teljes lista a textúracsomag kicsomagolása után jelenik meg, lásd a README-t)');
+  };
+  invSearch.addEventListener('input', filterInventory);
+
+  const openInventory = () => {
+    if (state !== 'playing') return;
+    if (!invItems.length) buildInventory();
+    state = 'inventory';
+    input.enabled = false;
+    input.reset();
+    if (document.pointerLockElement) document.exitPointerLock();
+    invSearch.value = '';
+    filterInventory();
+    invEl.hidden = false;
+    if (!input.touch) invSearch.focus();
+  };
+  function closeInventory() {
+    if (state !== 'inventory') return;
+    invEl.hidden = true;
+    invSearch.blur();
+    state = 'playing';
+    input.reset();
+    input.enabled = true;
+    input.lock();
+  }
+  input.onInventory = () => (state === 'inventory' ? closeInventory() : openInventory());
+  $('inv-close').addEventListener('click', closeInventory);
+  document.addEventListener('keydown', (e) => {
+    if (state !== 'inventory') return;
+    if (e.code === 'Escape') closeInventory();
+    else if (e.code === 'KeyE' && e.target !== invSearch) closeInventory();
+  });
 
   btnContinue.addEventListener('click', () => {
     if (!started) {
@@ -335,7 +439,7 @@ async function main(): Promise<void> {
   applySettings();
   refreshMenu();
 
-  setInterval(() => { if (state === 'playing') saveGame(); }, 20000);
+  setInterval(() => { if (state !== 'menu') saveGame(); }, 20000);
   window.addEventListener('beforeunload', saveGame);
 
   // ---------- fő ciklus ----------
@@ -355,7 +459,7 @@ async function main(): Promise<void> {
       if (world.setBlock(hit.x, hit.y, hit.z, 0)) refresh(hit.x, hit.z);
     }
     if (input.placeQueued && hit && hit.py >= 0 && hit.py < CH && !player.intersectsBlock(hit.px, hit.py, hit.pz)) {
-      if (world.setBlock(hit.px, hit.py, hit.pz, HOTBAR[input.hotbar] ?? B.DIRT)) refresh(hit.px, hit.pz);
+      if (world.setBlock(hit.px, hit.py, hit.pz, hotbar[input.hotbar] ?? B.DIRT)) refresh(hit.px, hit.pz);
     }
     input.breakQueued = input.placeQueued = false;
   };
@@ -367,7 +471,7 @@ async function main(): Promise<void> {
     frame++;
 
     let cx: number, cz: number;
-    if (state === 'playing') {
+    if (state !== 'menu') {
       player.yaw += input.dYaw;
       player.pitch = Math.max(-1.55, Math.min(1.55, player.pitch + input.dPitch));
       input.dYaw = input.dPitch = 0;
@@ -391,7 +495,7 @@ async function main(): Promise<void> {
     // ---------- nappal-éjszaka, ég, víz alatti köd ----------
     timeOfDay = (timeOfDay + dt / DAY_SECONDS) % 1;
     const sky = skyAt(timeOfDay);
-    const underwater = state === 'playing' && player.headUnderwater;
+    const underwater = state !== 'menu' && player.headUnderwater;
     const k = Math.pow((sky.light[0] + sky.light[1] + sky.light[2]) / 3, 0.45);
     const bg: RGB = underwater ? [0.1 * k, 0.28 * k, 0.6 * k] : sky.sky;
     bgColor.setRGB(bg[0], bg[1], bg[2], THREE.SRGBColorSpace);
