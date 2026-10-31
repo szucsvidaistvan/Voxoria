@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "textures": "node scripts/extract-textures.mjs"
+    "textures": "node scripts/extract-textures.mjs",
+    "blocks": "node scripts/build-blocks.mjs"
   },
   "dependencies": {
     "three": "^0.170.0"
