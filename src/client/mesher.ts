@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { AIR, BLOCKS, FLUID_LAVA, fluidHeight, fluidKind, fluidLevel, isOpaque, rotPoint, type BlockDef, type Dir, type FaceKind, type ShapeFace, type Vec3 } from '../shared/blocks';
+import { AIR, B, BLOCKS, FLUID_LAVA, fluidHeight, fluidKind, fluidLevel, isOpaque, rotPoint, type BlockDef, type Dir, type FaceKind, type ShapeFace, type Vec3 } from '../shared/blocks';
 import { CH, CS, type Chunk, type World } from '../shared/world';
 import type { Atlas } from './atlas';
 
@@ -43,6 +43,8 @@ export interface ChunkGeometry {
   solid: THREE.BufferGeometry | null;
   water: THREE.BufferGeometry | null;
   lava: THREE.BufferGeometry | null;
+  /** tűz: animált, külön anyaggal */
+  fire: THREE.BufferGeometry | null;
 }
 
 
@@ -68,7 +70,8 @@ const around = (p: Vec3, axis: 'x' | 'y' | 'z', deg: number): Vec3 => {
 
 /** Egy nem kocka alakú blokk lapjai: a modell elemei, az elemek és a blokk forgatásával */
 function addShape(
-  buf: Buffers, def: BlockDef, world: World, wx: number, y: number, wz: number, x: number, z: number, atlas: Atlas,
+  buf: Buffers, def: BlockDef, world: World, wx: number, y: number, wz: number, x: number, z: number,
+  uvOf: (tex: string) => [number, number, number, number], bright = false,
 ): void {
   const rots = def.rots ?? [];
   for (const part of def.parts!) {
@@ -99,10 +102,10 @@ function addShape(
       }
 
       const ax = Math.abs(n[0]), ay = Math.abs(n[1]), az = Math.abs(n[2]);
-      const shade = ay >= ax && ay >= az ? (n[1] > 0 ? 1 : 0.5) : ax >= az ? 0.8 : 0.65;
+      const shade = bright ? 1 : ay >= ax && ay >= az ? (n[1] > 0 ? 1 : 0.5) : ax >= az ? 0.8 : 0.65;
       const tint = face.tint && def.tintColor ? def.tintColor : ([1, 1, 1] as const);
 
-      const [u0, v0, u1, v1] = atlas.uv(face.tex);
+      const [u0, v0, u1, v1] = uvOf(face.tex);
       const [a, b, c, d] = face.uv;
       const uvs = [[a, d], [c, d], [c, b], [a, b]];
       const rot = (((face.rot ?? 0) / 90) | 0) & 3;
@@ -135,7 +138,7 @@ function addFluid(
   const above = world.getBlock(wx, y + 1, wz);
   const h = fluidKind(above) === kind ? 1 : fluidHeight(fluidLevel(id));
   const lava = kind === FLUID_LAVA;
-  const [u0, v0, u1, v1] = atlas.uv(def.top);
+  const [u0, v0, u1, v1] = atlas.anim.uv(def.top);
   for (const f of FACES) {
     const nx = wx + f.dir[0], ny = y + f.dir[1], nz = wz + f.dir[2];
     const nid = world.getBlock(nx, ny, nz);
@@ -169,6 +172,7 @@ export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): Ch
   const solid = new Buffers();
   const water = new Buffers();
   const lava = new Buffers();
+  const fire = new Buffers();
   const ox = chunk.cx * CS, oz = chunk.cz * CS;
 
   for (let y = 0; y < CH; y++) {
@@ -179,7 +183,8 @@ export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): Ch
         const def = BLOCKS[id];
         if (!def) continue; // ismeretlen blokk: nem rajzoljuk
         if (def.parts) {
-          addShape(solid, def, world, ox + x, y, oz + z, x, z, atlas);
+          if (id === B.FIRE) addShape(fire, def, world, ox + x, y, oz + z, x, z, (t) => atlas.anim.uv(t), true);
+          else addShape(solid, def, world, ox + x, y, oz + z, x, z, (t) => atlas.uv(t));
           continue;
         }
         const kind = fluidKind(id);
@@ -205,5 +210,5 @@ export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): Ch
     }
   }
 
-  return { solid: solid.toGeometry(), water: water.toGeometry(), lava: lava.toGeometry() };
+  return { solid: solid.toGeometry(), water: water.toGeometry(), lava: lava.toGeometry(), fire: fire.toGeometry() };
 }

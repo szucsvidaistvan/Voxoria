@@ -18,6 +18,8 @@ export class Input {
 
   onHotbar: (i: number) => void = () => {};
   onPause: () => void = () => {};
+  /** eddig az időpontig (performance.now) a kurzor felszabadulása nem nyitja meg a menüt */
+  ignoreUnlockUntil = 0;
   onInventory: () => void = () => {};
 
   private keys = new Set<string>();
@@ -99,7 +101,7 @@ export class Input {
       this.select(this.hotbar + (e.deltaY > 0 ? 1 : -1));
     }, { passive: true });
     document.addEventListener('pointerlockchange', () => {
-      if (!this.locked && this.enabled && !this.touch) this.onPause();
+      if (!this.locked && this.enabled && !this.touch && performance.now() >= this.ignoreUnlockUntil) this.onPause();
     });
     window.addEventListener('blur', () => this.reset());
   }

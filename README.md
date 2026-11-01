@@ -53,7 +53,7 @@ A korábbi, saját textúralapokból kivágott textúrákat a `scripts/slice-tex
 Az **Új világ (túlélő)** és az **Új világ (kreatív)** gomb közül választasz; a mentés megjegyzi a módot.
 
 - **Kreatív:** végtelen blokk, nincs sebzés, az **E** a kereshető blokklistát nyitja, a bontás egy kattintás.
-- **Túlélő:** üres kézzel indulsz. A bontás a blokk keménységétől és a kezedben lévő szerszámtól függ (tartsd nyomva), a blokkok a tárolóba kerülnek. Életerő (10 szív), esési sebzés, fulladás (buborékok), égés és láva sebzés, természetes gyógyulás. Halál után újraélesztés a kiinduló helyen, a tárgyaid megmaradnak.
+- **Túlélő:** üres kézzel indulsz. A bontás a blokk keménységétől és a kezedben lévő szerszámtól függ (tartsd nyomva), közben repedések jelennek meg a blokkon, a bontáskor törmelék repül szét, a blokk pedig a földre esik. Ha a közelébe érsz, a játékos felveszi (ha tele a tároló, a földön marad). Életerő (10 szív), esési sebzés, fulladás (buborékok), égés és láva sebzés, természetes gyógyulás. Halál után újraélesztés a kiinduló helyen, a tárgyaid megmaradnak.
 
 ### Inventory és barkácsolás
 
@@ -63,10 +63,10 @@ Receptek (a rács alakja számít, a tükrözött is jó): rönk → 4 deszka, 2
 
 ### Folyadékok és tűz
 
-- **Víz:** 7 blokk távolságra folyik, lefelé esik, két szomszédos forrás között új forrás keletkezik (végtelen víz), forrás nélkül elapad.
+- **Víz:** 3 blokk távolságra folyik (a lávával megegyezően, 0,5 másodpercenként egy lépés), lefelé esik, két szomszédos forrás között új forrás keletkezik (végtelen víz), forrás nélkül elapad. A távolság és a sebesség a `src/shared/fluids.ts` elején állítható.
 - **Láva:** lassan folyik (3 blokk távolságra), lassítja és sebzi a játékost, és meggyújtja a közeli éghető blokkokat.
 - **Láva + víz:** a láva forrás obszidiánná, a folyó láva kaviccsá válik, a vízbe lefolyó láva kővé.
-- **Tűz:** átterjed a fára, lombra, gyapjúra és növényekre, majd kialszik. Kova és acéllal (jobb gomb) lehet gyújtani, vízzel el lehet oltani.
+- **Tűz:** animált, átterjed a fára, lombra, gyapjúra és növényekre, majd kialszik. Kova és acéllal (jobb gomb) lehet gyújtani, vízzel el lehet oltani.
 - **Vödör:** üres vödörrel (jobb gomb) vizet vagy lávát veszel fel, a teli vödörrel lerakod.
 
 ## Felépítés

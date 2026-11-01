@@ -5,7 +5,7 @@ import { CH, type World } from './world';
 
 /**
  * Víz, láva és tűz szimulációja a Minecraft szabályai szerint (20 "tick" = 1 másodperc).
- * - A víz 5 tickenként (0,25 s) terjed, 7 blokk távolságig; két szomszédos forrás között új forrás születik.
+ * - A víz 10 tickenként (0,5 s) terjed, 3 blokk távolságig; két szomszédos forrás között új forrás születik.
  * - A láva 30 tickenként (1,5 s) terjed, 3 blokk távolságig.
  * - Láva + víz: a láva forrás obszidiánná, a folyó láva kaviccsá válik; ha a láva lefelé vízbe folyik, kő lesz.
  * - A tűz átterjed az éghető blokkokra, majd kialszik. A láva meggyújtja a közelében lévő éghető dolgokat.
@@ -13,8 +13,9 @@ import { CH, type World } from './world';
  */
 
 export const TICKS_PER_SECOND = 20;
-const WATER_DELAY = 5, LAVA_DELAY = 30, FIRE_DELAY = 30;
-const MAX_LEVEL: Record<number, number> = { [FLUID_WATER]: 7, [FLUID_LAVA]: 3 };
+// A víz és a láva ugyanolyan messzire folyik (3 blokk); a víz gyorsabban, a láva lassabban.
+const WATER_DELAY = 10, LAVA_DELAY = 30, FIRE_DELAY = 30;
+const MAX_LEVEL: Record<number, number> = { [FLUID_WATER]: 3, [FLUID_LAVA]: 3 };
 
 const OFF = 1 << 20;
 const keyOf = (x: number, y: number, z: number) => ((x + OFF) * 2097152 + (z + OFF)) * 64 + y;

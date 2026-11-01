@@ -14,6 +14,8 @@ import { buildAtlas, TILE } from './atlas';
 import { DAY_SECONDS, START_TIME, skyAt } from './daynight';
 import { BagUI, HOTBAR_SIZE, Inventory, SlotView, createItemPainter } from './inventory';
 import { Health, createVitals } from './health';
+import { createCracks, createDrops, createParticles } from './effects';
+import { createBlockIcons } from './icons';
 import { Input } from './input';
 import { buildChunkGeometry } from './mesher';
 import { EYE, Player } from './player';
@@ -55,11 +57,16 @@ async function main(): Promise<void> {
   const material = new THREE.MeshBasicMaterial({ map: atlas.texture, vertexColors: true, alphaTest: 0.5 });
   // a víz átlátszó, és alulról is látszik a felszíne
   const waterMaterial = new THREE.MeshBasicMaterial({
-    map: atlas.texture, vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide,
+    map: atlas.anim.texture, vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide,
   });
 
+  const cracks = createCracks(scene);
+  const particles = createParticles(scene, atlas);
+
   // a láva világít: nem sötétedik az éjszakával
-  const lavaMaterial = new THREE.MeshBasicMaterial({ map: atlas.texture, vertexColors: true });
+  const lavaMaterial = new THREE.MeshBasicMaterial({ map: atlas.anim.texture, vertexColors: true });
+  // a tűz is világít, és animált
+  const fireMaterial = new THREE.MeshBasicMaterial({ map: atlas.anim.texture, vertexColors: true, alphaTest: 0.3, side: THREE.DoubleSide });
 
   // ég: nap, hold, csillagok (a kamerával együtt mozognak)
   const sun = new THREE.Mesh(
@@ -154,6 +161,7 @@ async function main(): Promise<void> {
     };
     add(g.solid, material, 0);
     add(g.lava, lavaMaterial, 0);
+    add(g.fire, fireMaterial, 0);
     add(g.water, waterMaterial, 1);
     if (list.length) meshes.set(key, list);
     built.add(key);
@@ -248,6 +256,7 @@ async function main(): Promise<void> {
     world = new World(seed);
     sim = new FluidSim(world, (x, _y, z) => markDirty(x, z));
     dirty.clear();
+    drops.clear();
     if (save) world.importEdits(save.edits);
     timeOfDay = save?.time ?? START_TIME;
 
@@ -287,31 +296,19 @@ async function main(): Promise<void> {
   };
 
   // ---------- hotbar ----------
-  /** A blokk ikonja: az oldallap textúrája az atlaszból, színezéssel */
-  const drawIcon = (c: HTMLCanvasElement, id: number) => {
-    const def = BLOCKS[id];
-    const ctx = c.getContext('2d')!;
-    ctx.clearRect(0, 0, TILE, TILE);
-    if (!def) return;
-    const [sx, sy] = atlas.cell(def.side);
-    ctx.drawImage(atlas.canvas, sx, sy, TILE, TILE, 0, 0, TILE, TILE);
-    const tint = def.tint?.side;
-    if (tint) {
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.fillStyle = `rgb(${tint.map((v) => Math.round(v * 255)).join(',')})`;
-      ctx.fillRect(0, 0, TILE, TILE);
-      ctx.globalCompositeOperation = 'source-over';
-    }
-  };
+  /** A blokk ikonja: izometrikus kocka (a nem kocka alakú blokkok dobozokból, a növények képként) */
+  const drawIcon = createBlockIcons(atlas);
 
   /** Az elem textúrák betöltése után minden ikon újrarajzolódik */
   const itemPainter = createItemPainter(import.meta.env.BASE_URL, () => {
     hotViews.forEach((v) => v.invalidate());
     paintHotbar();
     bag.invalidate();
+    drops.refreshIcons();
   });
   const paintStack = (c: HTMLCanvasElement, id: number) => (isItem(id) ? itemPainter(c, id) : drawIcon(c, id));
 
+  const drops = createDrops(scene, atlas, material, paintStack);
   const hotbarEl = $('hotbar');
   const hotViews: SlotView[] = [];
   const held = () => inv.slots[input.hotbar];
@@ -463,7 +460,7 @@ async function main(): Promise<void> {
     if (document.pointerLockElement) document.exitPointerLock();
     bag.open(size);
   };
-  function closeUI() {
+  function closeUI(viaEsc = false) {
     if (state !== 'inventory') return;
     invEl.hidden = true;
     invSearch.blur();
@@ -471,14 +468,24 @@ async function main(): Promise<void> {
     state = 'playing';
     input.reset();
     input.enabled = true;
-    input.lock();
+    if (viaEsc) {
+      // Az Esc megnyomása közben kért kurzorzár azonnal felszabadulna, és megnyitná a menüt:
+      // ezért az Esc felengedésekor zárjuk le, addig a felszabadulást nem vesszük figyelembe.
+      input.ignoreUnlockUntil = performance.now() + 800;
+      const relock = (e: KeyboardEvent) => {
+        if (e.code !== 'Escape') return;
+        document.removeEventListener('keyup', relock);
+        if (state === 'playing') input.lock();
+      };
+      document.addEventListener('keyup', relock);
+    } else input.lock();
   }
-  bag.onClose = closeUI;
+  bag.onClose = () => closeUI();
   input.onInventory = () => (state === 'inventory' ? closeUI() : mode === 'creative' ? openPicker() : openBag(2));
-  $('inv-close').addEventListener('click', closeUI);
+  $('inv-close').addEventListener('click', () => closeUI());
   document.addEventListener('keydown', (e) => {
     if (state !== 'inventory') return;
-    if (e.code === 'Escape') closeUI();
+    if (e.code === 'Escape') { e.preventDefault(); closeUI(true); }
     else if (e.code === 'KeyE' && e.target !== invSearch) closeUI();
   });
 
@@ -579,22 +586,24 @@ async function main(): Promise<void> {
     return true;
   };
 
-  const giveDrop = (id: number) => {
+  /** A kibontott blokk a földre esik (a játékos felveszi, ha a közelébe ér) */
+  const giveDrop = (id: number, x: number, y: number, z: number) => {
     const d = dropFor(id, held()?.id);
-    if (d) inv.add(d.id, d.n); // ami nem fér a tárolóba, elvész
-    paintHotbar();
+    if (d) drops.spawn(d.id, d.n, x + 0.5, y + 0.5, z + 0.5);
   };
 
   const breakBlock = (x: number, y: number, z: number) => {
     const id = world.getBlock(x, y, z);
     if (!setBlockAt(x, y, z, AIR)) return;
-    if (mode === 'survival') giveDrop(id);
+    particles.burst(x, y, z, id);
+    if (mode === 'survival') giveDrop(id, x, y, z);
     // a rajta álló növény, fáklya, tűz vele együtt leesik
     for (let yy = y + 1; yy < CH; yy++) {
       const up = world.getBlock(x, yy, z);
       if (up === AIR || !isReplaceable(up)) break;
       setBlockAt(x, yy, z, AIR);
-      if (mode === 'survival') giveDrop(up);
+      particles.burst(x, yy, z, up);
+      if (mode === 'survival') giveDrop(up, x, yy, z);
     }
     flushDirty(5);
   };
@@ -704,6 +713,9 @@ async function main(): Promise<void> {
     const showBar = mine.active && mine.need > 0.15 && isFinite(mine.need);
     mineEl.classList.toggle('on', showBar);
     if (showBar) mineBar.style.width = `${Math.min(100, (mine.t / mine.need) * 100)}%`;
+    // repedések a bontott blokkon
+    if (mine.active && hit && isFinite(mine.need) && mine.need > 0.05 && mine.t > 0) cracks.show(hit.box, mine.t / mine.need);
+    else cracks.hide();
 
     if (input.placeQueued) useItem(hit);
     input.breakQueued = input.placeQueued = false;
@@ -714,6 +726,7 @@ async function main(): Promise<void> {
     const dt = Math.min((now - last) / 1000, 0.1);
     last = now;
     frame++;
+    atlas.anim.update(now / 1000);
 
     let cx: number, cz: number;
     if (state !== 'menu') {
@@ -785,6 +798,14 @@ async function main(): Promise<void> {
       while (simAcc >= 0.05) { simAcc -= 0.05; sim.update(); }
     }
     flushDirty(3);
+    if (state !== 'menu') {
+      particles.update(dt);
+      drops.update(dt, world, player.pos.x, player.pos.y, player.pos.z, (id, n) => {
+        const left = inv.add(id, n);
+        if (left < n) paintHotbar();
+        return left;
+      });
+    }
     stream(cx, cz, settings.renderDistance, 4, 2);
     if (frame % 60 === 0) unload(cx, cz, settings.renderDistance);
     renderer.render(scene, camera);

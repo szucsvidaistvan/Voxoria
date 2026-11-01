@@ -40,7 +40,16 @@ function drawWater(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   }
 }
 
+/** Az animált textúrák (víz, láva, tűz) külön, kicsi atlaszon vannak, hogy az animáció csak ezt töltse újra a GPU-ra */
+export interface AnimAtlas {
+  texture: THREE.CanvasTexture;
+  uv(name: TexName): [number, number, number, number];
+  /** t: idő másodpercben; a képkockát csak akkor cseréli, ha változott */
+  update(t: number): void;
+}
+
 export interface Atlas {
+  anim: AnimAtlas;
   texture: THREE.CanvasTexture;
   canvas: HTMLCanvasElement;
   /** [u0, v0, u1, v1] */
@@ -57,6 +66,66 @@ function loadImage(url: string): Promise<HTMLImageElement | null> {
     img.onerror = () => res(null);
     img.src = url;
   });
+}
+
+// az animált textúrák képkockasebessége (kocka / másodperc)
+const ANIM: [TexName, number][] = [['water', 8], ['lava', 6], ['fire', 15]];
+
+async function buildAnim(main: HTMLCanvasElement, cellOf: (n: TexName) => [number, number], base: string): Promise<AnimAtlas> {
+  const canvas = document.createElement('canvas');
+  canvas.width = ANIM.length * CELL;
+  canvas.height = CELL;
+  const ctx = canvas.getContext('2d')!;
+  const strips = await Promise.all(ANIM.map(([n]) => loadImage(`${base}textures/${n}.png`)));
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = SMOOTH ? THREE.LinearFilter : THREE.NearestFilter;
+  texture.minFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+
+  const edges = (x: number, y: number) => {
+    ctx.drawImage(canvas, x, y, TILE, 1, x, y - PAD, TILE, PAD);
+    ctx.drawImage(canvas, x, y + TILE - 1, TILE, 1, x, y + TILE, TILE, PAD);
+    ctx.drawImage(canvas, x, y - PAD, 1, TILE + PAD * 2, x - PAD, y - PAD, PAD, TILE + PAD * 2);
+    ctx.drawImage(canvas, x + TILE - 1, y - PAD, 1, TILE + PAD * 2, x + TILE, y - PAD, PAD, TILE + PAD * 2);
+  };
+  // kezdetben az atlasz állóképe (ez marad, ha a csíkot nem sikerült betölteni)
+  ANIM.forEach(([n], i) => {
+    const [sx, sy] = cellOf(n);
+    const x = i * CELL + PAD, y = PAD;
+    ctx.drawImage(main, sx, sy, TILE, TILE, x, y, TILE, TILE);
+    edges(x, y);
+  });
+  texture.needsUpdate = true;
+
+  const last = ANIM.map(() => -1);
+  return {
+    texture,
+    uv(name) {
+      const i = Math.max(0, ANIM.findIndex(([n]) => n === name));
+      const x = i * CELL + PAD;
+      return [x / canvas.width, 1 - (PAD + TILE) / CELL, (x + TILE) / canvas.width, 1 - PAD / CELL];
+    },
+    update(t) {
+      let dirty = false;
+      ANIM.forEach(([, fps], i) => {
+        const img = strips[i];
+        if (!img || img.width === 0) return;
+        const frames = Math.max(1, Math.floor(img.height / img.width));
+        const f = Math.floor(t * fps) % frames;
+        if (f === last[i]) return;
+        last[i] = f;
+        const x = i * CELL + PAD, y = PAD;
+        ctx.clearRect(x - PAD, 0, CELL, CELL);
+        ctx.imageSmoothingEnabled = img.width >= TILE;
+        ctx.drawImage(img, 0, f * img.width, img.width, img.width, x, y, TILE, TILE);
+        edges(x, y);
+        dirty = true;
+      });
+      if (dirty) texture.needsUpdate = true;
+    },
+  };
 }
 
 /** Az atlasz az alap textúrákból és (ha regisztrálva vannak) a generált blokkok textúráiból áll */
@@ -119,7 +188,12 @@ export async function buildAtlas(): Promise<Atlas> {
 
   const W = canvas.width, H = canvas.height;
   const at = (n: TexName) => index.get(n) ?? 0;
+  const anim = await buildAnim(canvas, (n) => {
+    const i = index.get(n) ?? 0;
+    return [(i % cols) * CELL + PAD, Math.floor(i / cols) * CELL + PAD];
+  }, base);
   return {
+    anim,
     texture,
     canvas,
     usingPack: baseFound === BASE_TEXTURES.length,
