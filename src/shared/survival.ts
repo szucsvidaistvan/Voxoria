@@ -1,0 +1,84 @@
+import { B, BLOCKS, blockId, blockKey } from './blocks';
+import { I, toolOf, type ToolType } from './items';
+
+/** Bontási szabály: keménység, a hozzá való szerszám, és a begyűjtéshez kellő minimális szint (0: bármi) */
+export interface BreakRule {
+  hardness: number;
+  tool: ToolType | null;
+  tier: number;
+}
+
+const baseOf = (id: number) => BLOCKS[id]?.base ?? id;
+
+const INSTANT = /(torch|sapling|^grass$|^short_grass$|^fern$|dead_bush|tulip|poppy|dandelion|allium|orchid|bluet|daisy|mushroom$|sugar_cane|seagrass|^fire$|cobweb|rail$|lever|button|lily_pad|carpet$|^snow$|^tall_grass)/;
+const SOFT = /^(dirt|grass_block|coarse_dirt|podzol|mycelium|farmland|dirt_path|sand|red_sand|gravel|clay|soul_sand|snow_block|concrete_powder)$|_concrete_powder$/;
+const WOOD = /(planks|_log$|_wood$|^stripped_|fence|trapdoor|_door$|^crafting_table$|^bookshelf$|^chest$|^barrel$|^ladder$|^note_block$|^jukebox$)|^(oak|spruce|birch|jungle|acacia|dark_oak)_(stairs|slab|pressure_plate)$/;
+
+export function breakRule(id: number): BreakRule {
+  const key = blockKey(id);
+  if (key === 'bedrock') return { hardness: Infinity, tool: null, tier: 0 };
+  if (key === 'obsidian') return { hardness: 50, tool: 'pickaxe', tier: 4 };
+  if (INSTANT.test(key)) return { hardness: 0, tool: null, tier: 0 };
+  if (/_ore$/.test(key)) {
+    const tier = /(coal|quartz)/.test(key) ? 1 : /(iron|lapis|copper)/.test(key) ? 2 : 3;
+    return { hardness: 3, tool: 'pickaxe', tier };
+  }
+  const metal = /^(iron|gold|diamond|emerald|lapis|redstone|coal)_block$/.exec(key);
+  if (metal) {
+    const tier = metal[1] === 'iron' || metal[1] === 'lapis' ? 2 : metal[1] === 'coal' || metal[1] === 'redstone' ? 1 : 3;
+    return { hardness: metal[1] === 'gold' ? 3 : 5, tool: 'pickaxe', tier };
+  }
+  if (SOFT.test(key)) return { hardness: /^(gravel|clay|grass_block)$/.test(key) ? 0.6 : 0.5, tool: 'shovel', tier: 0 };
+  if (WOOD.test(key)) return { hardness: key === 'bookshelf' ? 1.5 : 2, tool: 'axe', tier: 0 };
+  if (/leaves$/.test(key)) return { hardness: 0.2, tool: null, tier: 0 };
+  if (/glass|ice$/.test(key)) return { hardness: 0.3, tool: null, tier: 0 };
+  if (/wool$|^hay_block$/.test(key)) return { hardness: 0.8, tool: null, tier: 0 };
+  if (/stone|cobble|brick|stairs|slab|wall|terracotta|concrete|prismarine|andesite|diorite|granite|netherrack|quartz|purpur|magma|basalt|deepslate|tuff|blackstone|furnace|lantern|iron_bars/.test(key)) {
+    return { hardness: /^netherrack$/.test(key) ? 0.4 : 1.5, tool: 'pickaxe', tier: 1 };
+  }
+  return { hardness: 1, tool: null, tier: 0 };
+}
+
+/** Meddig tart a blokk bontása a kézben tartott dologgal (másodperc). Infinity: nem bontható. */
+export function breakTime(id: number, held: number | undefined): number {
+  const r = breakRule(id);
+  if (!isFinite(r.hardness)) return Infinity;
+  if (r.hardness <= 0) return 0;
+  const tool = toolOf(held);
+  const matches = !!r.tool && !!tool && tool.type === r.tool;
+  const speed = matches ? tool!.speed : 1;
+  const can = !r.tool || r.tier === 0 || (matches && tool!.tier >= r.tier);
+  return (r.hardness * (can ? 1.5 : 5)) / speed;
+}
+
+/** Mit ad a blokk, ha a kézben lévő dologgal bontják? null: semmit. */
+export function dropFor(id: number, held: number | undefined, rand: () => number = Math.random): { id: number; n: number } | null {
+  const base = baseOf(id);
+  const r = breakRule(base);
+  if (!isFinite(r.hardness)) return null;
+  const tool = toolOf(held);
+  const matches = !!r.tool && !!tool && tool.type === r.tool;
+  if (r.tool && r.tier > 0 && !(matches && tool!.tier >= r.tier)) return null;
+
+  const key = blockKey(base);
+  switch (key) {
+    case 'stone': return { id: B.COBBLE, n: 1 };
+    case 'grass_block': return { id: B.DIRT, n: 1 };
+    case 'coal_ore': return { id: I.COAL, n: 1 };
+    case 'diamond_ore': return { id: I.DIAMOND, n: 1 };
+    case 'iron_ore': return { id: I.IRON_INGOT, n: 1 };
+    case 'gold_ore': return { id: I.GOLD_INGOT, n: 1 };
+    case 'gravel': return rand() < 0.1 ? { id: I.FLINT, n: 1 } : { id: base, n: 1 };
+    case 'fire': case 'bedrock': return null;
+    default:
+  }
+  if (/leaves$/.test(key)) {
+    const sapling = blockId('oak_sapling');
+    if (sapling !== undefined && rand() < 0.06) return { id: sapling, n: 1 };
+    if (rand() < 0.02) return { id: I.APPLE, n: 1 };
+    return null;
+  }
+  if (/glass|ice$/.test(key) && !/^(glass_pane|iron_bars)$/.test(key)) return null;
+  if (/^(short_grass|grass|fern|tall_grass)$/.test(key)) return null;
+  return { id: base, n: 1 };
+}

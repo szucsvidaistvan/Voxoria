@@ -11,6 +11,12 @@ export interface SaveData {
   time?: number;
   /** a hotbar blokkjai (a régi mentésekben nincs) */
   hotbar?: number[];
+  /** játékmód (a régi mentésekben nincs: kreatív) */
+  mode?: 'survival' | 'creative';
+  /** életerő, 0..20 */
+  hp?: number;
+  /** a tároló: [id, darab, id, darab, ...] 36 helyre */
+  inv?: number[];
 }
 
 export interface Settings {

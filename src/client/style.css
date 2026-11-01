@@ -98,6 +98,25 @@ html, body {
 .slot canvas { width: 100%; height: 100%; display: block; }
 .slot.selected { border-color: var(--gold); }
 
+#held-name {
+  position: fixed;
+  left: 50%;
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 70px);
+  transform: translateX(-50%);
+  padding: 0.25rem 0.7rem;
+  max-width: 90vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--chalk);
+  background: rgba(14, 26, 51, 0.72);
+  box-shadow: inset 0 0 0 2px var(--edge);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s;
+}
+#held-name.show { opacity: 1; transition: opacity 0.05s; }
+
 .touch-only { display: none; }
 body.touch .touch-only { display: block; }
 
@@ -107,6 +126,7 @@ body.touch #hotbar {
   width: calc(100vw - 7rem);
   max-width: 24rem;
 }
+body.touch #held-name { top: calc(max(8px, env(safe-area-inset-top)) + 64px); bottom: auto; }
 body.touch .slot { flex: 1; width: auto; height: auto; aspect-ratio: 1; padding: 2px; border-width: 2px; }
 
 #btn-menu {
@@ -228,3 +248,115 @@ body.touch #touch-actions { display: grid; }
 @media (prefers-reduced-motion: reduce) {
   .btn:active { transform: none; }
 }
+
+#credits a { color: inherit; }
+
+/* ---------- életerő, levegő, bontás ---------- */
+#vitals {
+  position: fixed;
+  left: 50%;
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 72px);
+  transform: translateX(-50%);
+  width: min(var(--hotbar-w, 520px), 96vw);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  pointer-events: none;
+}
+body.touch #vitals { top: calc(max(8px, env(safe-area-inset-top)) + 100px); bottom: auto; width: min(24rem, calc(100vw - 7rem)); }
+#hearts, #air { display: flex; gap: 2px; min-height: 22px; }
+#air { margin-left: auto; }
+.vital {
+  width: 20px;
+  height: 20px;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+}
+.vital.shake { animation: shake 0.3s infinite; }
+@keyframes shake { 50% { transform: translateY(-2px); } }
+body.creative #vitals { display: none; }
+
+#mine {
+  position: fixed;
+  left: 50%;
+  top: calc(50% + 26px);
+  width: 90px;
+  height: 8px;
+  transform: translateX(-50%);
+  background: rgba(14, 26, 51, 0.7);
+  box-shadow: inset 0 0 0 2px var(--edge);
+  pointer-events: none;
+  opacity: 0;
+}
+#mine.on { opacity: 1; }
+#mine-bar { height: 100%; width: 0; background: var(--gold); }
+
+#hurt, #fire-overlay { position: fixed; inset: 0; pointer-events: none; opacity: 0; }
+#hurt { background: radial-gradient(ellipse at center, rgba(200, 0, 0, 0) 40%, rgba(200, 0, 0, 0.55) 100%); }
+#hurt.flash { animation: hurt 0.45s ease-out; }
+@keyframes hurt { 0% { opacity: 1; } 100% { opacity: 0; } }
+#fire-overlay { background: linear-gradient(to top, rgba(255, 120, 0, 0.55), rgba(255, 120, 0, 0) 55%); }
+#fire-overlay.on { opacity: 1; }
+
+/* a hotbar darabszámai */
+.slot { position: relative; }
+.cnt { position: absolute; right: 3px; bottom: 1px; color: #fff; font-size: 0.95rem; text-shadow: 2px 2px 0 #000; pointer-events: none; }
+
+/* ---------- halál ---------- */
+#death {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: rgba(60, 0, 0, 0.7);
+}
+#death h2 { margin: 0; font-size: clamp(2.4rem, 8vw, 3.6rem); color: #ff6a5a; text-shadow: 4px 4px 0 #2a0505; }
+#death .btn { width: min(20rem, 80vw); text-align: center; }
+
+/* ---------- inventory és barkácsolás ---------- */
+#bag {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 18, 36, 0.7);
+  overflow: auto;
+  touch-action: manipulation;
+}
+.bag-panel {
+  --slot: min(52px, calc((100vw - 3rem) / 9 - 4px));
+  padding: 0.8rem;
+  max-width: 100vw;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 3px var(--edge), 0 0 0 4px var(--night-deep);
+}
+.bag-panel header { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.6rem; }
+.bag-panel h2 { flex: 1; margin: 0; font-size: 1.3rem; font-weight: 600; }
+.bag-panel .btn { width: auto; margin: 0; padding: 0.4rem 0.9rem; font-size: 1rem; }
+#bag-split.on { background: var(--gold); color: #000; }
+#craft-area { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 0 0 0.8rem; }
+#craft-grid { display: grid; grid-template-columns: repeat(var(--n, 2), var(--slot)); gap: 4px; }
+#craft-arrow { font-size: 2rem; color: var(--gold); }
+#bag-main, #bag-hot { display: grid; grid-template-columns: repeat(9, var(--slot)); gap: 4px; }
+#bag-hot { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 3px solid var(--edge); }
+.islot {
+  position: relative;
+  width: var(--slot, 52px);
+  height: var(--slot, 52px);
+  padding: 3px;
+  background: var(--night-deep);
+  box-shadow: inset 0 0 0 2px var(--edge);
+  cursor: pointer;
+}
+.islot:hover { box-shadow: inset 0 0 0 2px var(--gold); }
+.islot canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; pointer-events: none; }
+.islot.out { box-shadow: inset 0 0 0 2px var(--gold); }
+#bag-cursor { position: fixed; left: 0; top: 0; z-index: 50; width: 44px; height: 44px; pointer-events: none; }
+#bag-cursor .islot { width: 44px; height: 44px; background: transparent; box-shadow: none; }
+#bag .hint { margin: 0.7rem 0 0; font-size: 0.8rem; max-width: 30rem; }

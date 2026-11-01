@@ -1,10 +1,19 @@
 import './style.css';
 import * as THREE from 'three';
-import { B, BLOCKS, HOTBAR, placeableBlocks, registerGenerated, type GeneratedPack, type RGB } from '../shared/blocks';
+import {
+  AIR, B, BLOCKS, FLUID_LAVA, FLUID_WATER, HOTBAR, blockKey, fluidId, fluidKind, fluidLevel, placeableBlocks,
+  registerGenerated, type GeneratedPack, type RGB,
+} from '../shared/blocks';
+import { FluidSim, isReplaceable } from '../shared/fluids';
+import { I, ITEMS, isItem, itemName } from '../shared/items';
+import { initRecipes } from '../shared/recipes';
+import { breakTime, dropFor } from '../shared/survival';
 import { raycast, type RayHit } from '../shared/raycast';
 import { CH, CS, SEA_LEVEL, World } from '../shared/world';
 import { buildAtlas, TILE } from './atlas';
 import { DAY_SECONDS, START_TIME, skyAt } from './daynight';
+import { BagUI, HOTBAR_SIZE, Inventory, SlotView, createItemPainter } from './inventory';
+import { Health, createVitals } from './health';
 import { Input } from './input';
 import { buildChunkGeometry } from './mesher';
 import { EYE, Player } from './player';
@@ -20,7 +29,8 @@ async function loadGenerated(): Promise<number> {
   try {
     const res = await fetch(`${import.meta.env.BASE_URL}generated/blocks.json`);
     if (!res.ok) return 0;
-    return registerGenerated((await res.json()) as GeneratedPack).length;
+    const n = registerGenerated((await res.json()) as GeneratedPack).length;
+    return n;
   } catch {
     return 0; // nincs fájl (a dev szerver ilyenkor HTML-t ad vissza, ami nem JSON)
   }
@@ -28,6 +38,7 @@ async function loadGenerated(): Promise<number> {
 
 async function main(): Promise<void> {
   const extraCount = await loadGenerated();
+  initRecipes(); // a generált blokkok után, mert a receptek hivatkoznak rájuk
   const atlas = await buildAtlas();
 
   // ---------- renderelés ----------
@@ -46,6 +57,9 @@ async function main(): Promise<void> {
   const waterMaterial = new THREE.MeshBasicMaterial({
     map: atlas.texture, vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide,
   });
+
+  // a láva világít: nem sötétedik az éjszakával
+  const lavaMaterial = new THREE.MeshBasicMaterial({ map: atlas.texture, vertexColors: true });
 
   // ég: nap, hold, csillagok (a kamerával együtt mozognak)
   const sun = new THREE.Mesh(
@@ -73,7 +87,7 @@ async function main(): Promise<void> {
   }
 
   const highlight = new THREE.LineSegments(
-    new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004, 1.004, 1.004)),
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
     new THREE.LineBasicMaterial({ color: 0x000000 }),
   );
   highlight.visible = false;
@@ -88,8 +102,8 @@ async function main(): Promise<void> {
   resize();
 
   // ---------- bemenet és beállítások ----------
-  const hotbar = [...HOTBAR];
-  const input = new Input(canvas, hotbar.length);
+  const inv = new Inventory();
+  const input = new Input(canvas, HOTBAR_SIZE);
   if (input.touch) document.body.classList.add('touch');
   const settings = loadSettings({ renderDistance: input.touch ? 4 : 6, sensitivity: 1 });
 
@@ -102,6 +116,10 @@ async function main(): Promise<void> {
   // ---------- világ ----------
   let world: World;
   let player: Player;
+  let sim: FluidSim;
+  type Mode = 'survival' | 'creative';
+  let mode: Mode = 'survival';
+  const health = new Health();
   /** chunkonként két mesh: a szilárd blokkoké és a vízé */
   const meshes = new Map<string, THREE.Mesh[]>();
   const built = new Set<string>();
@@ -135,19 +153,35 @@ async function main(): Promise<void> {
       list.push(m);
     };
     add(g.solid, material, 0);
+    add(g.lava, lavaMaterial, 0);
     add(g.water, waterMaterial, 1);
     if (list.length) meshes.set(key, list);
     built.add(key);
   };
 
-  const refresh = (x: number, z: number) => {
+  /** A megváltozott chunkok (és a szomszédaik, ha a határon van a blokk): képkockánként néhányat építünk újra */
+  const dirty = new Set<string>();
+  const markDirty = (x: number, z: number) => {
     const cx = Math.floor(x / CS), cz = Math.floor(z / CS);
     const lx = x - cx * CS, lz = z - cz * CS;
-    rebuild(cx, cz);
-    if (lx === 0) rebuild(cx - 1, cz);
-    if (lx === CS - 1) rebuild(cx + 1, cz);
-    if (lz === 0) rebuild(cx, cz - 1);
-    if (lz === CS - 1) rebuild(cx, cz + 1);
+    dirty.add(World.key(cx, cz));
+    if (lx === 0) dirty.add(World.key(cx - 1, cz));
+    if (lx === CS - 1) dirty.add(World.key(cx + 1, cz));
+    if (lz === 0) dirty.add(World.key(cx, cz - 1));
+    if (lz === CS - 1) dirty.add(World.key(cx, cz + 1));
+  };
+  const flushDirty = (budget: number) => {
+    for (const key of dirty) {
+      if (budget-- <= 0) break;
+      dirty.delete(key);
+      const [cx, cz] = key.split(',').map(Number);
+      if (built.has(key)) rebuild(cx, cz);
+    }
+  };
+  /** Azonnali újraépítés (a játékos saját módosításánál, hogy ne késsen) */
+  const refresh = (x: number, z: number) => {
+    markDirty(x, z);
+    flushDirty(5);
   };
 
   const orderCache = new Map<number, [number, number][]>();
@@ -209,16 +243,24 @@ async function main(): Promise<void> {
     [spawn.x, spawn.z] = land ?? [8, 8];
   };
 
-  const startWorld = (seed: number, save: SaveData | null) => {
+  const startWorld = (seed: number, save: SaveData | null, newMode: Mode = 'survival') => {
     clearWorld();
     world = new World(seed);
+    sim = new FluidSim(world, (x, _y, z) => markDirty(x, z));
+    dirty.clear();
     if (save) world.importEdits(save.edits);
     timeOfDay = save?.time ?? START_TIME;
-    if (save?.hotbar && save.hotbar.length === hotbar.length) {
-      // csak a most is ismert blokkokat állítjuk vissza (másik textúracsomagnál az azonosítók eltérhetnek)
-      save.hotbar.forEach((id, i) => { if (BLOCKS[id]) hotbar[i] = id; });
-      hotbar.forEach((_, i) => paintSlot(i));
-    }
+
+    // játékmód és tároló (a régi mentések kreatívak voltak, csak a hotbarjuk volt meg)
+    mode = save ? save.mode ?? 'creative' : newMode;
+    document.body.classList.toggle('creative', mode === 'creative');
+    inv.slots.fill(null);
+    if (save?.inv) inv.fromFlat(save.inv);
+    else if (save?.hotbar) save.hotbar.forEach((id, i) => { if (BLOCKS[id] && i < HOTBAR_SIZE) inv.slots[i] = { id, n: 1 }; });
+    else if (mode === 'creative') HOTBAR.forEach((id, i) => { inv.slots[i] = { id, n: 1 }; });
+    paintHotbar();
+    health.reset();
+    if (save?.hp !== undefined) health.hp = Math.max(1, Math.min(health.max, save.hp));
     findSpawn(world);
     player = new Player(world);
     stream(spawn.x, spawn.z, 2, Infinity, Infinity);
@@ -238,7 +280,10 @@ async function main(): Promise<void> {
   const saveGame = () => {
     if (!started) return;
     const p = player.pos;
-    writeSave({ seed: world.seed, edits: world.exportEdits(), pos: [p.x, p.y, p.z], yaw: player.yaw, pitch: player.pitch, time: timeOfDay, hotbar: [...hotbar] });
+    writeSave({
+      seed: world.seed, edits: world.exportEdits(), pos: [p.x, p.y, p.z], yaw: player.yaw, pitch: player.pitch,
+      time: timeOfDay, mode, hp: health.hp, inv: inv.toFlat(),
+    });
   };
 
   // ---------- hotbar ----------
@@ -259,35 +304,62 @@ async function main(): Promise<void> {
     }
   };
 
+  /** Az elem textúrák betöltése után minden ikon újrarajzolódik */
+  const itemPainter = createItemPainter(import.meta.env.BASE_URL, () => {
+    hotViews.forEach((v) => v.invalidate());
+    paintHotbar();
+    bag.invalidate();
+  });
+  const paintStack = (c: HTMLCanvasElement, id: number) => (isItem(id) ? itemPainter(c, id) : drawIcon(c, id));
+
   const hotbarEl = $('hotbar');
-  const slotEls: HTMLElement[] = [];
-  const slotCanvases: HTMLCanvasElement[] = [];
-  const paintSlot = (i: number) => {
-    slotEls[i].title = BLOCKS[hotbar[i]]?.name ?? '';
-    drawIcon(slotCanvases[i], hotbar[i]);
-  };
-  hotbar.forEach((_, i) => {
-    const slot = document.createElement('div');
-    slot.className = 'slot';
-    const c = document.createElement('canvas');
-    c.width = c.height = TILE;
-    slot.appendChild(c);
-    slot.addEventListener('pointerdown', (e) => {
+  const hotViews: SlotView[] = [];
+  const held = () => inv.slots[input.hotbar];
+  const paintHotbar = () => hotViews.forEach((v, i) => v.set(inv.slots[i], mode === 'creative'));
+  for (let i = 0; i < HOTBAR_SIZE; i++) {
+    const v = new SlotView(paintStack, 'slot');
+    v.el.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       input.hotbar = i;
       selectSlot(i);
+      announce(i);
     });
-    hotbarEl.appendChild(slot);
-    slotEls.push(slot);
-    slotCanvases.push(c);
-    paintSlot(i);
-  });
-  const selectSlot = (i: number) => slotEls.forEach((el, n) => el.classList.toggle('selected', n === i));
-  input.onHotbar = selectSlot;
+    hotbarEl.appendChild(v.el);
+    hotViews.push(v);
+  }
+  const selectSlot = (i: number) => hotViews.forEach((v, n) => v.el.classList.toggle('selected', n === i));
+
+  // a kézben lévő dolog neve rövid időre megjelenik, amikor a sávban választasz
+  const heldName = $('held-name');
+  let heldTimer = 0;
+  const announce = (i: number) => {
+    const st = inv.slots[i];
+    if (!st) return;
+    heldName.textContent = itemName(st.id);
+    heldName.classList.add('show');
+    window.clearTimeout(heldTimer);
+    heldTimer = window.setTimeout(() => heldName.classList.remove('show'), 1800);
+  };
+  input.onHotbar = (i) => { selectSlot(i); announce(i); };
   selectSlot(0);
+  paintHotbar();
+
+  // ---------- életerő ----------
+  const updateVitals = createVitals($('hearts'), $('air'));
+  const hurtEl = $('hurt'), fireEl = $('fire-overlay');
+  health.onHurt = () => {
+    hurtEl.classList.remove('flash');
+    void hurtEl.offsetWidth; // az animáció újraindításához
+    hurtEl.classList.add('flash');
+  };
+  let lastFallAt = -99;
+
+  // ---------- inventory és barkácsolás ----------
+  const bag = new BagUI(inv, paintStack);
+  bag.onChange = paintHotbar;
 
   // ---------- menü ----------
-  type State = 'menu' | 'playing' | 'inventory';
+  type State = 'menu' | 'playing' | 'inventory' | 'dead';
   let state: State = 'menu';
   const menu = $('menu'), hud = $('hud');
   const btnContinue = $('btn-continue'), btnNew = $('btn-new'), btnSettings = $('btn-settings');
@@ -345,9 +417,10 @@ async function main(): Promise<void> {
       drawIcon(c, id);
       el.appendChild(c);
       el.addEventListener('click', () => {
-        hotbar[input.hotbar] = id;
-        paintSlot(input.hotbar);
-        closeInventory();
+        inv.slots[input.hotbar] = { id, n: 1 };
+        paintHotbar();
+        closeUI();
+        announce(input.hotbar);
       });
       frag.appendChild(el);
       return { id, el, text: `${def.name} ${def.key ?? ''}`.toLowerCase() };
@@ -369,7 +442,7 @@ async function main(): Promise<void> {
   };
   invSearch.addEventListener('input', filterInventory);
 
-  const openInventory = () => {
+  const openPicker = () => {
     if (state !== 'playing') return;
     if (!invItems.length) buildInventory();
     state = 'inventory';
@@ -381,21 +454,61 @@ async function main(): Promise<void> {
     invEl.hidden = false;
     if (!input.touch) invSearch.focus();
   };
-  function closeInventory() {
+  /** Túlélő módban az inventory és a munkapad (2x2 vagy 3x3 rács) */
+  const openBag = (size: 2 | 3) => {
+    if (state !== 'playing') return;
+    state = 'inventory';
+    input.enabled = false;
+    input.reset();
+    if (document.pointerLockElement) document.exitPointerLock();
+    bag.open(size);
+  };
+  function closeUI() {
     if (state !== 'inventory') return;
     invEl.hidden = true;
     invSearch.blur();
+    bag.close();
     state = 'playing';
     input.reset();
     input.enabled = true;
     input.lock();
   }
-  input.onInventory = () => (state === 'inventory' ? closeInventory() : openInventory());
-  $('inv-close').addEventListener('click', closeInventory);
+  bag.onClose = closeUI;
+  input.onInventory = () => (state === 'inventory' ? closeUI() : mode === 'creative' ? openPicker() : openBag(2));
+  $('inv-close').addEventListener('click', closeUI);
   document.addEventListener('keydown', (e) => {
     if (state !== 'inventory') return;
-    if (e.code === 'Escape') closeInventory();
-    else if (e.code === 'KeyE' && e.target !== invSearch) closeInventory();
+    if (e.code === 'Escape') closeUI();
+    else if (e.code === 'KeyE' && e.target !== invSearch) closeUI();
+  });
+
+  // ---------- halál és újraéledés ----------
+  const deathEl = $('death');
+  const die = () => {
+    if (state === 'menu' || state === 'dead') return;
+    if (state === 'inventory') closeUI();
+    state = 'dead';
+    input.enabled = false;
+    input.reset();
+    highlight.visible = false;
+    if (document.pointerLockElement) document.exitPointerLock();
+    const cause = player.inLava ? 'Lávában égtél el.'
+      : health.burn > 0 || player.inFire ? 'Megégtél.'
+        : health.air <= 0 ? 'Vízbe fulladtál.'
+          : performance.now() / 1000 - lastFallAt < 1 ? 'Túl magasról estél le.' : 'Meghaltál.';
+    $('death-reason').textContent = cause;
+    deathEl.hidden = false;
+    updateVitals(health, false);
+  };
+  $('btn-respawn').addEventListener('click', () => {
+    health.reset();
+    let y = world.heightAt(spawn.x, spawn.z) + 1;
+    while (world.getBlock(spawn.x, y, spawn.z) !== AIR || world.getBlock(spawn.x, y + 1, spawn.z) !== AIR) y++;
+    player.pos = { x: spawn.x + 0.5, y, z: spawn.z + 0.5 };
+    player.vel = { x: 0, y: 0, z: 0 };
+    player.landing = 0;
+    deathEl.hidden = true;
+    play();
   });
 
   btnContinue.addEventListener('click', () => {
@@ -406,12 +519,14 @@ async function main(): Promise<void> {
     }
     play();
   });
-  btnNew.addEventListener('click', () => {
+  const newWorld = (m: Mode) => {
     clearSave();
-    startWorld((Math.random() * 2 ** 31) | 0, null);
+    startWorld((Math.random() * 2 ** 31) | 0, null, m);
     started = true;
     play();
-  });
+  };
+  btnNew.addEventListener('click', () => newWorld('survival'));
+  $('btn-new-creative').addEventListener('click', () => newWorld('creative'));
   btnSettings.addEventListener('click', () => {
     settingsEl.hidden = !settingsEl.hidden;
     btnSettings.setAttribute('aria-expanded', String(!settingsEl.hidden));
@@ -432,8 +547,8 @@ async function main(): Promise<void> {
   });
 
   $('controls').textContent = input.touch
-    ? 'Bal oldalon a joystick, a jobb oldalon húzással nézel körül. A gombokkal bontasz, építesz és ugrasz.'
-    : 'WASD mozgás, szóköz ugrás, bal gomb bont, jobb gomb épít, 1–8 vagy görgő a blokkválasztáshoz, Esc a menühöz.';
+    ? 'Bal oldalon a joystick, a jobb oldalon húzással nézel körül. A Bont gombot tartsd nyomva (túlélő módban a bontás időbe telik), az Épít gomb lerak vagy használ (munkapad, vödör, étel). A Tárgyak gomb az inventory.'
+    : 'WASD mozgás, szóköz ugrás/úszás, bal gomb (tartva) bont, jobb gomb épít vagy használ (munkapad, vödör, kova és acél, alma), 1–9 vagy görgő a választáshoz, E az inventory, Esc a menü.';
   $('pack-note').hidden = atlas.usingPack;
 
   // ---------- indulás ----------
@@ -450,20 +565,147 @@ async function main(): Promise<void> {
   let last = performance.now();
   let angle = 0;
   let frame = 0;
+  let simAcc = 0;
 
-  const interact = () => {
+  // ---------- blokkok bontása, lerakása, tárgyak használata ----------
+  const mineEl = $('mine'), mineBar = $('mine-bar');
+  const mine = { x: 0, y: 0, z: 0, t: 0, need: 0, active: false };
+
+  /** Blokk átírása: újrameshelés és a folyadék/tűz szimuláció értesítése */
+  const setBlockAt = (x: number, y: number, z: number, id: number): boolean => {
+    if (!world.setBlock(x, y, z, id)) return false;
+    markDirty(x, z);
+    sim.notify(x, y, z);
+    return true;
+  };
+
+  const giveDrop = (id: number) => {
+    const d = dropFor(id, held()?.id);
+    if (d) inv.add(d.id, d.n); // ami nem fér a tárolóba, elvész
+    paintHotbar();
+  };
+
+  const breakBlock = (x: number, y: number, z: number) => {
+    const id = world.getBlock(x, y, z);
+    if (!setBlockAt(x, y, z, AIR)) return;
+    if (mode === 'survival') giveDrop(id);
+    // a rajta álló növény, fáklya, tűz vele együtt leesik
+    for (let yy = y + 1; yy < CH; yy++) {
+      const up = world.getBlock(x, yy, z);
+      if (up === AIR || !isReplaceable(up)) break;
+      setBlockAt(x, yy, z, AIR);
+      if (mode === 'survival') giveDrop(up);
+    }
+    flushDirty(5);
+  };
+
+  /** A kézben lévő stack lecserélése egy másik dologra (üres vödör <-> teli vödör) */
+  const swapHeld = (newId: number) => {
+    const st = held();
+    if (!st) return;
+    if (st.n > 1) { st.n--; inv.add(newId, 1); } else inv.slots[input.hotbar] = { id: newId, n: 1 };
+    paintHotbar();
+  };
+
+  const useItem = (hit: RayHit | null) => {
+    const st = held();
+    const p = camera.position;
+    const id = st?.id ?? 0;
+
+    // üres vödör: folyadék forrás felvétele
+    if (id === I.BUCKET) {
+      const fh = raycast(world, p.x, p.y, p.z, dir.x, dir.y, dir.z, 6, true);
+      if (!fh) return;
+      const fid = world.getBlock(fh.x, fh.y, fh.z);
+      const kind = fluidKind(fid);
+      if (kind && fluidLevel(fid) === 0 && setBlockAt(fh.x, fh.y, fh.z, AIR)) {
+        if (mode === 'survival') swapHeld(kind === FLUID_WATER ? I.WATER_BUCKET : I.LAVA_BUCKET);
+      }
+      return;
+    }
+    // teli vödör: forrás lerakása
+    if (id === I.WATER_BUCKET || id === I.LAVA_BUCKET) {
+      if (!hit || hit.py < 0 || hit.py >= CH) return;
+      const kind = id === I.WATER_BUCKET ? FLUID_WATER : FLUID_LAVA;
+      if (setBlockAt(hit.px, hit.py, hit.pz, fluidId(kind, 0)) && mode === 'survival') swapHeld(I.BUCKET);
+      return;
+    }
+    // kova és acél: tűz a megcélzott blokk mellé
+    if (id === I.FLINT_AND_STEEL) {
+      if (hit && hit.py >= 0 && hit.py < CH) {
+        const cell = world.getBlock(hit.px, hit.py, hit.pz);
+        if (cell === AIR || isReplaceable(cell)) setBlockAt(hit.px, hit.py, hit.pz, B.FIRE);
+      }
+      return;
+    }
+    // étel
+    const heal = ITEMS[id]?.heal;
+    if (heal) {
+      if (health.hp < health.max) {
+        health.heal(heal);
+        if (mode === 'survival') { inv.takeOne(input.hotbar); paintHotbar(); }
+      }
+      return;
+    }
+    if (!hit) return;
+    // munkapad: megnyitja a 3x3-as barkácsrácsot
+    if (blockKey(world.getBlock(hit.x, hit.y, hit.z)) === 'crafting_table') {
+      openBag(3);
+      return;
+    }
+    if (!st || isItem(id) || hit.py < 0 || hit.py >= CH) return;
+
+    let placeId = id;
+    const def = BLOCKS[id];
+    // az átjárható blokkokat (növény, fáklya) a játékos testébe is le lehet rakni
+    const blocking = !def?.parts || !!def.boxes?.length;
+    if (blocking && player.intersectsBlock(hit.px, hit.py, hit.pz)) return;
+    if (def?.variants) {
+      // a blokk a játékos nézési irányába néz (a lépcső magas fele előre esik)
+      const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+      const d = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 0 : 2) : fz > 0 ? 1 : 3;
+      // lap és lépcső: alulról vagy a lap felső felére építve fejjel lefelé kerül
+      let flip = 0;
+      if (def.variants.length > 4) flip = hit.ny < 0 || (hit.ny === 0 && hit.hy - hit.y > 0.5) ? 1 : 0;
+      placeId = def.variants[flip * 4 + d] ?? id;
+    }
+    if (setBlockAt(hit.px, hit.py, hit.pz, placeId)) {
+      refresh(hit.px, hit.pz);
+      if (mode === 'survival') { inv.takeOne(input.hotbar); paintHotbar(); }
+    }
+  };
+
+  const interact = (dt: number) => {
     camera.getWorldDirection(dir);
     const p = camera.position;
     const hit: RayHit | null = raycast(world, p.x, p.y, p.z, dir.x, dir.y, dir.z, 6);
     highlight.visible = !!hit;
-    if (hit) highlight.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
+    if (hit) {
+      const [x0, y0, z0, x1, y1, z1] = hit.box;
+      highlight.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+      highlight.scale.set(x1 - x0 + 0.004, y1 - y0 + 0.004, z1 - z0 + 0.004);
+    }
 
-    if (input.breakQueued && hit && hit.y > 0) {
-      if (world.setBlock(hit.x, hit.y, hit.z, 0)) refresh(hit.x, hit.z);
-    }
-    if (input.placeQueued && hit && hit.py >= 0 && hit.py < CH && !player.intersectsBlock(hit.px, hit.py, hit.pz)) {
-      if (world.setBlock(hit.px, hit.py, hit.pz, hotbar[input.hotbar] ?? B.DIRT)) refresh(hit.px, hit.pz);
-    }
+    // bontás: kreatívban egy kattintás, túlélőben a keménységtől függő ideig tart a nyomva tartás
+    if (mode === 'creative') {
+      if (input.breakQueued && hit && hit.y > 0) breakBlock(hit.x, hit.y, hit.z);
+      mine.active = false;
+    } else if (input.breakHeld && hit && hit.y > 0) {
+      const id = world.getBlock(hit.x, hit.y, hit.z);
+      if (!mine.active || mine.x !== hit.x || mine.y !== hit.y || mine.z !== hit.z) {
+        Object.assign(mine, { x: hit.x, y: hit.y, z: hit.z, t: 0, need: breakTime(id, held()?.id), active: true });
+      }
+      mine.t += dt;
+      if (mine.t >= mine.need) {
+        breakBlock(hit.x, hit.y, hit.z);
+        mine.active = false;
+      }
+    } else mine.active = false;
+    const showBar = mine.active && mine.need > 0.15 && isFinite(mine.need);
+    mineEl.classList.toggle('on', showBar);
+    if (showBar) mineBar.style.width = `${Math.min(100, (mine.t / mine.need) * 100)}%`;
+
+    if (input.placeQueued) useItem(hit);
     input.breakQueued = input.placeQueued = false;
   };
 
@@ -481,9 +723,23 @@ async function main(): Promise<void> {
       const { mx, mz } = input.getMove();
       player.update(dt, mx, mz, input.jump);
 
+      // esés- és környezeti sebzés
+      const fall = player.landing;
+      player.landing = 0;
+      if (fall > 3 && mode === 'survival') lastFallAt = now / 1000;
+      if (mode === 'survival') health.fall(fall);
+      health.update(dt, {
+        inLava: player.inLava, inFire: player.inFire, inWater: player.inWater,
+        headUnderwater: player.headUnderwater, creative: mode === 'creative',
+      });
+      updateVitals(health, true);
+      fireEl.classList.toggle('on', health.burn > 0 && mode === 'survival');
+      if (health.dead) die();
+
       camera.position.set(player.pos.x, player.pos.y + EYE, player.pos.z);
       camera.rotation.set(player.pitch, player.yaw, 0);
-      interact();
+      if (state === 'playing') interact(dt);
+      else { mine.active = false; mineEl.classList.remove('on'); }
       cx = player.pos.x;
       cz = player.pos.z;
     } else {
@@ -499,12 +755,13 @@ async function main(): Promise<void> {
     timeOfDay = (timeOfDay + dt / DAY_SECONDS) % 1;
     const sky = skyAt(timeOfDay);
     const underwater = state !== 'menu' && player.headUnderwater;
+    const inLavaView = state !== 'menu' && player.headInLava;
     const k = Math.pow((sky.light[0] + sky.light[1] + sky.light[2]) / 3, 0.45);
-    const bg: RGB = underwater ? [0.1 * k, 0.28 * k, 0.6 * k] : sky.sky;
+    const bg: RGB = inLavaView ? [0.75, 0.22, 0.04] : underwater ? [0.1 * k, 0.28 * k, 0.6 * k] : sky.sky;
     bgColor.setRGB(bg[0], bg[1], bg[2], THREE.SRGBColorSpace);
     fog.color.copy(bgColor);
-    fog.near = underwater ? 0.5 : fogFar * 0.55;
-    fog.far = underwater ? 24 : fogFar * 0.95;
+    fog.near = inLavaView ? 0.05 : underwater ? 0.5 : fogFar * 0.55;
+    fog.far = inLavaView ? 2.5 : underwater ? 24 : fogFar * 0.95;
     material.color.setRGB(sky.light[0], sky.light[1], sky.light[2]);
     waterMaterial.color.copy(material.color);
 
@@ -520,6 +777,14 @@ async function main(): Promise<void> {
     starMat.opacity = sky.stars;
     stars.visible = sky.stars > 0.01 && !underwater;
 
+    // folyadékok és tűz: állandó 20 tick/másodperc lépésekben, a menü mögött is
+    if (state !== 'menu') {
+      for (let i = 0; i < world.dynamic.length; i += 3) sim.sched(world.dynamic[i], world.dynamic[i + 1], world.dynamic[i + 2], Math.floor(Math.random() * 10));
+      world.dynamic.length = 0;
+      simAcc = Math.min(simAcc + dt, 0.25);
+      while (simAcc >= 0.05) { simAcc -= 0.05; sim.update(); }
+    }
+    flushDirty(3);
     stream(cx, cz, settings.renderDistance, 4, 2);
     if (frame % 60 === 0) unload(cx, cz, settings.renderDistance);
     renderer.render(scene, camera);

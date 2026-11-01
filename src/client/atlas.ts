@@ -6,7 +6,7 @@ export const TILE = 64;
 /** a csempék körüli perem: a mipmapelés és a sima szűrés miatt nem szivároghat át a szomszéd */
 const PAD = 4;
 const CELL = TILE + PAD * 2;
-const MAX_COLS = 16;
+const MAX_COLS = 24; // szélesebb atlasz: a magasság így biztosan a 4096 pixeles GPU-korlát alatt marad
 /** true: közelről elmosódó, sima textúrák; false: éles pixelek (a textúracsomag eredeti kinézete) */
 const SMOOTH = false;
 
@@ -15,10 +15,12 @@ const FALLBACK: Record<string, string> = {
   grass_top: '#8a8a8a', grass_side: '#6b5a3a', dirt: '#7a5636', stone: '#8d8d8d', sand: '#dbd0a0',
   log_side: '#6a4e2c', log_top: '#a98a55', planks: '#b08b52', leaves: '#9a9a9a', cobblestone: '#767676',
   water: '#3b68d4',
+  obsidian: '#14101f', lava: '#d4540f', fire: '#f08a1c', crafting_table_top: '#a07a44', crafting_table_side: '#8a6a3a',
   bedrock: '#3a3a3a', gravel: '#837f7d', sandstone: '#d8cc98', sandstone_top: '#dbd0a0', sandstone_bottom: '#cfc28c',
   coal_ore: '#4a4a4a', iron_ore: '#b49a86', gold_ore: '#d4b84a', diamond_ore: '#5ac8c8',
 };
 const FALLBACK_EXTRA = '#8a8a8a';
+
 
 /** A víz csempéjét mi rajzoljuk: kék alap, halvány, pixeles hullámokkal */
 function drawWater(ctx: CanvasRenderingContext2D, x: number, y: number): void {
@@ -78,11 +80,21 @@ export async function buildAtlas(): Promise<Atlas> {
   await Promise.all(
     names.map(async (name, i) => {
       const x = (i % cols) * CELL + PAD, y = Math.floor(i / cols) * CELL + PAD;
-      const url = isBase.has(name) ? `${base}textures/${name}.png` : `${base}textures/mc/${name}.png`;
+      // "név@u0,v0,u1,v1": a modell lapja a textúrának csak egy részét használja (pl. a pss_cube a 2x2-es lap bal felső negyedét)
+      const [file, crop] = name.split('@');
+      const url = isBase.has(name) ? `${base}textures/${file}.png` : `${base}textures/mc/${file}.png`;
       const img = await loadImage(url);
       if (img) {
-        // felső négyzet: az animált csíkokat is kezeli, és más felbontásnál is jó
-        ctx.drawImage(img, 0, 0, img.width, img.width, x, y, TILE, TILE);
+        // kis felbontású csomagnál (pl. 16 px) éles pixeleket akarunk, nem elmosást
+        ctx.imageSmoothingEnabled = img.width >= TILE;
+        if (crop) {
+          const [u0, v0, u1, v1] = crop.split(',').map(Number);
+          const w = img.width;
+          ctx.drawImage(img, (u0 / 16) * w, (v0 / 16) * w, ((u1 - u0) / 16) * w, ((v1 - v0) / 16) * w, x, y, TILE, TILE);
+        } else {
+          // felső négyzet: az animált csíkokat is kezeli, és más felbontásnál is jó
+          ctx.drawImage(img, 0, 0, img.width, img.width, x, y, TILE, TILE);
+        }
         if (isBase.has(name)) baseFound++;
       } else if (name === 'water') {
         drawWater(ctx, x, y);

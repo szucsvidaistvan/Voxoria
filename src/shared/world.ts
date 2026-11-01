@@ -1,4 +1,4 @@
-import { AIR, B } from './blocks';
+import { AIR, B, fluidKind } from './blocks';
 
 export const CS = 16; // chunk szélesség (X és Z)
 export const CH = 64; // világ magassága
@@ -52,6 +52,8 @@ export class World {
   chunks = new Map<string, Chunk>();
   /** chunk kulcs -> (helyi index -> blokk id): a játékos módosításai */
   private edits = new Map<string, Map<number, number>>();
+  /** [x, y, z, ...]: a most betöltött chunkokban lévő folyadékok és tűz, amiket a szimulációnak ütemezni kell */
+  dynamic: number[] = [];
 
   constructor(public seed: number) {}
 
@@ -155,7 +157,14 @@ export class World {
       }
     }
     const edits = this.edits.get(World.key(c.cx, c.cz));
-    if (edits) for (const [i, id] of edits) c.data[i] = id;
+    if (edits) {
+      for (const [i, id] of edits) {
+        c.data[i] = id;
+        if (id === B.FIRE || fluidKind(id) !== 0) {
+          this.dynamic.push(ox + (i % CS), Math.floor(i / (CS * CS)), oz + (Math.floor(i / CS) % CS));
+        }
+      }
+    }
   }
 
   /** Kő, vagy ritkán érc. Minél mélyebben vagyunk, annál értékesebb érc fordul elő (egy blokkos telérek). */

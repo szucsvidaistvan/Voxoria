@@ -14,9 +14,15 @@
 
   <div id="hud" hidden>
     <div id="crosshair"></div>
+    <div id="held-name" aria-live="polite"></div>
+    <div id="mine"><div id="mine-bar"></div></div>
+    <div id="vitals">
+      <div id="hearts" aria-label="Életerő"></div>
+      <div id="air" hidden aria-label="Levegő"></div>
+    </div>
     <div id="hotbar"></div>
     <button id="btn-menu" class="touch-only" type="button">Menü</button>
-    <button id="btn-inv" class="touch-only" type="button">Blokkok</button>
+    <button id="btn-inv" class="touch-only" type="button">Tárgyak</button>
     <div id="joy" class="touch-only"><div id="joy-knob"></div></div>
     <div id="touch-actions" class="touch-only">
       <button id="btn-break" type="button">Bont</button>
@@ -24,6 +30,33 @@
       <button id="btn-jump" type="button">Ugrás</button>
     </div>
   </div>
+
+  <div id="hurt"></div>
+  <div id="fire-overlay"></div>
+  <section id="death" hidden aria-label="Meghaltál">
+    <h2>Meghaltál</h2>
+    <p id="death-reason" class="hint"></p>
+    <button id="btn-respawn" class="btn" type="button">Újraéledés</button>
+  </section>
+
+  <section id="bag" hidden aria-label="Inventory">
+    <div class="bag-panel">
+      <header>
+        <h2 id="bag-title">Inventory</h2>
+        <button id="bag-split" class="btn touch-only" type="button">Fél</button>
+        <button id="bag-close" class="btn" type="button">Bezár</button>
+      </header>
+      <div id="craft-area">
+        <div id="craft-grid"></div>
+        <span id="craft-arrow">→</span>
+        <div id="craft-out"></div>
+      </div>
+      <div id="bag-main"></div>
+      <div id="bag-hot"></div>
+      <p class="hint" id="bag-hint">Kattintás: felvesz / lerak. Jobb gomb: felét veszi fel / egyet rak le. Shift+kattintás: gyorsmozgatás.</p>
+    </div>
+    <div id="bag-cursor" hidden></div>
+  </section>
 
   <section id="inventory" hidden aria-label="Blokkok">
     <div class="inv-panel">
@@ -41,7 +74,8 @@
     <p class="lead">Építs, ásj, fedezd fel a végtelen kockavilágot.</p>
 
     <button id="btn-continue" class="btn" type="button" hidden>Folytatás</button>
-    <button id="btn-new" class="btn" type="button">Új világ</button>
+    <button id="btn-new" class="btn" type="button">Új világ (túlélő)</button>
+    <button id="btn-new-creative" class="btn" type="button">Új világ (kreatív)</button>
     <button id="btn-settings" class="btn" type="button" aria-expanded="false" aria-controls="settings">Beállítások</button>
 
     <section id="settings" hidden>
@@ -52,6 +86,7 @@
     </section>
 
     <p id="controls" class="hint"></p>
+    <p id="credits" class="hint">Textúrák: Good Vibes, készítette Acaitart (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>).</p>
     <p id="pack-note" class="hint" hidden>A textúracsomag nincs kicsomagolva, ezért egyszerű színekkel fut a játék. Lásd a README-t.</p>
   </main>
 
