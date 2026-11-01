@@ -2,6 +2,12 @@
 <html lang="hu">
 <head>
   <meta charset="UTF-8" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#0e1a33" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#0e1a33" />
   <title>Voxoria</title>
@@ -16,11 +22,13 @@
     <div id="crosshair"></div>
     <div id="held-name" aria-live="polite"></div>
     <div id="mine"><div id="mine-bar"></div></div>
-    <div id="vitals">
-      <div id="hearts" aria-label="Életerő"></div>
-      <div id="air" hidden aria-label="Levegő"></div>
+    <div id="hotwrap">
+      <div id="vitals">
+        <div id="hearts" aria-label="Életerő"></div>
+        <div id="air" hidden aria-label="Levegő"></div>
+      </div>
+      <div id="hotbar"></div>
     </div>
-    <div id="hotbar"></div>
     <button id="btn-menu" class="touch-only" type="button">Menü</button>
     <button id="btn-inv" class="touch-only" type="button">Tárgyak</button>
     <div id="joy" class="touch-only"><div id="joy-knob"></div></div>
@@ -31,6 +39,11 @@
     </div>
   </div>
 
+  <div id="rotate">
+    <div class="phone"></div>
+    <p>Fordítsd vízszintesbe a telefont: a játék fekvő helyzetben játszható jól.</p>
+    <button id="rotate-ok" class="btn" type="button">Mégis így játszom</button>
+  </div>
   <div id="hurt"></div>
   <div id="fire-overlay"></div>
   <section id="death" hidden aria-label="Meghaltál">

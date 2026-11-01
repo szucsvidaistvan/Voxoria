@@ -1,4 +1,4 @@
-import { B, BLOCKS, FLUID_LAVA, FLUID_WATER, fluidKind, isSolid } from '../shared/blocks';
+import { B, BLOCKS, FLUID_LAVA, FLUID_WATER, dynamicBoxes, fluidKind, isSolid } from '../shared/blocks';
 import type { World } from '../shared/world';
 
 const HALF_W = 0.3, HEIGHT = 1.8, EPS = 1e-3;
@@ -34,12 +34,18 @@ export class Player {
 
   private collides(x: number, y: number, z: number): boolean {
     for (let ix = Math.floor(x - HALF_W + EPS); ix <= Math.floor(x + HALF_W - EPS); ix++) {
-      for (let iy = Math.floor(y + EPS); iy <= Math.floor(y + HEIGHT - EPS); iy++) {
+      // egy blokkal lejjebbről is indulunk: a kerítés és a fal doboza másfél blokk magas
+      const y0 = Math.floor(y + EPS);
+      for (let iy = y0 - 1; iy <= Math.floor(y + HEIGHT - EPS); iy++) {
         for (let iz = Math.floor(z - HALF_W + EPS); iz <= Math.floor(z + HALF_W - EPS); iz++) {
           const id = this.world.getBlock(ix, iy, iz);
           if (!isSolid(id)) continue;
-          const boxes = BLOCKS[id]?.boxes;
-          if (!boxes) return true; // teljes kocka
+          const def = BLOCKS[id];
+          const boxes = def?.conn ? dynamicBoxes(def, (dx, dz) => this.world.getBlock(ix + dx, iy, iz + dz), 'boxes') : def?.boxes;
+          if (!boxes) {
+            if (iy < y0) continue; // a lenti teljes kocka csak akkor ütközik, ha a lábunk is benne van
+            return true; // teljes kocka
+          }
           // nem kocka alakú blokk: csak a tényleges dobozaival ütközik
           for (const b of boxes) {
             if (
@@ -79,6 +85,8 @@ export class Player {
     this.headInLava = fluidKind(head) === FLUID_LAVA;
     this.inFire = body === B.FIRE || feet === B.FIRE;
     const swim = this.inWater || this.inLava;
+    // létrán: lehet mászni (előre vagy ugrás: fel, hátra: le), nincs gravitáció
+    const ladder = !swim && (BLOCKS[body]?.key === 'ladder' || BLOCKS[feet]?.key === 'ladder');
 
     const len = Math.hypot(mx, mz);
     if (len > 1) { mx /= len; mz /= len; }
@@ -87,7 +95,12 @@ export class Player {
     this.vel.x = (-sin * mz + cos * mx) * speed;
     this.vel.z = (-cos * mz - sin * mx) * speed;
 
-    if (swim) {
+    if (ladder) {
+      this.vel.y = jump || mz > 0.1 ? 3.2 : mz < -0.1 ? -3.2 : -0.8;
+      this.vel.x *= 0.6;
+      this.vel.z *= 0.6;
+      this.onGround = false;
+    } else if (swim) {
       if (jump) {
         // a felszín közelében erősebb a lökés, hogy ki lehessen mászni a partra
         this.vel.y = this.inLava ? LAVA_UP : this.headUnderwater ? SWIM_UP : SWIM_SURFACE;
@@ -101,7 +114,7 @@ export class Player {
     const steps = Math.max(1, Math.ceil(Math.min(dt, 0.1) / 0.016));
     const h = Math.min(dt, 0.1) / steps;
     for (let i = 0; i < steps; i++) {
-      this.vel.y = this.inLava
+      if (!ladder) this.vel.y = this.inLava
         ? Math.max(this.vel.y - LAVA_GRAVITY * h, -LAVA_SINK)
         : this.inWater
           ? Math.max(this.vel.y - WATER_GRAVITY * h, -MAX_SINK)
@@ -123,7 +136,7 @@ export class Player {
       }
     }
     // esés követése: vízben vagy lávában nincs sebzés, a leérkezéskor az esés magasságát jegyezzük meg
-    if (swim) { this.peak = p.y; this.airborne = false; }
+    if (swim || ladder) { this.peak = p.y; this.airborne = false; }
     else if (this.onGround) {
       if (this.airborne) this.landing = Math.max(this.landing, this.peak - p.y);
       this.airborne = false;

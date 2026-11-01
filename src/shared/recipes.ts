@@ -54,6 +54,15 @@ export function initRecipes(): void {
   addIf({ shape: ['PPP'], keys: { P: 'planks' } }, blk('oak_slab', 6));
   addIf({ shape: ['P  ', 'PP ', 'PPP'], keys: { P: 'planks' } }, blk('oak_stairs', 4));
   addIf({ shape: ['PPP', 'PPP'], keys: { P: 'planks' } }, blk('oak_trapdoor', 2));
+  // ajtó: 2x3 deszka, a deszka fajtájának megfelelő ajtó (3 darab)
+  add({
+    shape: ['PP', 'PP', 'PP'], keys: { P: 'planks' },
+    out: ([id]) => {
+      const door = blockId(`${blockKey(id).replace(/_planks$/, '')}_door`) ?? blockId('oak_door');
+      return door === undefined ? null : { id: door, n: 3 };
+    },
+  });
+  addIf({ shape: ['II', 'II', 'II'], keys: { I: I.IRON_INGOT } }, blk('iron_door', 3));
   addIf({ shape: ['CCC'], keys: { C: B.COBBLE } }, blk('cobblestone_slab', 6));
   addIf({ shape: ['C  ', 'CC ', 'CCC'], keys: { C: B.COBBLE } }, blk('cobblestone_stairs', 4));
   addIf({ shape: ['CCC', 'CCC'], keys: { C: B.COBBLE } }, blk('cobblestone_wall', 6));

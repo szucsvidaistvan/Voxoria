@@ -151,8 +151,7 @@ export class BagUI {
 
     const mk = (parent: HTMLElement, area: 'inv' | 'craft', i: number, list: SlotView[]) => {
       const v = new SlotView(paint);
-      v.el.addEventListener('pointerdown', (e) => { e.preventDefault(); this.click(area, i, e.button === 2 || this.split ? 2 : 0, e.shiftKey); });
-      v.el.addEventListener('contextmenu', (e) => e.preventDefault());
+      this.bindSlot(v.el, area, i);
       parent.appendChild(v.el);
       list.push(v);
     };
@@ -167,8 +166,67 @@ export class BagUI {
       this.splitBtn.classList.toggle('on', this.split);
     });
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
+    // a sötét háttérre koppintva bezárul a panel (a kézben lévő dolog visszakerül a tárolóba)
+    this.root.addEventListener('pointerdown', (e) => { if (e.target === this.root) this.onClose(); });
     document.addEventListener('pointermove', (e) => this.moveCursor(e.clientX, e.clientY));
     this.root.addEventListener('pointerdown', (e) => this.moveCursor(e.clientX, e.clientY), true);
+  }
+
+  /**
+   * Egérrel: kattintás azonnal (jobb gomb: fél / egy darab). Érintéssel:
+   * koppintás = felvesz / lerak, hosszan nyomva = fél stack / egy darab, ujjal húzva = a stack vonszolása
+   * a másik helyre (az ujj felengedésekor oda kerül).
+   */
+  private bindSlot(el: HTMLElement, area: 'inv' | 'craft', idx: number): void {
+    el.dataset.area = area;
+    el.dataset.idx = String(idx);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (e.pointerType !== 'touch') {
+        this.click(area, idx, e.button === 2 || this.split ? 2 : 0, e.shiftKey);
+        return;
+      }
+      const sx = e.clientX, sy = e.clientY;
+      let mode: 'pending' | 'long' | 'drag' | 'ignore' = 'pending';
+      const timer = window.setTimeout(() => {
+        if (mode !== 'pending') return;
+        mode = 'long';
+        this.click(area, idx, 2, false);
+      }, 450);
+      const move = (ev: PointerEvent) => {
+        this.moveCursor(ev.clientX, ev.clientY);
+        if (mode !== 'pending' || Math.hypot(ev.clientX - sx, ev.clientY - sy) < 10) return;
+        window.clearTimeout(timer);
+        if (!this.cursor && this.list(area)[idx]) {
+          mode = 'drag';
+          this.click(area, idx, this.split ? 2 : 0, false); // felveszi a stacket (vagy a felét), és követi az ujjat
+          this.moveCursor(ev.clientX, ev.clientY);
+        } else mode = 'ignore';
+      };
+      const end = (ev: PointerEvent) => {
+        window.clearTimeout(timer);
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', end);
+        document.removeEventListener('pointercancel', end);
+        if (ev.type === 'pointercancel') return;
+        if (mode === 'pending') this.click(area, idx, this.split ? 2 : 0, false);
+        else if (mode === 'drag') {
+          // a vonszolt stack oda kerül, ahol az ujjat felengedték; ha nincs ott hely, visszamegy
+          const t = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest('[data-area]') as HTMLElement | null;
+          if (t && t.dataset.area) this.click(t.dataset.area as 'inv' | 'craft', Number(t.dataset.idx), 0, false);
+          if (this.cursor && !this.list(area)[idx]) {
+            this.list(area)[idx] = this.cursor;
+            this.cursor = null;
+            this.render();
+            this.onChange();
+          }
+        }
+      };
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', end);
+      document.addEventListener('pointercancel', end);
+    });
   }
 
   private moveCursor(x: number, y: number): void {
@@ -188,8 +246,7 @@ export class BagUI {
     this.craftViews = [];
     for (let i = 0; i < size * size; i++) {
       const v = new SlotView(this.paint);
-      v.el.addEventListener('pointerdown', (e) => { e.preventDefault(); this.click('craft', i, e.button === 2 || this.split ? 2 : 0, e.shiftKey); });
-      v.el.addEventListener('contextmenu', (e) => e.preventDefault());
+      this.bindSlot(v.el, 'craft', i);
       this.craftEl.appendChild(v.el);
       this.craftViews.push(v);
     }

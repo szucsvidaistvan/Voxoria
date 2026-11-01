@@ -367,7 +367,20 @@ async function main(): Promise<void> {
     btnContinue.hidden = !(started || loadSave());
   };
 
+  /** Telefonon: teljes képernyő és fekvő tájolás kérése (Androidon működik, iPhone-on csak a forgatás kérése látszik) */
+  const tryLandscape = () => {
+    if (!input.touch) return;
+    try {
+      const el = document.documentElement;
+      const full = !document.fullscreenElement && el.requestFullscreen ? el.requestFullscreen() : Promise.resolve();
+      Promise.resolve(full)
+        .then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape'))
+        .catch(() => {});
+    } catch { /* nem támogatott */ }
+  };
+  $('rotate-ok').addEventListener('click', () => document.body.classList.add('allow-portrait'));
   const play = () => {
+    tryLandscape();
     state = 'playing';
     menu.hidden = true;
     hud.hidden = false;
@@ -596,6 +609,16 @@ async function main(): Promise<void> {
     const id = world.getBlock(x, y, z);
     if (!setBlockAt(x, y, z, AIR)) return;
     particles.burst(x, y, z, id);
+    // ajtó: a másik fele is eltűnik (egyetlen ajtót ad)
+    const door = BLOCKS[id]?.door;
+    if (door) {
+      const oy = door.half === 0 ? y + 1 : y - 1;
+      const oid = world.getBlock(x, oy, z);
+      if (BLOCKS[oid]?.door?.ids === door.ids) {
+        setBlockAt(x, oy, z, AIR);
+        particles.burst(x, oy, z, oid);
+      }
+    }
     if (mode === 'survival') giveDrop(id, x, y, z);
     // a rajta álló növény, fáklya, tűz vele együtt leesik
     for (let yy = y + 1; yy < CH; yy++) {
@@ -657,6 +680,16 @@ async function main(): Promise<void> {
       return;
     }
     if (!hit) return;
+    // ajtó: nyitás és csukás
+    const hitDoor = BLOCKS[world.getBlock(hit.x, hit.y, hit.z)]?.door;
+    if (hitDoor) {
+      const flip = (cy: number, d: NonNullable<typeof hitDoor>) => setBlockAt(hit.x, cy, hit.z, d.ids[d.half * 8 + (1 - d.open) * 4 + d.dir]);
+      flip(hit.y, hitDoor);
+      const oy = hitDoor.half === 0 ? hit.y + 1 : hit.y - 1;
+      const od = BLOCKS[world.getBlock(hit.x, oy, hit.z)]?.door;
+      if (od && od.ids === hitDoor.ids) flip(oy, od);
+      return;
+    }
     // munkapad: megnyitja a 3x3-as barkácsrácsot
     if (blockKey(world.getBlock(hit.x, hit.y, hit.z)) === 'crafting_table') {
       openBag(3);
@@ -666,13 +699,30 @@ async function main(): Promise<void> {
 
     let placeId = id;
     const def = BLOCKS[id];
+    /** a játékos nézési iránya: 0 kelet, 1 dél, 2 nyugat, 3 észak */
+    const fx0 = -Math.sin(player.yaw), fz0 = -Math.cos(player.yaw);
+    const facing = Math.abs(fx0) > Math.abs(fz0) ? (fx0 > 0 ? 0 : 2) : fz0 > 0 ? 1 : 3;
+    if (def?.door) {
+      // ajtó: két blokk magas, a játékos nézési irányába néz
+      const above = world.getBlock(hit.px, hit.py + 1, hit.pz);
+      if (hit.py + 1 >= CH || !(above === AIR || isReplaceable(above))) return;
+      if (player.intersectsBlock(hit.px, hit.py, hit.pz) || player.intersectsBlock(hit.px, hit.py + 1, hit.pz)) return;
+      if (setBlockAt(hit.px, hit.py, hit.pz, def.door.ids[facing]) && setBlockAt(hit.px, hit.py + 1, hit.pz, def.door.ids[8 + facing])) {
+        refresh(hit.px, hit.pz);
+        if (mode === 'survival') { inv.takeOne(input.hotbar); paintHotbar(); }
+      }
+      return;
+    }
     // az átjárható blokkokat (növény, fáklya) a játékos testébe is le lehet rakni
     const blocking = !def?.parts || !!def.boxes?.length;
     if (blocking && player.intersectsBlock(hit.px, hit.py, hit.pz)) return;
     if (def?.variants) {
-      // a blokk a játékos nézési irányába néz (a lépcső magas fele előre esik)
-      const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
-      const d = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 0 : 2) : fz > 0 ? 1 : 3;
+      // a blokk a játékos nézési irányába néz (a lépcső magas fele előre esik); a létra a megcélzott falra kerül
+      let d = facing;
+      if (def.wall !== undefined && hit.ny === 0) {
+        const wallDir = hit.nx < 0 ? 0 : hit.nx > 0 ? 2 : hit.nz < 0 ? 1 : 3; // a fal a találati lappal szemben van
+        d = (wallDir - def.wall + 4) % 4;
+      }
       // lap és lépcső: alulról vagy a lap felső felére építve fejjel lefelé kerül
       let flip = 0;
       if (def.variants.length > 4) flip = hit.ny < 0 || (hit.ny === 0 && hit.hy - hit.y > 0.5) ? 1 : 0;
@@ -727,6 +777,7 @@ async function main(): Promise<void> {
     last = now;
     frame++;
     atlas.anim.update(now / 1000);
+    document.body.classList.toggle('ingame', state !== 'menu');
 
     let cx: number, cz: number;
     if (state !== 'menu') {

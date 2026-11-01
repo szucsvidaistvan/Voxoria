@@ -83,11 +83,16 @@ html, body {
 #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
 #crosshair::after { left: 0; top: 10px; width: 22px; height: 2px; }
 
-#hotbar {
+#hotwrap {
   position: fixed;
   left: 50%;
   bottom: max(12px, env(safe-area-inset-bottom));
   transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+#hotbar {
   display: flex;
   gap: 4px;
   padding: 4px;
@@ -101,7 +106,7 @@ html, body {
 #held-name {
   position: fixed;
   left: 50%;
-  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 70px);
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 98px);
   transform: translateX(-50%);
   padding: 0.25rem 0.7rem;
   max-width: 90vw;
@@ -120,13 +125,13 @@ html, body {
 .touch-only { display: none; }
 body.touch .touch-only { display: block; }
 
-body.touch #hotbar {
+body.touch #hotwrap {
   top: max(8px, env(safe-area-inset-top));
   bottom: auto;
-  width: calc(100vw - 7rem);
-  max-width: 24rem;
+  width: min(24rem, calc(100vw - 11rem));
+  flex-direction: column-reverse;
 }
-body.touch #held-name { top: calc(max(8px, env(safe-area-inset-top)) + 64px); bottom: auto; }
+body.touch #held-name { top: calc(max(8px, env(safe-area-inset-top)) + 84px); bottom: auto; }
 body.touch .slot { flex: 1; width: auto; height: auto; aspect-ratio: 1; padding: 2px; border-width: 2px; }
 
 #btn-menu {
@@ -253,17 +258,12 @@ body.touch #touch-actions { display: grid; }
 
 /* ---------- életerő, levegő, bontás ---------- */
 #vitals {
-  position: fixed;
-  left: 50%;
-  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 72px);
-  transform: translateX(-50%);
-  width: min(var(--hotbar-w, 520px), 96vw);
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
+  width: 100%;
   pointer-events: none;
 }
-body.touch #vitals { top: calc(max(8px, env(safe-area-inset-top)) + 100px); bottom: auto; width: min(24rem, calc(100vw - 7rem)); }
 #hearts, #air { display: flex; gap: 2px; min-height: 22px; }
 #air { margin-left: auto; }
 .vital {
@@ -329,8 +329,9 @@ body.creative #vitals { display: none; }
   overflow: auto;
   touch-action: manipulation;
 }
+#bag .bag-panel { margin: auto; }
 .bag-panel {
-  --slot: min(52px, calc((100vw - 3rem) / 9 - 4px));
+  --slot: min(52px, calc((100vw - 3rem) / 9 - 4px), calc((100vh - 11rem) / 6.6));
   padding: 0.8rem;
   max-width: 100vw;
   background: var(--panel);
@@ -353,6 +354,9 @@ body.creative #vitals { display: none; }
   background: var(--night-deep);
   box-shadow: inset 0 0 0 2px var(--edge);
   cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .islot:hover { box-shadow: inset 0 0 0 2px var(--gold); }
 .islot canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; pointer-events: none; }
@@ -360,3 +364,51 @@ body.creative #vitals { display: none; }
 #bag-cursor { position: fixed; left: 0; top: 0; z-index: 50; width: 44px; height: 44px; pointer-events: none; }
 #bag-cursor .islot { width: 44px; height: 44px; background: transparent; box-shadow: none; }
 #bag .hint { margin: 0.7rem 0 0; font-size: 0.8rem; max-width: 30rem; }
+
+/* alacsony (fekvő telefon) kijelzőn: a barkácsrács balra, a tároló jobbra, így minden elfér a képernyőn */
+@media (max-height: 560px) and (orientation: landscape) {
+  .bag-panel {
+    --slot: min(52px, calc((100vh - 6.5rem) / 4.3), calc((100vw - 5rem) / 14.5));
+    display: grid;
+    grid-template-columns: auto auto;
+    column-gap: 1.3rem;
+    align-items: start;
+    padding: 0.5rem 0.7rem;
+  }
+  .bag-panel header { grid-column: 1 / -1; margin-bottom: 0.4rem; }
+  #craft-area { grid-column: 1; grid-row: 2 / span 2; flex-direction: column; margin: 0; gap: 0.3rem; justify-content: flex-start; }
+  #craft-arrow { transform: rotate(90deg); font-size: 1.6rem; line-height: 1; }
+  #bag-main { grid-column: 2; grid-row: 2; }
+  #bag-hot { grid-column: 2; grid-row: 3; margin-top: 0.4rem; padding-top: 0.4rem; }
+  #bag .hint { display: none; }
+  #bag-cursor, #bag-cursor .islot { width: 36px; height: 36px; }
+}
+
+/* álló telefonon kérjük a fekvő tartást */
+#rotate {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  padding: 2rem;
+  text-align: center;
+  background: rgba(8, 14, 30, 0.96);
+  color: var(--chalk);
+  font-size: 1.15rem;
+}
+#rotate .phone {
+  width: 3rem;
+  height: 5.2rem;
+  border: 4px solid var(--gold);
+  border-radius: 8px;
+  animation: rotate-phone 2.4s ease-in-out infinite;
+}
+@keyframes rotate-phone { 0%, 30% { transform: rotate(0); } 65%, 100% { transform: rotate(-90deg); } }
+#rotate .btn { width: auto; padding: 0.5rem 1.2rem; }
+@media (orientation: portrait) {
+  body.touch.ingame:not(.allow-portrait) #rotate { display: flex; }
+}

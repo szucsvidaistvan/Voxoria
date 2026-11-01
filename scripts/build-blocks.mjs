@@ -374,6 +374,13 @@ for (const file of zip.names) {
   put('snow', TPL.layer, { t: b('snow') });
   put('lily_pad', TPL.lily, { t: b('lily_pad') }, true);
   put('ladder', TPL.ladder, { t: b('ladder') });
+  // ajtók: a blokk alsó, zárt állapota; az alsó és felső fél textúrája külön, az állapotokat a játék készíti el
+  for (const w of [...WOODS, 'iron']) {
+    const name = `${w}_door`, bottom = `${w}_door_bottom`, top = `${w}_door_top`;
+    if (have.has(name) || !hasTex(bottom) || !hasTex(top)) continue;
+    const plate = [{ from: [13, 0, 0], to: [16, 16, 16], faces: Object.fromEntries(['down', 'up', 'north', 'south', 'west', 'east'].map((d) => [d, { texture: '#t' }])) }];
+    add({ name, kind: 'shape', parts: toParts(plate, { t: b(bottom) }), rx: 0, ry: 0, tinted: false, door: { bottom: b(bottom), top: b(top) } });
+  }
   for (const n of ['rail', 'powered_rail', 'detector_rail', 'activator_rail']) put(n, TPL.rail, { t: b(n) });
   put('cactus', TPL.cactus, { top: b('cactus_top'), bottom: b('cactus_bottom'), side: b('cactus_side') });
   put('enchanting_table', boxed(12), { top: b('enchanting_table_top'), bottom: b('enchanting_table_bottom'), side: b('enchanting_table_side') });
@@ -487,6 +494,7 @@ const used = new Set();
 for (const b of blocks) {
   if (b.kind === 'cube') [b.top, b.bottom, b.side].forEach((x) => used.add(x));
   else for (const part of b.parts) for (const f of Object.values(part.faces)) used.add(f.tex);
+  if (b.door) { used.add(b.door.bottom); used.add(b.door.top); }
 }
 
 const flat = (id) => id.replace(/\//g, '__');
@@ -510,7 +518,10 @@ for (const id of [...used].sort()) {
 const key = (id) => (id ? flat(id) : null);
 for (const b of blocks) {
   if (b.kind === 'cube') { b.top = key(b.top); b.bottom = key(b.bottom); b.side = key(b.side); }
-  else for (const part of b.parts) for (const f of Object.values(part.faces)) f.tex = key(f.tex);
+  else {
+    for (const part of b.parts) for (const f of Object.values(part.faces)) f.tex = key(f.tex);
+    if (b.door) { b.door.bottom = key(b.door.bottom); b.door.top = key(b.door.top); }
+  }
 }
 
 writeFileSync(resolve(outGen, 'blocks.json'), JSON.stringify({ textures: textureKeys, blocks }));

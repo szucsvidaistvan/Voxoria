@@ -94,6 +94,21 @@ export interface BlockDef {
   tintColor?: RGB;
   /** az elforgatott vagy folyó változat alapblokkja (ezt dobja, ezt választja a pipetta) */
   base?: number;
+  /** kerítés, fal, üvegtábla: a szomszédok felé kinyúló karok */
+  conn?: Conn;
+  /** ajtó: melyik fele, nyitva van-e, merre néz; ids: a 16 változat ([fél * 8 + nyitva * 4 + irány]) */
+  door?: { half: 0 | 1; open: 0 | 1; dir: number; ids: number[] };
+  /** falra szerelhető blokk (létra): az az irány, amerre alapállásban a fal van (0 kelet, 1 dél, 2 nyugat, 3 észak) */
+  wall?: number;
+}
+
+export type ConnKind = 'fence' | 'wall' | 'pane';
+/** A karok sorrendje: észak (-z), kelet (+x), dél (+z), nyugat (-x) */
+export interface Conn {
+  kind: ConnKind;
+  arms: ShapePart[][];
+  armBoxes: Box[][];
+  armPick: Box[][];
 }
 
 const GRASS_TINT: RGB = [0.55, 0.85, 0.35];
@@ -181,6 +196,8 @@ export interface GeneratedBlock {
   parts?: ShapePart[];
   rx?: number;
   ry?: number;
+  /** ajtó: az alsó és a felső fél textúrája */
+  door?: { bottom: string; top: string };
 }
 
 export interface GeneratedPack {
@@ -271,6 +288,14 @@ function shapeDef(b: GeneratedBlock, dir: number, flip: number): BlockDef {
   const leafy = LEAF_LIKE.test(b.name);
   const tintColor: RGB | undefined = b.tinted ? (leafy ? LEAF_TINT : GRASS_TINT) : undefined;
   const name = b.name.replace(/_/g, ' ');
+  const kind = connKindOf(b.name);
+  if (kind) {
+    // kerítés, fal, üvegtábla: az oszlop dobozai, a karok a szomszédoktól függően kerülnek hozzá
+    return {
+      name: name.charAt(0).toUpperCase() + name.slice(1), key: b.name, top, bottom, side, opaque: false,
+      parts, rots, tintColor, boxes: [POST_SHAPES[kind].coll], pick: [POST_SHAPES[kind].pick], conn: makeConn(kind, side),
+    };
+  }
   return {
     name: name.charAt(0).toUpperCase() + name.slice(1),
     key: b.name,
@@ -280,8 +305,124 @@ function shapeDef(b: GeneratedBlock, dir: number, flip: number): BlockDef {
     tint: tintColor ? { top: tintColor, bottom: tintColor, side: tintColor } : undefined,
     boxes: NO_COLLIDE.test(b.name) ? [] : boxes,
     pick,
+    wall: b.name === 'ladder' ? 1 : undefined,
   };
 }
+
+
+// ---------- kapcsolódó blokkok (kerítés, fal, üvegtábla) ----------
+
+const DIRS: Dir[] = ['down', 'up', 'north', 'south', 'west', 'east'];
+
+/** A Minecraft alap uv-ja egy laphoz */
+function defaultUv(dir: Dir, [x1, y1, z1]: Vec3, [x2, y2, z2]: Vec3): [number, number, number, number] {
+  switch (dir) {
+    case 'down': return [x1, 16 - z2, x2, 16 - z1];
+    case 'up': return [x1, z1, x2, z2];
+    case 'north': return [16 - x2, 16 - y2, 16 - x1, 16 - y1];
+    case 'south': return [x1, 16 - y2, x2, 16 - y1];
+    case 'west': return [z1, 16 - y2, z2, 16 - y1];
+    default: return [16 - z2, 16 - y2, 16 - z1, 16 - y1];
+  }
+}
+
+function boxPart(from: Vec3, to: Vec3, tex: string): ShapePart {
+  const faces: ShapePart['faces'] = {};
+  for (const d of DIRS) faces[d] = { uv: defaultUv(d, from, to), tex };
+  return { from, to, faces };
+}
+
+/** Doboz elforgatása a blokk közepe körül k * 90 fokkal (az óramutató járásával megegyezően, felülnézetből): (x, z) -> (16 - z, x) */
+function turn16(from: Vec3, to: Vec3, k: number): [Vec3, Vec3] {
+  let [x1, z1, x2, z2] = [from[0], from[2], to[0], to[2]];
+  for (let i = 0; i < k; i++) [x1, z1, x2, z2] = [16 - z2, x1, 16 - z1, x2];
+  return [[x1, from[1], z1], [x2, to[1], z2]];
+}
+function turnUnit(b: Box, k: number): Box {
+  let [x1, z1, x2, z2] = [b[0], b[2], b[3], b[5]];
+  for (let i = 0; i < k; i++) [x1, z1, x2, z2] = [1 - z2, x1, 1 - z1, x2];
+  return [x1, b[1], z1, x2, b[4], z2];
+}
+
+/** A karok alakja a blokk fajtája szerint, északi irányban (16-os egységekben) */
+const ARM_SHAPES: Record<ConnKind, { bars: [Vec3, Vec3][]; coll: Box; pick: Box }> = {
+  fence: {
+    bars: [[[7, 6, 0], [9, 9, 9]], [[7, 12, 0], [9, 15, 9]]],
+    coll: [7 / 16, 0, 0, 9 / 16, 1.5, 9 / 16], pick: [7 / 16, 0, 0, 9 / 16, 1, 9 / 16],
+  },
+  wall: {
+    bars: [[[5, 0, 0], [11, 13, 8]]],
+    coll: [5 / 16, 0, 0, 11 / 16, 1.5, 8 / 16], pick: [5 / 16, 0, 0, 11 / 16, 1, 8 / 16],
+  },
+  pane: {
+    bars: [[[7, 0, 0], [9, 16, 8]]],
+    coll: [7 / 16, 0, 0, 9 / 16, 1, 8 / 16], pick: [7 / 16, 0, 0, 9 / 16, 1, 8 / 16],
+  },
+};
+/** Az oszlop ütközési és célzási doboza */
+const POST_SHAPES: Record<ConnKind, { coll: Box; pick: Box }> = {
+  fence: { coll: [6 / 16, 0, 6 / 16, 10 / 16, 1.5, 10 / 16], pick: [6 / 16, 0, 6 / 16, 10 / 16, 1, 10 / 16] },
+  wall: { coll: [4 / 16, 0, 4 / 16, 12 / 16, 1.5, 12 / 16], pick: [4 / 16, 0, 4 / 16, 12 / 16, 1, 12 / 16] },
+  pane: { coll: [7 / 16, 0, 7 / 16, 9 / 16, 1, 9 / 16], pick: [7 / 16, 0, 7 / 16, 9 / 16, 1, 9 / 16] },
+};
+
+function connKindOf(name: string): ConnKind | null {
+  if (/_fence$/.test(name)) return 'fence';
+  if (/_wall$/.test(name)) return 'wall';
+  if (/(_pane$|^iron_bars$)/.test(name)) return 'pane';
+  return null;
+}
+
+function makeConn(kind: ConnKind, tex: string): Conn {
+  const shape = ARM_SHAPES[kind];
+  const arms: ShapePart[][] = [], armBoxes: Box[][] = [], armPick: Box[][] = [];
+  for (let k = 0; k < 4; k++) {
+    arms.push(shape.bars.map(([f, t]) => { const [a, b] = turn16(f, t, k); return boxPart(a, b, tex); }));
+    armBoxes.push([turnUnit(shape.coll, k)]);
+    armPick.push([turnUnit(shape.pick, k)]);
+  }
+  return { kind, arms, armBoxes, armPick };
+}
+
+/** A szomszéd blokk kapcsolódik-e a (kerítés, fal, üvegtábla) blokkhoz? */
+function connectsTo(kind: ConnKind, nid: number): boolean {
+  if (nid === AIR) return false;
+  const d = BLOCKS[nid];
+  if (!d) return false;
+  if (d.conn) return kind === 'pane' ? d.conn.kind === 'pane' || d.conn.kind === 'wall' : d.conn.kind === kind;
+  return isOpaque(nid) && !d.parts && fluidKind(nid) === FLUID_NONE; // tömör kocka
+}
+
+const ARM_OFFSETS: [number, number][] = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+/** Melyik irányba nyúlnak karok: bitmaszk (0: észak, 1: kelet, 2: dél, 3: nyugat). get(dx, dz): a szomszéd blokk. */
+export function connectionMask(def: BlockDef, get: (dx: number, dz: number) => number): number {
+  let m = 0;
+  for (let k = 0; k < 4; k++) if (connectsTo(def.conn!.kind, get(ARM_OFFSETS[k][0], ARM_OFFSETS[k][1]))) m |= 1 << k;
+  return m;
+}
+/** A blokk lapjai a kapcsolódó karokkal együtt */
+export function connectedParts(def: BlockDef, get: (dx: number, dz: number) => number): ShapePart[] {
+  const m = connectionMask(def, get);
+  const out = [...def.parts!];
+  for (let k = 0; k < 4; k++) if (m & (1 << k)) out.push(...def.conn!.arms[k]);
+  return out;
+}
+/** Ütközési vagy célzási dobozok a kapcsolódó karokkal együtt */
+export function dynamicBoxes(def: BlockDef, get: (dx: number, dz: number) => number, which: 'boxes' | 'pick'): Box[] {
+  const m = connectionMask(def, get);
+  const out: Box[] = [...((which === 'boxes' ? def.boxes : def.pick) ?? [])];
+  for (let k = 0; k < 4; k++) if (m & (1 << k)) out.push(...(which === 'boxes' ? def.conn!.armBoxes[k] : def.conn!.armPick[k]));
+  return out;
+}
+
+// ---------- ajtók ----------
+
+/** Az ajtólap: zárva a blokk keleti szélén, nyitva az északi szélén (alapállásban; az irány elforgatja) */
+function doorPlate(open: number, tex: string): ShapePart {
+  return open ? boxPart([0, 0, 0], [16, 16, 3], tex) : boxPart([13, 0, 0], [16, 16, 16], tex);
+}
+const DOOR_BOX: Box[] = [[13 / 16, 0, 0, 1, 1, 1], [0, 0, 0, 1, 1, 3 / 16]];
+
 
 /** A regisztráció eredménye: azonosító → generált blokk, és a plusz textúrák */
 export const extraTextures: TexName[] = [];
@@ -331,6 +472,7 @@ export function registerGenerated(pack: GeneratedPack): number[] {
     if (next > MAX_BLOCK_ID - 8) break;
     BLOCKS[next] = shapeDef(b, 0, 0);
     for (const p of b.parts!) for (const f of Object.values(p.faces)) tex.add(f!.tex);
+    if (b.door) { tex.add(b.door.bottom); tex.add(b.door.top); }
     baseIds.push(next);
     kept.push(b);
     KEY_ID.set(b.name, next);
@@ -338,6 +480,28 @@ export function registerGenerated(pack: GeneratedPack): number[] {
   }
   baseIds.forEach((id, i) => {
     const b = kept[i];
+    if (BLOCKS[id].conn) return; // a kerítés, fal, üvegtábla alakja a szomszédoktól függ, nincs elforgatott változata
+    if (b.door) {
+      // ajtó: alsó és felső fél, zárva és nyitva, négy irányban (16 változat); az alap az alsó, zárt, keleti
+      const doorIds: number[] = new Array(16);
+      const nm = BLOCKS[id].name;
+      for (let half = 0; half < 2; half++) for (let open = 0; open < 2; open++) for (let dir = 0; dir < 4; dir++) {
+        const idx = half * 8 + open * 4 + dir;
+        const did = idx === 0 ? id : next++;
+        if (did > MAX_BLOCK_ID) return;
+        const t = half ? b.door.top : b.door.bottom;
+        const rots: Rot[] = dir ? [['y', 90 * dir]] : [];
+        const box = rotBox(DOOR_BOX[open], rots);
+        BLOCKS[did] = {
+          name: nm, key: b.name, top: t, bottom: t, side: t, opaque: false,
+          parts: [doorPlate(open, t)], rots, boxes: [box], pick: [box],
+          hidden: idx !== 0, base: id,
+          door: { half: half as 0 | 1, open: open as 0 | 1, dir, ids: doorIds },
+        };
+        doorIds[idx] = did;
+      }
+      return;
+    }
     const n = FLIPPABLE.test(b.name) ? 8 : 4;
     const variants: number[] = new Array(n);
     variants[0] = id;

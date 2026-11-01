@@ -48,6 +48,10 @@ A korábbi, saját textúralapokból kivágott textúrákat a `scripts/slice-tex
 | Inventory (kreatívban blokklista) | E | Tárgyak gomb |
 | Menü | Esc | Menü gomb |
 
+## Telefon
+
+A játék fekvő helyzetben játszható jól: álló helyzetben egy kérés jelenik meg a forgatásra (a „Mégis így játszom" gombbal eltüntethető). Androidon a játék indításakor teljes képernyőt és fekvő zárolást kér. iPhone-on a böngésző ezt nem engedi, de a Megosztás, Főképernyőhöz adás után a manifest alapján teljes képernyős appként indul.
+
 ## Játékmódok
 
 Az **Új világ (túlélő)** és az **Új világ (kreatív)** gomb közül választasz; a mentés megjegyzi a módot.
@@ -57,9 +61,14 @@ Az **Új világ (túlélő)** és az **Új világ (kreatív)** gomb közül vál
 
 ### Inventory és barkácsolás
 
-Az **E** (telefonon a **Tárgyak** gomb) 36 helyes tárolót nyit (alul a 9 helyes hotbar) és 2×2-es barkácsrácsot. A munkapadra (**jobb gomb**) 3×3-as rács nyílik. Kattintás: felvesz / lerak, jobb gomb: felét veszi fel vagy egyet rak le (telefonon a **Fél** gomb), Shift+kattintás: gyorsmozgatás, az eredményen Shift+kattintás: amíg van alapanyag, készít.
+Az **E** (telefonon a **Tárgyak** gomb) 36 helyes tárolót nyit (alul a 9 helyes hotbar) és 2×2-es barkácsrácsot. A munkapadra (**jobb gomb**) 3×3-as rács nyílik. Egérrel: kattintás felvesz / lerak, jobb gomb a felét veszi fel vagy egyet rak le, Shift+kattintás gyorsmozgatás. Telefonon: koppintás felvesz / lerak, hosszan nyomva a stack fele (vagy egy darab), ujjal húzva a stack a másik helyre kerül; a sötét háttérre koppintva a panel bezárul. Az eredményen Shift+kattintás: amíg van alapanyag, készít.
 
 Receptek (a rács alakja számít, a tükrözött is jó): rönk → 4 deszka, 2 deszka egymás fölött → 4 pálca, 2×2 deszka → munkapad, szén + pálca → 4 fáklya, 3 pálca + 2 pálca (létra, kerítés), lap, lépcső, csapóajtó, kő- és kavicslépcső, -lap, fal, kőtégla, homokkő, vödör (3 vasrúd V alakban), kova és acél (vasrúd + kova), valamint fa-, kő-, vas-, arany- és gyémántcsákány, -balta, -ásó és -kard. A vas- és aranyérc bontáskor rögtön rúdként esik (nincs kemence), a szénérc szenet, a gyémántérc gyémántot ad, a kavics néha kovát, a lomb néha csemetét vagy almát.
+
+### Ajtók, kerítések, létra
+
+- **Ajtó** (6 deszka 2×3-as alakban = 3 ajtó): két blokk magas, a nézési irányodba néz, jobb gombbal nyitható és csukható. A kerítések, falak és üvegtáblák a szomszédaik felé kinyúlnak (egymáshoz és tömör blokkokhoz), a kerítésen és falon nem lehet átugrani.
+- **Létra:** a megcélzott falra kerül, rajta előre nézve vagy ugrással fel, hátra nézve le lehet mászni.
 
 ### Folyadékok és tűz
 

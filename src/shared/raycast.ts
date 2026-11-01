@@ -1,4 +1,4 @@
-import { BLOCKS, fluidKind, fluidLevel, isSolid, type Box } from './blocks';
+import { BLOCKS, dynamicBoxes, fluidKind, fluidLevel, isSolid, type Box } from './blocks';
 import type { World } from './world';
 
 export interface RayHit {
@@ -70,7 +70,8 @@ export function raycast(
       };
     }
     if (isSolid(id)) {
-      const pick = BLOCKS[id]?.pick;
+      const bdef = BLOCKS[id];
+      const pick = bdef?.conn ? dynamicBoxes(bdef, (dx, dz) => world.getBlock(x + dx, y, z + dz), 'pick') : bdef?.pick;
       if (!pick) {
         return {
           x, y, z, px, py, pz, nx, ny, nz,

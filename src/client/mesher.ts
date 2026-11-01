@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { AIR, B, BLOCKS, FLUID_LAVA, fluidHeight, fluidKind, fluidLevel, isOpaque, rotPoint, type BlockDef, type Dir, type FaceKind, type ShapeFace, type Vec3 } from '../shared/blocks';
+import { AIR, B, BLOCKS, FLUID_LAVA, connectedParts, fluidHeight, fluidKind, fluidLevel, isOpaque, rotPoint, type BlockDef, type Dir, type FaceKind, type ShapeFace, type ShapePart, type Vec3 } from '../shared/blocks';
 import { CH, CS, type Chunk, type World } from '../shared/world';
 import type { Atlas } from './atlas';
 
@@ -70,11 +70,11 @@ const around = (p: Vec3, axis: 'x' | 'y' | 'z', deg: number): Vec3 => {
 
 /** Egy nem kocka alakú blokk lapjai: a modell elemei, az elemek és a blokk forgatásával */
 function addShape(
-  buf: Buffers, def: BlockDef, world: World, wx: number, y: number, wz: number, x: number, z: number,
+  buf: Buffers, def: BlockDef, parts: ShapePart[], world: World, wx: number, y: number, wz: number, x: number, z: number,
   uvOf: (tex: string) => [number, number, number, number], bright = false,
 ): void {
   const rots = def.rots ?? [];
-  for (const part of def.parts!) {
+  for (const part of parts) {
     for (const [name, face] of Object.entries(part.faces) as [Dir, ShapeFace][]) {
       if (face.cull) {
         let c: Vec3 = DIR_VEC[face.cull];
@@ -183,8 +183,9 @@ export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): Ch
         const def = BLOCKS[id];
         if (!def) continue; // ismeretlen blokk: nem rajzoljuk
         if (def.parts) {
-          if (id === B.FIRE) addShape(fire, def, world, ox + x, y, oz + z, x, z, (t) => atlas.anim.uv(t), true);
-          else addShape(solid, def, world, ox + x, y, oz + z, x, z, (t) => atlas.uv(t));
+          const parts = def.conn ? connectedParts(def, (dx, dz) => world.getBlock(ox + x + dx, y, oz + z + dz)) : def.parts;
+          if (id === B.FIRE) addShape(fire, def, parts, world, ox + x, y, oz + z, x, z, (t) => atlas.anim.uv(t), true);
+          else addShape(solid, def, parts, world, ox + x, y, oz + z, x, z, (t) => atlas.uv(t));
           continue;
         }
         const kind = fluidKind(id);
