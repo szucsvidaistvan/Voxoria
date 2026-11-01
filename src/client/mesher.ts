@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { AIR, B, BLOCKS, isOpaque, type FaceKind } from '../shared/blocks';
+import { AIR, B, BLOCKS, isOpaque, rotPoint, type BlockDef, type Dir, type FaceKind, type ShapeFace, type Vec3 } from '../shared/blocks';
 import { CH, CS, type Chunk, type World } from '../shared/world';
 import type { Atlas } from './atlas';
 
@@ -46,6 +46,79 @@ export interface ChunkGeometry {
   water: THREE.BufferGeometry | null;
 }
 
+
+// ---------- nem kocka alakú blokkok ----------
+
+const DIR_VEC: Record<Dir, Vec3> = {
+  up: [0, 1, 0], down: [0, -1, 0], east: [1, 0, 0], west: [-1, 0, 0], south: [0, 0, 1], north: [0, 0, -1],
+};
+// a lap sarkai: bal alsó, jobb alsó, jobb felső, bal felső (kívülről nézve), a 0 a "from", az 1 a "to" koordináta
+const CORNERS: Record<Dir, Vec3[]> = {
+  up: [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]],
+  down: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]],
+  east: [[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]],
+  west: [[0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0]],
+  south: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]],
+  north: [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]],
+};
+
+const around = (p: Vec3, axis: 'x' | 'y' | 'z', deg: number): Vec3 => {
+  const r = rotPoint([p[0] - 8, p[1] - 8, p[2] - 8], axis, deg);
+  return [r[0] + 8, r[1] + 8, r[2] + 8];
+};
+
+/** Egy nem kocka alakú blokk lapjai: a modell elemei, az elemek és a blokk forgatásával */
+function addShape(
+  buf: Buffers, def: BlockDef, world: World, wx: number, y: number, wz: number, x: number, z: number, atlas: Atlas,
+): void {
+  const rots = def.rots ?? [];
+  for (const part of def.parts!) {
+    for (const [name, face] of Object.entries(part.faces) as [Dir, ShapeFace][]) {
+      if (face.cull) {
+        let c: Vec3 = DIR_VEC[face.cull];
+        for (const [a, d] of rots) c = rotPoint(c, a, d);
+        if (isOpaque(world.getBlock(wx + Math.round(c[0]), y + Math.round(c[1]), wz + Math.round(c[2])))) continue;
+      }
+
+      let verts: Vec3[] = CORNERS[name].map(([cx, cy, cz]) => [
+        cx ? part.to[0] : part.from[0], cy ? part.to[1] : part.from[1], cz ? part.to[2] : part.from[2],
+      ]);
+      let n: Vec3 = DIR_VEC[name];
+      if (part.rot) {
+        const { o, a, g, s } = part.rot;
+        const k = s ? 1 / Math.cos((g * Math.PI) / 180) : 1;
+        verts = verts.map((v) => {
+          const r = rotPoint([v[0] - o[0], v[1] - o[1], v[2] - o[2]], a, g);
+          const sc: Vec3 = [a === 'x' ? 1 : k, a === 'y' ? 1 : k, a === 'z' ? 1 : k];
+          return [r[0] * sc[0] + o[0], r[1] * sc[1] + o[1], r[2] * sc[2] + o[2]];
+        });
+        n = rotPoint(n, a, g);
+      }
+      for (const [a, d] of rots) {
+        verts = verts.map((v) => around(v, a, d));
+        n = rotPoint(n, a, d);
+      }
+
+      const ax = Math.abs(n[0]), ay = Math.abs(n[1]), az = Math.abs(n[2]);
+      const shade = ay >= ax && ay >= az ? (n[1] > 0 ? 1 : 0.5) : ax >= az ? 0.8 : 0.65;
+      const tint = face.tint && def.tintColor ? def.tintColor : ([1, 1, 1] as const);
+
+      const [u0, v0, u1, v1] = atlas.uv(face.tex);
+      const [a, b, c, d] = face.uv;
+      const uvs = [[a, d], [c, d], [c, b], [a, b]];
+      const rot = (((face.rot ?? 0) / 90) | 0) & 3;
+      const base = buf.pos.length / 3;
+      verts.forEach((v, i) => {
+        buf.pos.push(x + v[0] / 16, y + v[1] / 16, z + v[2] / 16);
+        buf.col.push(shade * tint[0], shade * tint[1], shade * tint[2]);
+        const [u, vt] = uvs[(i + rot) & 3];
+        buf.uvs.push(u0 + ((u1 - u0) * u) / 16, v1 - ((v1 - v0) * vt) / 16);
+      });
+      buf.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+  }
+}
+
 /** Egy chunk geometriája (a csúcsok chunk-helyi koordinátákban). Csak a látható lapokat rajzolja. */
 export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): ChunkGeometry {
   const solid = new Buffers();
@@ -59,6 +132,10 @@ export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): Ch
         if (id === AIR) continue;
         const def = BLOCKS[id];
         if (!def) continue; // ismeretlen blokk: nem rajzoljuk
+        if (def.parts) {
+          addShape(solid, def, world, ox + x, y, oz + z, x, z, atlas);
+          continue;
+        }
         const liquid = id === B.WATER;
         const buf = liquid ? water : solid;
         for (const f of FACES) {

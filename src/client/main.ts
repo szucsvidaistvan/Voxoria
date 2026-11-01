@@ -73,7 +73,7 @@ async function main(): Promise<void> {
   }
 
   const highlight = new THREE.LineSegments(
-    new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004, 1.004, 1.004)),
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
     new THREE.LineBasicMaterial({ color: 0x000000 }),
   );
   highlight.visible = false;
@@ -276,6 +276,7 @@ async function main(): Promise<void> {
       e.stopPropagation();
       input.hotbar = i;
       selectSlot(i);
+      announce(i);
     });
     hotbarEl.appendChild(slot);
     slotEls.push(slot);
@@ -283,7 +284,19 @@ async function main(): Promise<void> {
     paintSlot(i);
   });
   const selectSlot = (i: number) => slotEls.forEach((el, n) => el.classList.toggle('selected', n === i));
-  input.onHotbar = selectSlot;
+
+  // a kézben lévő blokk neve rövid időre megjelenik, amikor a sávban választasz
+  const heldName = $('held-name');
+  let heldTimer = 0;
+  const announce = (i: number) => {
+    const name = BLOCKS[hotbar[i]]?.name;
+    if (!name) return;
+    heldName.textContent = name;
+    heldName.classList.add('show');
+    window.clearTimeout(heldTimer);
+    heldTimer = window.setTimeout(() => heldName.classList.remove('show'), 1800);
+  };
+  input.onHotbar = (i) => { selectSlot(i); announce(i); };
   selectSlot(0);
 
   // ---------- menü ----------
@@ -348,6 +361,7 @@ async function main(): Promise<void> {
         hotbar[input.hotbar] = id;
         paintSlot(input.hotbar);
         closeInventory();
+        announce(input.hotbar);
       });
       frag.appendChild(el);
       return { id, el, text: `${def.name} ${def.key ?? ''}`.toLowerCase() };
@@ -456,13 +470,32 @@ async function main(): Promise<void> {
     const p = camera.position;
     const hit: RayHit | null = raycast(world, p.x, p.y, p.z, dir.x, dir.y, dir.z, 6);
     highlight.visible = !!hit;
-    if (hit) highlight.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
+    if (hit) {
+      const [x0, y0, z0, x1, y1, z1] = hit.box;
+      highlight.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+      highlight.scale.set(x1 - x0 + 0.004, y1 - y0 + 0.004, z1 - z0 + 0.004);
+    }
 
     if (input.breakQueued && hit && hit.y > 0) {
       if (world.setBlock(hit.x, hit.y, hit.z, 0)) refresh(hit.x, hit.z);
     }
-    if (input.placeQueued && hit && hit.py >= 0 && hit.py < CH && !player.intersectsBlock(hit.px, hit.py, hit.pz)) {
-      if (world.setBlock(hit.px, hit.py, hit.pz, hotbar[input.hotbar] ?? B.DIRT)) refresh(hit.px, hit.pz);
+    if (input.placeQueued && hit && hit.py >= 0 && hit.py < CH) {
+      let id = hotbar[input.hotbar] ?? B.DIRT;
+      const def = BLOCKS[id];
+      // az átjárható blokkokat (növény, fáklya) a játékos testébe is le lehet rakni
+      const blocking = !def?.parts || !!def.boxes?.length;
+      if (!blocking || !player.intersectsBlock(hit.px, hit.py, hit.pz)) {
+        if (def?.variants) {
+          // a blokk a játékos nézési irányába néz (a lépcső magas fele előre esik)
+          const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+          const dir = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 0 : 2) : fz > 0 ? 1 : 3;
+          // lap és lépcső: alulról vagy a lap felső felére építve fejjel lefelé kerül
+          let flip = 0;
+          if (def.variants.length > 4) flip = hit.ny < 0 || (hit.ny === 0 && hit.hy - hit.y > 0.5) ? 1 : 0;
+          id = def.variants[flip * 4 + dir] ?? id;
+        }
+        if (world.setBlock(hit.px, hit.py, hit.pz, id)) refresh(hit.px, hit.pz);
+      }
     }
     input.breakQueued = input.placeQueued = false;
   };

@@ -1,4 +1,4 @@
-import { B, isSolid } from '../shared/blocks';
+import { B, BLOCKS, isSolid } from '../shared/blocks';
 import type { World } from '../shared/world';
 
 const HALF_W = 0.3, HEIGHT = 1.8, EPS = 1e-3;
@@ -24,7 +24,18 @@ export class Player {
     for (let ix = Math.floor(x - HALF_W + EPS); ix <= Math.floor(x + HALF_W - EPS); ix++) {
       for (let iy = Math.floor(y + EPS); iy <= Math.floor(y + HEIGHT - EPS); iy++) {
         for (let iz = Math.floor(z - HALF_W + EPS); iz <= Math.floor(z + HALF_W - EPS); iz++) {
-          if (isSolid(this.world.getBlock(ix, iy, iz))) return true;
+          const id = this.world.getBlock(ix, iy, iz);
+          if (!isSolid(id)) continue;
+          const boxes = BLOCKS[id]?.boxes;
+          if (!boxes) return true; // teljes kocka
+          // nem kocka alakú blokk: csak a tényleges dobozaival ütközik
+          for (const b of boxes) {
+            if (
+              x + HALF_W > ix + b[0] + EPS && x - HALF_W < ix + b[3] - EPS &&
+              y + HEIGHT > iy + b[1] + EPS && y < iy + b[4] - EPS &&
+              z + HALF_W > iz + b[2] + EPS && z - HALF_W < iz + b[5] - EPS
+            ) return true;
+          }
         }
       }
     }

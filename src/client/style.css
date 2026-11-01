@@ -98,6 +98,25 @@ html, body {
 .slot canvas { width: 100%; height: 100%; display: block; }
 .slot.selected { border-color: var(--gold); }
 
+#held-name {
+  position: fixed;
+  left: 50%;
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 70px);
+  transform: translateX(-50%);
+  padding: 0.25rem 0.7rem;
+  max-width: 90vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--chalk);
+  background: rgba(14, 26, 51, 0.72);
+  box-shadow: inset 0 0 0 2px var(--edge);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s;
+}
+#held-name.show { opacity: 1; transition: opacity 0.05s; }
+
 .touch-only { display: none; }
 body.touch .touch-only { display: block; }
 
@@ -107,6 +126,7 @@ body.touch #hotbar {
   width: calc(100vw - 7rem);
   max-width: 24rem;
 }
+body.touch #held-name { top: calc(max(8px, env(safe-area-inset-top)) + 64px); bottom: auto; }
 body.touch .slot { flex: 1; width: auto; height: auto; aspect-ratio: 1; padding: 2px; border-width: 2px; }
 
 #btn-menu {
@@ -228,3 +248,5 @@ body.touch #touch-actions { display: grid; }
 @media (prefers-reduced-motion: reduce) {
   .btn:active { transform: none; }
 }
+
+#credits a { color: inherit; }

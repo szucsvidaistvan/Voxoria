@@ -6,7 +6,7 @@ export const TILE = 64;
 /** a csempék körüli perem: a mipmapelés és a sima szűrés miatt nem szivároghat át a szomszéd */
 const PAD = 4;
 const CELL = TILE + PAD * 2;
-const MAX_COLS = 16;
+const MAX_COLS = 24; // szélesebb atlasz: a magasság így biztosan a 4096 pixeles GPU-korlát alatt marad
 /** true: közelről elmosódó, sima textúrák; false: éles pixelek (a textúracsomag eredeti kinézete) */
 const SMOOTH = false;
 
@@ -20,8 +20,6 @@ const FALLBACK: Record<string, string> = {
 };
 const FALLBACK_EXTRA = '#8a8a8a';
 
-/** Alap textúrák, amik a Dokucraftban 2x2-es lapok (pss_cube): csak a bal felső negyedük a látható kép */
-const BASE_CROP: Record<string, string> = { diamond_ore: '0,0,8,8' };
 
 /** A víz csempéjét mi rajzoljuk: kék alap, halvány, pixeles hullámokkal */
 function drawWater(ctx: CanvasRenderingContext2D, x: number, y: number): void {
@@ -82,10 +80,12 @@ export async function buildAtlas(): Promise<Atlas> {
     names.map(async (name, i) => {
       const x = (i % cols) * CELL + PAD, y = Math.floor(i / cols) * CELL + PAD;
       // "név@u0,v0,u1,v1": a modell lapja a textúrának csak egy részét használja (pl. a pss_cube a 2x2-es lap bal felső negyedét)
-      const [file, crop = BASE_CROP[name]] = name.split('@');
+      const [file, crop] = name.split('@');
       const url = isBase.has(name) ? `${base}textures/${file}.png` : `${base}textures/mc/${file}.png`;
       const img = await loadImage(url);
       if (img) {
+        // kis felbontású csomagnál (pl. 16 px) éles pixeleket akarunk, nem elmosást
+        ctx.imageSmoothingEnabled = img.width >= TILE;
         if (crop) {
           const [u0, v0, u1, v1] = crop.split(',').map(Number);
           const w = img.width;

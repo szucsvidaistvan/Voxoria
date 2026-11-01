@@ -3,9 +3,10 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { unzipSync } from 'fflate';
+import { readZip } from './lib-zip.mjs';
+import { packRoot } from './lib-pack.mjs';
 
-// játékbeli név -> útvonal a csomagban (assets/minecraft/textures/ alatt)
+// játékbeli név -> útvonal a csomagban (a textures/ mappa alatt); több lehetséges útvonal is megadható
 const MAP = {
   grass_top: 'block/grass_block_top.png',
   grass_side: 'block/grass_block_side.png',
@@ -15,7 +16,7 @@ const MAP = {
   log_side: 'block/oak_log.png',
   log_top: 'block/oak_log_top.png',
   planks: 'block/oak_planks.png',
-  leaves: 'block/leaves/oak_leaves.png',
+  leaves: ['block/leaves/oak_leaves.png', 'block/oak_leaves.png'],
   cobblestone: 'block/cobblestone.png',
   water: 'block/water_still.png',
   bedrock: 'block/bedrock.png',
@@ -39,17 +40,16 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = resolve(root, 'public/textures');
 mkdirSync(outDir, { recursive: true });
 
-const prefix = 'assets/minecraft/textures/';
-const wanted = new Set(Object.values(MAP).map((p) => prefix + p));
-const files = unzipSync(new Uint8Array(readFileSync(zipPath)), {
-  filter: (f) => wanted.has(f.name),
-});
+const zip = readZip(zipPath);
+const prefix = `${packRoot(zip)}textures/`;
 
 let ok = 0;
-for (const [name, path] of Object.entries(MAP)) {
-  const data = files[prefix + path];
+for (const [name, paths] of Object.entries(MAP)) {
+  const candidates = Array.isArray(paths) ? paths : [paths];
+  const found = candidates.find((p) => zip.has(prefix + p));
+  const data = found ? zip.read(prefix + found) : null;
   if (!data) {
-    console.warn(`Hiányzik: ${path}`);
+    console.warn(`Hiányzik: ${candidates[0]}`);
     continue;
   }
   writeFileSync(resolve(outDir, `${name}.png`), data);
