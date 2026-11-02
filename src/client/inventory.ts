@@ -1,6 +1,7 @@
 import { BLOCKS } from '../shared/blocks';
 import { ITEMS, isItem, itemName, maxStack } from '../shared/items';
 import { matchRecipe, type Stack } from '../shared/recipes';
+import { SMELT_SECONDS, type Furnace } from '../shared/smelting';
 
 export const HOTBAR_SIZE = 9;
 export const TOTAL_SLOTS = 36;
@@ -138,6 +139,8 @@ export class BagUI {
   private result: Stack | null = null;
   /** érintésnél: a koppintás jobb gombot helyettesít (egyesével lerak, felét felveszi) */
   private split = false;
+  /** nyitva lévő tűzhely: a bemenet és az üzemanyag a `craft` rács két helye, a kimenet a tűzhelyé */
+  private furnace: Furnace | null = null;
 
   /** a tartalom változott (a HUD hotbarját frissíteni kell) */
   onChange: () => void = () => {};
@@ -238,19 +241,23 @@ export class BagUI {
   }
 
   /** Megnyitás: 2 = a saját 2x2-es rács, 3 = munkapad */
-  open(size: 2 | 3): void {
-    this.size = size;
-    this.craft = new Array(size * size).fill(null);
-    this.craftEl.style.setProperty('--n', String(size));
+  open(size: 2 | 3 | 'furnace', furnace?: Furnace): void {
+    this.furnace = size === 'furnace' ? furnace ?? null : null;
+    const cells = this.furnace ? 2 : (size as number) * (size as number);
+    this.size = this.furnace ? 1 : (size as number);
+    // a tűzhelynél a rács a tűzhely saját tárolója (nem másolat): amit ide teszel, ott marad bezárás után is
+    this.craft = this.furnace ? this.furnace.slots : new Array(cells).fill(null);
+    this.craftEl.style.setProperty('--n', this.furnace ? '1' : String(size));
+    this.root.classList.toggle('furnace', !!this.furnace);
     this.craftEl.replaceChildren();
     this.craftViews = [];
-    for (let i = 0; i < size * size; i++) {
+    for (let i = 0; i < cells; i++) {
       const v = new SlotView(this.paint);
       this.bindSlot(v.el, 'craft', i);
       this.craftEl.appendChild(v.el);
       this.craftViews.push(v);
     }
-    this.titleEl.textContent = size === 3 ? 'Crafting Table' : 'Inventory';
+    this.titleEl.textContent = this.furnace ? 'Furnace' : size === 3 ? 'Crafting Table' : 'Inventory';
     this.cursor = null;
     this.root.hidden = false;
     this.render();
@@ -259,12 +266,41 @@ export class BagUI {
   /** Bezárás: a kézben és a rácson lévő dolgok visszakerülnek a tárolóba */
   close(): void {
     if (this.root.hidden) return;
-    const back = [this.cursor, ...this.craft];
+    // a tűzhely tartalma a tűzhelyben marad, csak a kézben lévő dolog kerül vissza
+    const back = this.furnace ? [this.cursor] : [this.cursor, ...this.craft];
     this.cursor = null;
     this.craft = [];
+    this.furnace = null;
+    this.root.classList.remove('furnace');
     for (const s of back) if (s) this.inv.add(s.id, s.n); // ami nem fér el, elvész
     this.root.hidden = true;
     this.onChange();
+  }
+
+  /** Az olvasztott dolgok elvétele a tűzhelyből */
+  private takeFurnaceOut(shift: boolean): void {
+    const f = this.furnace!;
+    const o = f.out;
+    if (!o) return;
+    if (shift) {
+      const left = this.inv.add(o.id, o.n);
+      f.out = left > 0 ? { id: o.id, n: left } : null;
+    } else if (!this.cursor) {
+      this.cursor = o;
+      f.out = null;
+    } else if (this.cursor.id === o.id) {
+      const m = Math.min(maxStack(o.id) - this.cursor.n, o.n);
+      this.cursor.n += m;
+      o.n -= m;
+      if (o.n <= 0) f.out = null;
+    }
+    this.render();
+    this.onChange();
+  }
+
+  /** Minden képkockán hívjuk, amíg a tűzhely nyitva van: a haladás és a kimenet frissül */
+  tick(): void {
+    if (this.furnace && this.isOpen) this.render();
   }
 
   /** Újrarajzolás (pl. elem textúra betöltése után) */
@@ -279,8 +315,13 @@ export class BagUI {
   private render(): void {
     this.invViews.forEach((v, k) => v.set(this.inv.slots[this.order[k]]));
     this.craftViews.forEach((v, i) => v.set(this.craft[i]));
-    this.result = matchRecipe(this.craft, this.size, this.size);
+    this.result = this.furnace ? this.furnace.out : matchRecipe(this.craft, this.size, this.size);
     this.outView.set(this.result);
+    if (this.furnace) {
+      const f = this.furnace;
+      this.craftEl.parentElement!.style.setProperty('--p', String(Math.min(1, f.cook / SMELT_SECONDS)));
+      this.craftEl.parentElement!.classList.toggle('lit', f.lit);
+    }
     this.cursorView.set(this.cursor);
     this.cursorEl.hidden = !this.cursor;
   }
@@ -345,6 +386,7 @@ export class BagUI {
 
   /** Az eredmény elvétele (shifttel: addig készít, amíg fér a tárolóba és van alapanyag) */
   private takeResult(shift: boolean): void {
+    if (this.furnace) { this.takeFurnaceOut(shift); return; }
     const take = () => {
       const r = matchRecipe(this.craft, this.size, this.size);
       if (!r) return false;

@@ -122,6 +122,21 @@ html, body {
 }
 #held-name.show { opacity: 1; transition: opacity 0.05s; }
 
+/* a nap sorszáma és a játékbeli idő a sarokban */
+#clock {
+  position: fixed;
+  right: max(10px, env(safe-area-inset-right));
+  top: max(10px, env(safe-area-inset-top));
+  padding: 0.2rem 0.6rem;
+  font-size: 0.9rem;
+  color: var(--chalk);
+  background: rgba(14, 26, 51, 0.6);
+  box-shadow: inset 0 0 0 2px var(--edge);
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+body.touch #clock { top: auto; bottom: max(8px, env(safe-area-inset-bottom)); right: auto; left: max(10px, env(safe-area-inset-left)); font-size: 0.75rem; }
+
 .touch-only { display: none; }
 body.touch .touch-only { display: block; }
 
@@ -344,6 +359,14 @@ body.creative #vitals { display: none; }
 #craft-area { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 0 0 0.8rem; }
 #craft-grid { display: grid; grid-template-columns: repeat(var(--n, 2), var(--slot)); gap: 4px; }
 #craft-arrow { font-size: 2rem; color: var(--gold); }
+/* tűzhely: a nyíl a főzés haladását mutatja, a láng az égést */
+#bag.furnace #craft-grid { grid-template-columns: var(--slot); }
+#bag.furnace #craft-arrow {
+  background: linear-gradient(90deg, var(--gold) calc(var(--p, 0) * 100%), rgba(255, 255, 255, 0.25) 0);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+#bag.furnace #craft-area::before { content: '🔥'; font-size: 1.4rem; filter: grayscale(1) opacity(0.35); }
+#bag.furnace #craft-area.lit::before { filter: none; }
 #bag-main, #bag-hot { display: grid; grid-template-columns: repeat(9, var(--slot)); gap: 4px; }
 #bag-hot { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 3px solid var(--edge); }
 .islot {

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { AIR, B, BLOCKS, FLUID_LAVA, connectedParts, fluidHeight, fluidKind, fluidLevel, isOpaque, rotPoint, type BlockDef, type Dir, type FaceKind, type ShapeFace, type ShapePart, type Vec3 } from '../shared/blocks';
 import { CH, CS, type Chunk, type World } from '../shared/world';
+import { BLOCK_CURVE, SKY_CURVE, computeLight, type LightField } from '../shared/light';
 import type { Atlas } from './atlas';
 
 interface FaceDef {
@@ -25,7 +26,14 @@ class Buffers {
   pos: number[] = [];
   uvs: number[] = [];
   col: number[] = [];
+  /** csúcsonként (napfény, blokkfény) szorzó 0..1; csak a szilárd blokkoknál van */
+  lt: number[] = [];
   idx: number[] = [];
+
+  /** Egy csúcs fénye a csomagolt (napfény << 4 | blokkfény) értékből */
+  light(packed: number): void {
+    this.lt.push(SKY_CURVE[packed >> 4], BLOCK_CURVE[packed & 15]);
+  }
 
   toGeometry(): THREE.BufferGeometry | null {
     if (!this.idx.length) return null;
@@ -33,6 +41,7 @@ class Buffers {
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uvs, 2));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
+    if (this.lt.length === (this.pos.length / 3) * 2) g.setAttribute('lights', new THREE.Float32BufferAttribute(this.lt, 2));
     g.setIndex(this.idx);
     g.computeBoundingSphere();
     return g;
@@ -71,7 +80,7 @@ const around = (p: Vec3, axis: 'x' | 'y' | 'z', deg: number): Vec3 => {
 /** Egy nem kocka alakú blokk lapjai: a modell elemei, az elemek és a blokk forgatásával */
 function addShape(
   buf: Buffers, def: BlockDef, parts: ShapePart[], world: World, wx: number, y: number, wz: number, x: number, z: number,
-  uvOf: (tex: string) => [number, number, number, number], bright = false,
+  uvOf: (tex: string) => [number, number, number, number], bright = false, packedLight = 0xf0,
 ): void {
   const rots = def.rots ?? [];
   for (const part of parts) {
@@ -113,6 +122,7 @@ function addShape(
       verts.forEach((v, i) => {
         buf.pos.push(x + v[0] / 16, y + v[1] / 16, z + v[2] / 16);
         buf.col.push(shade * tint[0], shade * tint[1], shade * tint[2]);
+        buf.light(packedLight);
         const [u, vt] = uvs[(i + rot) & 3];
         buf.uvs.push(u0 + ((u1 - u0) * u) / 16, v1 - ((v1 - v0) * vt) / 16);
       });
@@ -174,6 +184,7 @@ export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): Ch
   const lava = new Buffers();
   const fire = new Buffers();
   const ox = chunk.cx * CS, oz = chunk.cz * CS;
+  const lf: LightField = computeLight(world, chunk.cx, chunk.cz);
 
   for (let y = 0; y < CH; y++) {
     for (let z = 0; z < CS; z++) {
@@ -185,7 +196,12 @@ export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): Ch
         if (def.parts) {
           const parts = def.conn ? connectedParts(def, (dx, dz) => world.getBlock(ox + x + dx, y, oz + z + dz)) : def.parts;
           if (id === B.FIRE) addShape(fire, def, parts, world, ox + x, y, oz + z, x, z, (t) => atlas.anim.uv(t), true);
-          else addShape(solid, def, parts, world, ox + x, y, oz + z, x, z, (t) => atlas.uv(t));
+          else {
+            // a nem kocka alakú blokk a saját cellájának fényét kapja; a világító blokk (fáklya) a saját fényerejét
+            let packed = lf.get(ox + x, y, oz + z);
+            if (def.light && (packed & 15) < def.light) packed = (packed & 0xf0) | def.light;
+            addShape(solid, def, parts, world, ox + x, y, oz + z, x, z, (t) => atlas.uv(t), false, packed);
+          }
           continue;
         }
         const kind = fluidKind(id);
@@ -200,9 +216,11 @@ export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): Ch
           const [u0, v0, u1, v1] = atlas.uv(def[f.kind]);
           const tint = def.tint?.[f.kind] ?? [1, 1, 1];
           const base = solid.pos.length / 3;
+          const packed = lf.get(ox + x + f.dir[0], y + f.dir[1], oz + z + f.dir[2]);
           for (const v of f.v) {
             solid.pos.push(x + v[0], y + v[1], z + v[2]);
             solid.col.push(f.shade * tint[0], f.shade * tint[1], f.shade * tint[2]);
+            solid.light(packed);
           }
           solid.uvs.push(u0, v0, u1, v0, u1, v1, u0, v1);
           solid.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);

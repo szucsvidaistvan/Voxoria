@@ -8,11 +8,15 @@ import { FluidSim, isReplaceable } from '../shared/fluids';
 import { I, ITEMS, isItem, itemName } from '../shared/items';
 import { CATEGORIES, categoryOf } from '../shared/categories';
 import { initRecipes } from '../shared/recipes';
+import { Furnace, initSmelting } from '../shared/smelting';
+import { LIGHT, isOpaque } from '../shared/blocks';
+import { resetLightCache } from '../shared/light';
 import { breakTime, dropFor } from '../shared/survival';
 import { raycast, type RayHit } from '../shared/raycast';
 import { CH, CS, SEA_LEVEL, World } from '../shared/world';
 import { buildAtlas, TILE } from './atlas';
-import { DAY_SECONDS, START_TIME, skyAt } from './daynight';
+import { DAY_SECONDS, START_TIME, formatClock, skyAt } from './daynight';
+import { createMoonTexture, createSunTexture } from './sky';
 import { BagUI, HOTBAR_SIZE, Inventory, SlotView, createItemPainter } from './inventory';
 import { Health, createVitals } from './health';
 import { createCracks, createDrops, createParticles } from './effects';
@@ -42,6 +46,8 @@ async function loadGenerated(): Promise<number> {
 async function main(): Promise<void> {
   const extraCount = await loadGenerated();
   initRecipes(); // a generált blokkok után, mert a receptek hivatkoznak rájuk
+  initSmelting();
+  resetLightCache();
   const atlas = await buildAtlas();
 
   // ---------- renderelés ----------
@@ -56,6 +62,24 @@ async function main(): Promise<void> {
   const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 400);
   camera.rotation.order = 'YXZ';
   const material = new THREE.MeshBasicMaterial({ map: atlas.texture, vertexColors: true, alphaTest: 0.5 });
+  // a chunkok anyaga: a `material` globális napszak-fénye mellé csúcsonként nap- és blokkfényt (fáklya, láva ...) kap.
+  // A kész szín = max(napszak-fény * napfény, barlang-félhomály, blokkfény * meleg árnyalat).
+  const chunkMaterial = new THREE.MeshBasicMaterial({ map: atlas.texture, vertexColors: true, alphaTest: 0.5 });
+  chunkMaterial.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec2 lights;\nvarying vec2 vLights;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLights = lights;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vLights;')
+      .replace(
+        'vec4 diffuseColor = vec4( diffuse, opacity );',
+        `vec3 skyLit = diffuse * vLights.x;
+         vec3 caveDark = vec3( 0.045, 0.05, 0.075 );
+         vec3 torchLit = vec3( 1.0, 0.86, 0.66 ) * vLights.y;
+         vec4 diffuseColor = vec4( max( max( skyLit, caveDark ), torchLit ), opacity );`,
+      );
+  };
+  chunkMaterial.customProgramCacheKey = () => 'voxoria-chunk-light';
   // a víz átlátszó, és alulról is látszik a felszíne
   const waterMaterial = new THREE.MeshBasicMaterial({
     map: atlas.anim.texture, vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide,
@@ -70,14 +94,14 @@ async function main(): Promise<void> {
   const fireMaterial = new THREE.MeshBasicMaterial({ map: atlas.anim.texture, vertexColors: true, alphaTest: 0.3, side: THREE.DoubleSide });
 
   // ég: nap, hold, csillagok (a kamerával együtt mozognak)
-  const sun = new THREE.Mesh(
-    new THREE.PlaneGeometry(60, 60),
-    new THREE.MeshBasicMaterial({ color: 0xfff2b0, fog: false, side: THREE.DoubleSide }),
-  );
-  const moon = new THREE.Mesh(
-    new THREE.PlaneGeometry(40, 40),
-    new THREE.MeshBasicMaterial({ color: 0xdfe6f5, fog: false, side: THREE.DoubleSide }),
-  );
+  const skyMat = (map: THREE.Texture) =>
+    new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide });
+  const sun = new THREE.Mesh(new THREE.PlaneGeometry(110, 110), skyMat(createSunTexture()));
+  // a hold 8 fázisa: a textúrák elkészülnek, és a nap sorszáma szerint váltunk köztük
+  const moonTextures = Array.from({ length: 8 }, (_, k) => createMoonTexture(k));
+  const moonMat = skyMat(moonTextures[4]);
+  const moon = new THREE.Mesh(new THREE.PlaneGeometry(56, 56), moonMat);
+  let moonShown = 4;
   const starPos = new Float32Array(400 * 3);
   for (let i = 0; i < 400; i++) {
     const zz = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, r = Math.sqrt(1 - zz * zz);
@@ -133,6 +157,11 @@ async function main(): Promise<void> {
   const built = new Set<string>();
   let started = false;
   let timeOfDay = START_TIME;
+  /** hányadik napnál tartunk (a hold fázisa ebből jön) */
+  let dayCount = 1;
+  /** a lerakott tűzhelyek állapota, a helyük szerint ("x,y,z") */
+  const furnaces = new Map<string, Furnace>();
+  const fkey = (x: number, y: number, z: number) => `${x},${y},${z}`;
   const spawn = { x: 8, z: 8 };
 
   const dropMeshes = (key: string) => {
@@ -160,7 +189,7 @@ async function main(): Promise<void> {
       scene.add(m);
       list.push(m);
     };
-    add(g.solid, material, 0);
+    add(g.solid, chunkMaterial, 0);
     add(g.lava, lavaMaterial, 0);
     add(g.fire, fireMaterial, 0);
     add(g.water, waterMaterial, 1);
@@ -260,6 +289,9 @@ async function main(): Promise<void> {
     drops.clear();
     if (save) world.importEdits(save.edits);
     timeOfDay = save?.time ?? START_TIME;
+    dayCount = save?.day ?? 1;
+    furnaces.clear();
+    for (const a of save?.furnaces ?? []) furnaces.set(fkey(a[0], a[1], a[2]), Furnace.fromFlat(a.slice(3)));
 
     // játékmód és tároló (a régi mentések kreatívak voltak, csak a hotbarjuk volt meg)
     mode = save ? save.mode ?? 'creative' : newMode;
@@ -292,7 +324,7 @@ async function main(): Promise<void> {
     const p = player.pos;
     writeSave({
       seed: world.seed, edits: world.exportEdits(), pos: [p.x, p.y, p.z], yaw: player.yaw, pitch: player.pitch,
-      time: timeOfDay, mode, hp: health.hp, inv: inv.toFlat(),
+      time: timeOfDay, day: dayCount, furnaces: [...furnaces].map(([k, f]) => [...k.split(',').map(Number), ...f.toFlat()]), mode, hp: health.hp, inv: inv.toFlat(),
     });
   };
 
@@ -504,13 +536,13 @@ async function main(): Promise<void> {
     if (!input.touch) invSearch.focus();
   };
   /** Túlélő módban az inventory és a munkapad (2x2 vagy 3x3 rács) */
-  const openBag = (size: 2 | 3) => {
+  const openBag = (size: 2 | 3 | 'furnace', furnace?: Furnace) => {
     if (state !== 'playing') return;
     state = 'inventory';
     input.enabled = false;
     input.reset();
     if (document.pointerLockElement) document.exitPointerLock();
-    bag.open(size);
+    bag.open(size, furnace);
   };
   function closeUI(viaEsc = false) {
     if (state !== 'inventory') return;
@@ -626,6 +658,8 @@ async function main(): Promise<void> {
   let angle = 0;
   let frame = 0;
   let simAcc = 0;
+  const clockEl = $('clock');
+  let clockText = '';
 
   // ---------- blokkok bontása, lerakása, tárgyak használata ----------
   const mineEl = $('mine'), mineBar = $('mine-bar');
@@ -633,8 +667,15 @@ async function main(): Promise<void> {
 
   /** Blokk átírása: újrameshelés és a folyadék/tűz szimuláció értesítése */
   const setBlockAt = (x: number, y: number, z: number, id: number): boolean => {
+    const old = world.getBlock(x, y, z);
     if (!world.setBlock(x, y, z, id)) return false;
     markDirty(x, z);
+    // a fény messzire elér: ha világító blokk vagy átlátszatlan blokk változott, a környező chunkok is újraszámolódnak
+    // (ezek a sor végére kerülnek, így előbb a saját chunk épül újra, a többi fokozatosan)
+    if (LIGHT[old] || LIGHT[id] || isOpaque(old) !== isOpaque(id)) {
+      const cx = Math.floor(x / CS), cz = Math.floor(z / CS);
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) dirty.add(World.key(cx + dx, cz + dz));
+    }
     sim.notify(x, y, z);
     return true;
   };
@@ -649,6 +690,14 @@ async function main(): Promise<void> {
     const id = world.getBlock(x, y, z);
     if (!setBlockAt(x, y, z, AIR)) return;
     particles.burst(x, y, z, id);
+    // tűzhely: a tartalma a földre esik
+    if (blockKey(id) === 'furnace') {
+      const f = furnaces.get(fkey(x, y, z));
+      if (f) {
+        for (const s of f.contents()) drops.spawn(s.id, s.n, x + 0.5, y + 0.5, z + 0.5);
+        furnaces.delete(fkey(x, y, z));
+      }
+    }
     // ajtó: a másik fele is eltűnik (egyetlen ajtót ad)
     const door = BLOCKS[id]?.door;
     if (door) {
@@ -668,6 +717,19 @@ async function main(): Promise<void> {
       particles.burst(x, yy, z, up);
       if (mode === 'survival') giveDrop(up, x, yy, z);
     }
+    // falra szerelt dolog (létra, fali fáklya): ha a fal eltűnt, leesik
+    const sides: [number, number, number][] = [[1, 0, 0], [0, 0, 1], [-1, 0, 0], [0, 0, -1]]; // kelet, dél, nyugat, észak
+    sides.forEach(([dx, , dz], dirIdx) => {
+      const nx = x + dx, nz = z + dz;
+      const nid = world.getBlock(nx, y, nz);
+      const a = BLOCKS[nid]?.attach;
+      // a szomszéd `attach` iránya arra mutat, ahol a fal van: ha onnan nézve rám mutat, én voltam a fal
+      if (a !== undefined && (a + 2) % 4 === dirIdx) {
+        setBlockAt(nx, y, nz, AIR);
+        particles.burst(nx, y, nz, nid);
+        if (mode === 'survival') giveDrop(nid, nx, y, nz);
+      }
+    });
     flushDirty(5);
   };
 
@@ -735,10 +797,33 @@ async function main(): Promise<void> {
       openBag(3);
       return;
     }
+    // tűzhely: megnyitja az olvasztó felületet
+    if (blockKey(world.getBlock(hit.x, hit.y, hit.z)) === 'furnace') {
+      const k = fkey(hit.x, hit.y, hit.z);
+      let f = furnaces.get(k);
+      if (!f) furnaces.set(k, (f = new Furnace()));
+      openBag('furnace', f);
+      return;
+    }
     if (!st || isItem(id) || hit.py < 0 || hit.py >= CH) return;
 
     let placeId = id;
     const def = BLOCKS[id];
+    // fáklya: oldalra falra kerül (a fal felé dől), felülről a földre áll, alulról nem lehet
+    if (def?.wallVariants) {
+      if (hit.ny < 0) return;
+      if (hit.ny === 0) {
+        const wallDir = hit.nx < 0 ? 0 : hit.nx > 0 ? 2 : hit.nz < 0 ? 1 : 3; // a fal a találati lappal szemben van
+        const support = [[1, 0], [0, 1], [-1, 0], [0, -1]][wallDir];
+        if (!isOpaque(world.getBlock(hit.px + support[0], hit.py, hit.pz + support[1]))) return;
+        placeId = def.wallVariants[(wallDir - 2 + 4) % 4];
+      } else if (!isOpaque(world.getBlock(hit.px, hit.py - 1, hit.pz))) return;
+      if (setBlockAt(hit.px, hit.py, hit.pz, placeId)) {
+        refresh(hit.px, hit.pz);
+        if (mode === 'survival') { inv.takeOne(input.hotbar); paintHotbar(); }
+      }
+      return;
+    }
     /** a játékos nézési iránya: 0 kelet, 1 dél, 2 nyugat, 3 észak */
     const fx0 = -Math.sin(player.yaw), fz0 = -Math.cos(player.yaw);
     const facing = Math.abs(fx0) > Math.abs(fz0) ? (fx0 > 0 ? 0 : 2) : fz0 > 0 ? 1 : 3;
@@ -856,8 +941,15 @@ async function main(): Promise<void> {
     }
 
     // ---------- nappal-éjszaka, ég, víz alatti köd ----------
-    timeOfDay = (timeOfDay + dt / DAY_SECONDS) % 1;
-    const sky = skyAt(timeOfDay);
+    // az idő csak játék közben telik (a menüben megáll, a mögötte forgó világban is)
+    if (state !== 'menu') {
+      timeOfDay += dt / DAY_SECONDS;
+      if (timeOfDay >= 1) { timeOfDay -= 1; dayCount++; }
+    }
+    const sky = skyAt(timeOfDay, dayCount);
+    if (sky.moonPhase !== moonShown) { moonShown = sky.moonPhase; moonMat.map = moonTextures[moonShown]; moonMat.needsUpdate = true; }
+    const clock = `Day ${dayCount} · ${formatClock(timeOfDay)}`;
+    if (clock !== clockText) { clockText = clock; clockEl.textContent = clock; }
     const underwater = state !== 'menu' && player.headUnderwater;
     const inLavaView = state !== 'menu' && player.headInLava;
     const k = Math.pow((sky.light[0] + sky.light[1] + sky.light[2]) / 3, 0.45);
@@ -867,6 +959,7 @@ async function main(): Promise<void> {
     fog.near = inLavaView ? 0.05 : underwater ? 0.5 : fogFar * 0.55;
     fog.far = inLavaView ? 2.5 : underwater ? 24 : fogFar * 0.95;
     material.color.setRGB(sky.light[0], sky.light[1], sky.light[2]);
+    chunkMaterial.color.copy(material.color);
     waterMaterial.color.copy(material.color);
 
     const cp = camera.position;
@@ -890,6 +983,9 @@ async function main(): Promise<void> {
     }
     flushDirty(3);
     if (state !== 'menu') {
+      // a tűzhelyek folyamatosan dolgoznak (akkor is, ha épp nem nézed őket)
+      for (const f of furnaces.values()) f.update(dt);
+      if (state === 'inventory') bag.tick();
       particles.update(dt);
       drops.update(dt, world, player.pos.x, player.pos.y, player.pos.z, (id, n) => {
         const left = inv.add(id, n);

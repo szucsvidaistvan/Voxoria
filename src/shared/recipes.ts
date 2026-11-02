@@ -22,6 +22,8 @@ interface Recipe {
 const TAGS: Record<string, (id: number) => boolean> = {
   planks: (id) => blockKey(id).endsWith('_planks'),
   log: (id) => /(_log|_wood)$/.test(blockKey(id)),
+  coal: (id) => id === I.COAL || id === I.CHARCOAL,
+  wool: (id) => /_wool$/.test(blockKey(id)),
 };
 const matches = (ing: Ing, id: number) => (typeof ing === 'number' ? ing === id : !!TAGS[ing]?.(id));
 
@@ -47,13 +49,20 @@ export function initRecipes(): void {
     },
   });
   add({ shape: ['P', 'P'], keys: { P: 'planks' }, out: { id: I.STICK, n: 4 } });
-  add({ shape: ['PP', 'PP'], keys: { P: 'planks' }, out: { id: B.CRAFTING_TABLE, n: 1 } });
-  addIf({ shape: ['C', 'S'], keys: { C: I.COAL, S: I.STICK } }, blk('torch', 4));
+  addIf({ shape: ['C', 'S'], keys: { C: 'coal', S: I.STICK } }, blk('torch', 4));
   addIf({ shape: ['S S', 'SSS', 'S S'], keys: { S: I.STICK } }, blk('ladder', 3));
-  addIf({ shape: ['PSP', 'PSP'], keys: { P: 'planks', S: I.STICK } }, blk('oak_fence', 3));
-  addIf({ shape: ['PPP'], keys: { P: 'planks' } }, blk('oak_slab', 6));
-  addIf({ shape: ['P  ', 'PP ', 'PPP'], keys: { P: 'planks' } }, blk('oak_stairs', 4));
-  addIf({ shape: ['PPP', 'PPP'], keys: { P: 'planks' } }, blk('oak_trapdoor', 2));
+  addIf({ shape: ['CCC', 'C C', 'CCC'], keys: { C: B.COBBLE } }, blk('furnace', 1));
+  // a fa fajtájától függő eredmények: a deszka fajtájának megfelelő kerítés, lap, lépcső, csapóajtó
+  const woodOut = (suffix: string, n: number) => ([id]: number[]): Stack | null => {
+    const wood = blockKey(id).replace(/_planks$/, '');
+    const out = blockId(`${wood}_${suffix}`) ?? blockId(`oak_${suffix}`);
+    return out === undefined ? null : { id: out, n };
+  };
+  add({ shape: ['PSP', 'PSP'], keys: { P: 'planks', S: I.STICK }, out: woodOut('fence', 3) });
+  add({ shape: ['PPP'], keys: { P: 'planks' }, out: woodOut('slab', 6) });
+  add({ shape: ['P  ', 'PP ', 'PPP'], keys: { P: 'planks' }, out: woodOut('stairs', 4) });
+  add({ shape: ['PPP', 'PPP'], keys: { P: 'planks' }, out: woodOut('trapdoor', 2) });
+  add({ shape: ['PP', 'PP'], keys: { P: 'planks' }, out: { id: B.CRAFTING_TABLE, n: 1 } });
   // ajtó: 2x3 deszka, a deszka fajtájának megfelelő ajtó (3 darab)
   add({
     shape: ['PP', 'PP', 'PP'], keys: { P: 'planks' },
@@ -70,6 +79,43 @@ export function initRecipes(): void {
   addIf({ shape: ['S  ', 'SS ', 'SSS'], keys: { S: B.STONE } }, blk('stone_stairs', 4));
   addIf({ shape: ['SS', 'SS'], keys: { S: B.STONE } }, blk('stone_bricks', 4));
   add({ shape: ['SS', 'SS'], keys: { S: B.SAND }, out: { id: B.SANDSTONE, n: 1 } });
+
+  // kő-féle blokkcsaládok: lap (3 -> 6), lépcső (6 -> 4), fal (6 -> 6), ha a csomagban van
+  const families = [
+    'stone_brick', 'mossy_stone_brick', 'sandstone', 'red_sandstone', 'cut_sandstone', 'cut_red_sandstone', 'brick', 'nether_brick',
+    'red_nether_brick', 'andesite', 'diorite', 'granite', 'polished_andesite', 'polished_diorite', 'polished_granite',
+    'quartz', 'smooth_quartz', 'purpur', 'prismarine', 'prismarine_brick', 'dark_prismarine', 'end_stone_brick', 'mossy_cobblestone',
+  ];
+  for (const f of families) {
+    const base = blockId(f) ?? blockId(`${f}s`) ?? blockId(`${f}_block`);
+    if (base === undefined) continue;
+    addIf({ shape: ['BBB'], keys: { B: base } }, blk(`${f}_slab`, 6));
+    addIf({ shape: ['B  ', 'BB ', 'BBB'], keys: { B: base } }, blk(`${f}_stairs`, 4));
+    addIf({ shape: ['BBB', 'BBB'], keys: { B: base } }, blk(`${f}_wall`, 6));
+  }
+  // csiszolt kövek: 4 -> 4
+  for (const k of ['andesite', 'diorite', 'granite']) {
+    const b = blockId(k), o = blk(`polished_${k}`, 4);
+    if (b !== undefined && o) add({ shape: ['BB', 'BB'], keys: { B: b }, out: o });
+  }
+  // ásványblokkok és vissza: 9 -> blokk, blokk -> 9
+  const ores: [string, number][] = [['iron_block', I.IRON_INGOT], ['gold_block', I.GOLD_INGOT], ['diamond_block', I.DIAMOND], ['coal_block', I.COAL]];
+  for (const [key, item] of ores) {
+    const bid = blockId(key);
+    if (bid === undefined) continue;
+    add({ shape: ['III', 'III', 'III'], keys: { I: item }, out: { id: bid, n: 1 } });
+    add({ shapeless: [bid], out: { id: item, n: 9 } });
+  }
+  // üveg, üvegtábla, vasrács
+  const glass = blockId('glass');
+  if (glass !== undefined) addIf({ shape: ['GGG', 'GGG'], keys: { G: glass } }, blk('glass_pane', 16));
+  addIf({ shape: ['III', 'III'], keys: { I: I.IRON_INGOT } }, blk('iron_bars', 16));
+  // szőnyeg: 2 gyapjú -> 3 szőnyeg (a gyapjú színével)
+  add({
+    shape: ['WW'], keys: { W: 'wool' },
+    out: ([id]) => { const c = blockId(blockKey(id).replace(/_wool$/, '_carpet')); return c === undefined ? null : { id: c, n: 3 }; },
+  });
+
   add({ shape: ['I I', ' I '], keys: { I: I.IRON_INGOT }, out: { id: I.BUCKET, n: 1 } });
   add({ shapeless: [I.IRON_INGOT, I.FLINT], out: { id: I.FLINT_AND_STEEL, n: 1 } });
 

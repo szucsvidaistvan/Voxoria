@@ -98,8 +98,14 @@ export interface BlockDef {
   conn?: Conn;
   /** ajtó: melyik fele, nyitva van-e, merre néz; ids: a 16 változat ([fél * 8 + nyitva * 4 + irány]) */
   door?: { half: 0 | 1; open: 0 | 1; dir: number; ids: number[] };
-  /** falra szerelhető blokk (létra): az az irány, amerre alapállásban a fal van (0 kelet, 1 dél, 2 nyugat, 3 észak) */
+  /** falra szerelhető blokk (létra, fáklya): az az irány, amerre alapállásban a fal van (0 kelet, 1 dél, 2 nyugat, 3 észak) */
   wall?: number;
+  /** fali változat esetén: merre van a fal, amire a blokk fel van szerelve (0 kelet, 1 dél, 2 nyugat, 3 észak). Ha a fal eltűnik, a blokk leesik. */
+  attach?: number;
+  /** a falra rakott változatok (a `wall` iránya szerint elforgatva, a lerakáskor kell); csak az alap fáklyánál */
+  wallVariants?: number[];
+  /** fényforrás: a fény erőssége 1..15 (a fáklya 14, a láva 15) */
+  light?: number;
 }
 
 export type ConnKind = 'fence' | 'wall' | 'pane';
@@ -135,10 +141,10 @@ export const BLOCKS: Record<number, BlockDef> = {
   [B.GOLD_ORE]: { name: 'Gold Ore', top: 'gold_ore', bottom: 'gold_ore', side: 'gold_ore' },
   [B.DIAMOND_ORE]: { name: 'Diamond Ore', top: 'diamond_ore', bottom: 'diamond_ore', side: 'diamond_ore' },
   [B.OBSIDIAN]: { name: 'Obsidian', top: 'obsidian', bottom: 'obsidian', side: 'obsidian' },
-  [B.LAVA]: { name: 'Lava', top: 'lava', bottom: 'lava', side: 'lava', opaque: false },
+  [B.LAVA]: { name: 'Lava', top: 'lava', bottom: 'lava', side: 'lava', opaque: false, light: 15 },
   [B.FIRE]: {
     name: 'Fire', top: 'fire', bottom: 'fire', side: 'fire', opaque: false,
-    parts: crossParts('fire'), rots: [], boxes: [], pick: [],
+    parts: crossParts('fire'), rots: [], boxes: [], pick: [], light: 15,
   },
   [B.CRAFTING_TABLE]: { name: 'Crafting Table', top: 'crafting_table_top', bottom: 'planks', side: 'crafting_table_side' },
 };
@@ -147,7 +153,22 @@ export const BLOCKS: Record<number, BlockDef> = {
 for (let l = 1; l <= 8; l++) {
   const w = fluidId(FLUID_WATER, l), v = fluidId(FLUID_LAVA, l);
   BLOCKS[w] = { name: 'Water', top: 'water', bottom: 'water', side: 'water', opaque: false, hidden: true, base: B.WATER };
-  BLOCKS[v] = { name: 'Lava', top: 'lava', bottom: 'lava', side: 'lava', opaque: false, hidden: true, base: B.LAVA };
+  BLOCKS[v] = { name: 'Lava', top: 'lava', bottom: 'lava', side: 'lava', opaque: false, hidden: true, base: B.LAVA, light: 15 };
+}
+
+// ---------- fény ----------
+
+/** A blokkok fényereje azonosító szerint (0: nem világít). A `refreshLight` tölti fel a BLOCKS alapján. */
+export const LIGHT = new Uint8Array(MAX_BLOCK_ID + 1);
+export const lightOf = (id: number): number => LIGHT[id];
+/** Ezek a generált blokkok világítanak (kulcs: Minecraft-név, érték: fényerő) */
+const EMITTERS: Record<string, number> = {
+  glowstone: 15, sea_lantern: 15, jack_o_lantern: 15, magma: 3, torch: 14, redstone_torch: 7,
+};
+/** Újraszámolja a LIGHT táblát. A blokkok regisztrálása után kell hívni. */
+export function refreshLight(): void {
+  LIGHT.fill(0);
+  for (const [id, def] of Object.entries(BLOCKS)) LIGHT[Number(id)] = def.light ?? 0;
 }
 
 /** 'oak_stairs' -> 'Oak Stairs' */
@@ -177,6 +198,7 @@ for (const [id, key] of Object.entries(BASE_KEY_NAMES)) {
   BLOCKS[Number(id)].key = key;
   KEY_ID.set(key, Number(id));
 }
+refreshLight();
 /** A blokk azonosítója a Minecraftbeli nevéből (pl. 'cobblestone_slab'), vagy undefined, ha a csomagban nincs */
 export const blockId = (key: string): number | undefined => KEY_ID.get(key);
 /** A blokk Minecraftbeli neve, ha ismert */
@@ -310,8 +332,27 @@ function shapeDef(b: GeneratedBlock, dir: number, flip: number): BlockDef {
     boxes: NO_COLLIDE.test(b.name) ? [] : boxes,
     pick,
     wall: b.name === 'ladder' ? 1 : undefined,
+    // a létra a falra van szerelve: a fal iránya a forgatással együtt változik
+    attach: b.name === 'ladder' ? (1 + dir) % 4 : undefined,
+    light: EMITTERS[b.name],
   };
 }
+
+/** Ezeknek a fáklyáknak van fali változata */
+const TORCHES = new Set(['torch', 'redstone_torch']);
+/** A fali fáklya modellje a nyugati falra (x = 0) van rajzolva, ez a `wall` iránya */
+const WALL_TORCH_SIDE = 2;
+
+/**
+ * A fali fáklya modellje: a Minecraft template_torch_wall elemével egyező, a faltól 22,5 fokkal elhajló rúd.
+ * A lapok textúrája és uv-ja az álló fáklyáé.
+ */
+function wallTorchParts(standing: ShapePart[]): ShapePart[] {
+  const faces = standing[0].faces;
+  return [{ from: [-1, 3.5, 7], to: [1, 13.5, 9], rot: { o: [0, 3.5, 8], a: 'z', g: -22.5, s: 0 }, faces }];
+}
+/** A fali fáklya célzási doboza a nyugati falhoz (a forgatott részeket a shapeDef nem veszi figyelembe) */
+const WALL_TORCH_PICK: Box = [0, 3 / 16, 6 / 16, 5.5 / 16, 14 / 16, 10 / 16];
 
 
 // ---------- kapcsolódó blokkok (kerítés, fal, üvegtábla) ----------
@@ -459,6 +500,7 @@ export function registerGenerated(pack: GeneratedPack): number[] {
       tint: leafy
         ? { top: LEAF_TINT, bottom: LEAF_TINT, side: LEAF_TINT }
         : b.tinted ? { top: GRASS_TINT } : undefined,
+      light: EMITTERS[b.name],
     };
     tex.add(b.top!); tex.add(b.bottom!); tex.add(b.side!);
     KEY_ID.set(b.name, next);
@@ -516,6 +558,25 @@ export function registerGenerated(pack: GeneratedPack): number[] {
     }
     BLOCKS[id].variants = variants;
   });
+
+  // fali fáklyák: a végén vesszük fel őket, hogy a korábbi blokkok azonosítói (és a mentések) ne csússzanak el
+  for (const key of TORCHES) {
+    const id = KEY_ID.get(key);
+    const std = id === undefined ? undefined : BLOCKS[id];
+    if (id === undefined || !std?.parts || next + 4 > MAX_BLOCK_ID) continue;
+    const parts = wallTorchParts(std.parts);
+    const wallVariants: number[] = [];
+    for (let d = 0; d < 4; d++) {
+      const rots: Rot[] = d ? [['y', 90 * d]] : [];
+      BLOCKS[next] = {
+        ...std, parts, rots, boxes: [], pick: [rotBox(WALL_TORCH_PICK, rots)],
+        hidden: true, base: id, attach: (WALL_TORCH_SIDE + d) % 4, variants: undefined, wallVariants: undefined,
+      };
+      wallVariants.push(next++);
+    }
+    std.wallVariants = wallVariants;
+  }
+  refreshLight();
 
   extraTextures.length = 0;
   extraTextures.push(...[...tex].filter((t) => pack.textures.includes(t)).sort());

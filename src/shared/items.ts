@@ -20,7 +20,7 @@ export interface ItemDef {
 
 export const I = {
   STICK: ITEM_BASE + 1, COAL: ITEM_BASE + 2, DIAMOND: ITEM_BASE + 3, IRON_INGOT: ITEM_BASE + 4,
-  GOLD_INGOT: ITEM_BASE + 5, FLINT: ITEM_BASE + 6, APPLE: ITEM_BASE + 7,
+  GOLD_INGOT: ITEM_BASE + 5, FLINT: ITEM_BASE + 6, APPLE: ITEM_BASE + 7, CHARCOAL: ITEM_BASE + 12,
   BUCKET: ITEM_BASE + 8, WATER_BUCKET: ITEM_BASE + 9, LAVA_BUCKET: ITEM_BASE + 10, FLINT_AND_STEEL: ITEM_BASE + 11,
 } as const;
 
@@ -32,6 +32,7 @@ export const ITEMS: Record<number, ItemDef> = {
   [I.GOLD_INGOT]: { name: 'Gold Ingot', tex: 'gold_ingot', stack: 64, color: '#f5d442' },
   [I.FLINT]: { name: 'Flint', tex: 'flint', stack: 64, color: '#55555a' },
   [I.APPLE]: { name: 'Apple', tex: 'apple', stack: 64, heal: 4, color: '#d33a2c' },
+  [I.CHARCOAL]: { name: 'Charcoal', tex: 'charcoal', stack: 64, color: '#3a3330' },
   [I.BUCKET]: { name: 'Bucket', tex: 'bucket', stack: 16, color: '#b5b5b5' },
   [I.WATER_BUCKET]: { name: 'Water Bucket', tex: 'water_bucket', stack: 1, color: '#3a6fd8' },
   [I.LAVA_BUCKET]: { name: 'Lava Bucket', tex: 'lava_bucket', stack: 1, color: '#e86a14' },

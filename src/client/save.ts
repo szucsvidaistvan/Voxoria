@@ -9,6 +9,10 @@ export interface SaveData {
   pitch: number;
   /** napszak 0..1 (a régi mentésekben nincs) */
   time?: number;
+  /** hányadik nap (a hold fázisa ebből jön; a régi mentésekben nincs: 1) */
+  day?: number;
+  /** a tűzhelyek: [x, y, z, ...Furnace.toFlat()] (a régi mentésekben nincs) */
+  furnaces?: number[][];
   /** a hotbar blokkjai (a régi mentésekben nincs) */
   hotbar?: number[];
   /** játékmód (a régi mentésekben nincs: kreatív) */
