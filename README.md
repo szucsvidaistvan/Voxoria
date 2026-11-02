@@ -38,6 +38,12 @@ A nem kocka alakú blokkok dobozait (`parts`) a `npm run blocks` a `blocks.json`
 
 A korábbi, saját textúralapokból kivágott textúrákat a `scripts/slice-textures.py` és a `scripts/slice-sheet.py` állította elő. Ezek a Good Vibesra váltás előtt a repóban voltak.
 
+## Nappalok, fény, tűzhely
+
+- **Nap-éjszaka:** egy teljes nap 20 perc (kb. 12,5 perc nappal, 7,5 perc éjszaka). A hajnal rózsaszín, az alkonyat narancs, majd lila; a hold 8 napos fázisokon megy át (telihold idején világosabb az éjszaka). A jobb felső sarokban a nap sorszáma és a játékbeli idő látszik.
+- **Fény:** a fáklya (14), a láva, a tűz, az izzókő, a tengerlámpa és a tökfaragás világít, a fény blokkonként gyengül. A barlangok és a tető alatti terek sötétek, napfény az oldalról szivárog be. A fáklya a padlóra vagy a fal oldalára tehető (plafonra nem); ha a fal eltűnik, leesik.
+- **Tűzhely:** 8 kőből barkácsolható (gyűrű alakban), jobb klikkel nyílik. Bemenet + üzemanyag (szén, faszén, fa, deszka, bot ...), 10 másodperc tárgyanként. A vas- és aranyérc most már érc blokkot ad, amit meg kell olvasztani. A rönk faszénné olvad, a homok üveggé, a macskakő kővé.
+
 ## Irányítás
 
 | | Gép | Telefon |

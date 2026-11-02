@@ -1,4 +1,4 @@
-import { AIR, B, fluidKind } from './blocks';
+import { AIR, B, LIGHT, fluidKind } from './blocks';
 
 export const CS = 16; // chunk szélesség (X és Z)
 export const CH = 64; // világ magassága
@@ -35,12 +35,19 @@ function fbm(x: number, z: number, s: number): number {
 export class Chunk {
   /** két bájtos blokkazonosítók (65535 különböző blokk) */
   data = new Uint16Array(CS * CH * CS);
+  /** a világító blokkok helyei (az `data` indexei): ebből tudja a fényszámítás, hol kell kezdeni */
+  emit = new Set<number>();
   constructor(public cx: number, public cz: number) {}
   get(x: number, y: number, z: number): number {
     return this.data[(y * CS + z) * CS + x];
   }
   set(x: number, y: number, z: number, id: number): void {
-    this.data[(y * CS + z) * CS + x] = id;
+    this.setIndex((y * CS + z) * CS + x, id);
+  }
+  setIndex(i: number, id: number): void {
+    this.data[i] = id;
+    if (LIGHT[id]) this.emit.add(i);
+    else if (this.emit.size) this.emit.delete(i);
   }
 }
 
@@ -77,6 +84,15 @@ export class World {
 
   isLoaded(wx: number, wz: number): boolean {
     return this.chunks.has(World.key(Math.floor(wx / CS), Math.floor(wz / CS)));
+  }
+
+  /** Van-e világító blokk a (wx, wz) körüli 3x3 chunkban? (ha nincs, a fény számítása kihagyható) */
+  hasEmittersNear(wx: number, wz: number): boolean {
+    const cx = Math.floor(wx / CS), cz = Math.floor(wz / CS);
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      if (this.getChunk(cx + dx, cz + dz)?.emit.size) return true;
+    }
+    return false;
   }
 
   heightAt(wx: number, wz: number): number {
@@ -159,7 +175,7 @@ export class World {
     const edits = this.edits.get(World.key(c.cx, c.cz));
     if (edits) {
       for (const [i, id] of edits) {
-        c.data[i] = id;
+        c.setIndex(i, id);
         if (id === B.FIRE || fluidKind(id) !== 0) {
           this.dynamic.push(ox + (i % CS), Math.floor(i / (CS * CS)), oz + (Math.floor(i / CS) % CS));
         }

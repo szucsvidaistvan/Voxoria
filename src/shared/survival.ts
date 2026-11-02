@@ -66,8 +66,6 @@ export function dropFor(id: number, held: number | undefined, rand: () => number
     case 'grass_block': return { id: B.DIRT, n: 1 };
     case 'coal_ore': return { id: I.COAL, n: 1 };
     case 'diamond_ore': return { id: I.DIAMOND, n: 1 };
-    case 'iron_ore': return { id: I.IRON_INGOT, n: 1 };
-    case 'gold_ore': return { id: I.GOLD_INGOT, n: 1 };
     case 'gravel': return rand() < 0.1 ? { id: I.FLINT, n: 1 } : { id: base, n: 1 };
     case 'fire': case 'bedrock': return null;
     default:
