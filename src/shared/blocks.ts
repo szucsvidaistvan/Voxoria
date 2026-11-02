@@ -115,40 +115,44 @@ const GRASS_TINT: RGB = [0.55, 0.85, 0.35];
 const LEAF_TINT: RGB = [0.40, 0.75, 0.30];
 
 export const BLOCKS: Record<number, BlockDef> = {
-  [B.GRASS]: { name: 'Fű', top: 'grass_top', bottom: 'dirt', side: 'grass_side', tint: { top: GRASS_TINT } },
-  [B.DIRT]: { name: 'Föld', top: 'dirt', bottom: 'dirt', side: 'dirt' },
-  [B.STONE]: { name: 'Kő', top: 'stone', bottom: 'stone', side: 'stone' },
-  [B.SAND]: { name: 'Homok', top: 'sand', bottom: 'sand', side: 'sand' },
-  [B.LOG]: { name: 'Fatörzs', top: 'log_top', bottom: 'log_top', side: 'log_side' },
-  [B.PLANKS]: { name: 'Deszka', top: 'planks', bottom: 'planks', side: 'planks' },
+  [B.GRASS]: { name: 'Grass Block', top: 'grass_top', bottom: 'dirt', side: 'grass_side', tint: { top: GRASS_TINT } },
+  [B.DIRT]: { name: 'Dirt', top: 'dirt', bottom: 'dirt', side: 'dirt' },
+  [B.STONE]: { name: 'Stone', top: 'stone', bottom: 'stone', side: 'stone' },
+  [B.SAND]: { name: 'Sand', top: 'sand', bottom: 'sand', side: 'sand' },
+  [B.LOG]: { name: 'Oak Log', top: 'log_top', bottom: 'log_top', side: 'log_side' },
+  [B.PLANKS]: { name: 'Oak Planks', top: 'planks', bottom: 'planks', side: 'planks' },
   [B.LEAVES]: {
-    name: 'Lomb', top: 'leaves', bottom: 'leaves', side: 'leaves', opaque: false,
+    name: 'Oak Leaves', top: 'leaves', bottom: 'leaves', side: 'leaves', opaque: false,
     tint: { top: LEAF_TINT, bottom: LEAF_TINT, side: LEAF_TINT },
   },
-  [B.COBBLE]: { name: 'Kavics', top: 'cobblestone', bottom: 'cobblestone', side: 'cobblestone' },
-  [B.WATER]: { name: 'Víz', top: 'water', bottom: 'water', side: 'water', opaque: false },
-  [B.BEDROCK]: { name: 'Alapkőzet', top: 'bedrock', bottom: 'bedrock', side: 'bedrock' },
-  [B.GRAVEL]: { name: 'Kavics (sóder)', top: 'gravel', bottom: 'gravel', side: 'gravel' },
-  [B.SANDSTONE]: { name: 'Homokkő', top: 'sandstone_top', bottom: 'sandstone_bottom', side: 'sandstone' },
-  [B.COAL_ORE]: { name: 'Szénérc', top: 'coal_ore', bottom: 'coal_ore', side: 'coal_ore' },
-  [B.IRON_ORE]: { name: 'Vasérc', top: 'iron_ore', bottom: 'iron_ore', side: 'iron_ore' },
-  [B.GOLD_ORE]: { name: 'Aranyérc', top: 'gold_ore', bottom: 'gold_ore', side: 'gold_ore' },
-  [B.DIAMOND_ORE]: { name: 'Gyémántérc', top: 'diamond_ore', bottom: 'diamond_ore', side: 'diamond_ore' },
-  [B.OBSIDIAN]: { name: 'Obszidián', top: 'obsidian', bottom: 'obsidian', side: 'obsidian' },
-  [B.LAVA]: { name: 'Láva', top: 'lava', bottom: 'lava', side: 'lava', opaque: false },
+  [B.COBBLE]: { name: 'Cobblestone', top: 'cobblestone', bottom: 'cobblestone', side: 'cobblestone' },
+  [B.WATER]: { name: 'Water', top: 'water', bottom: 'water', side: 'water', opaque: false },
+  [B.BEDROCK]: { name: 'Bedrock', top: 'bedrock', bottom: 'bedrock', side: 'bedrock' },
+  [B.GRAVEL]: { name: 'Gravel', top: 'gravel', bottom: 'gravel', side: 'gravel' },
+  [B.SANDSTONE]: { name: 'Sandstone', top: 'sandstone_top', bottom: 'sandstone_bottom', side: 'sandstone' },
+  [B.COAL_ORE]: { name: 'Coal Ore', top: 'coal_ore', bottom: 'coal_ore', side: 'coal_ore' },
+  [B.IRON_ORE]: { name: 'Iron Ore', top: 'iron_ore', bottom: 'iron_ore', side: 'iron_ore' },
+  [B.GOLD_ORE]: { name: 'Gold Ore', top: 'gold_ore', bottom: 'gold_ore', side: 'gold_ore' },
+  [B.DIAMOND_ORE]: { name: 'Diamond Ore', top: 'diamond_ore', bottom: 'diamond_ore', side: 'diamond_ore' },
+  [B.OBSIDIAN]: { name: 'Obsidian', top: 'obsidian', bottom: 'obsidian', side: 'obsidian' },
+  [B.LAVA]: { name: 'Lava', top: 'lava', bottom: 'lava', side: 'lava', opaque: false },
   [B.FIRE]: {
-    name: 'Tűz', top: 'fire', bottom: 'fire', side: 'fire', opaque: false,
+    name: 'Fire', top: 'fire', bottom: 'fire', side: 'fire', opaque: false,
     parts: crossParts('fire'), rots: [], boxes: [], pick: [],
   },
-  [B.CRAFTING_TABLE]: { name: 'Munkapad', top: 'crafting_table_top', bottom: 'planks', side: 'crafting_table_side' },
+  [B.CRAFTING_TABLE]: { name: 'Crafting Table', top: 'crafting_table_top', bottom: 'planks', side: 'crafting_table_side' },
 };
 
 // a folyékony blokkok további szintjei (az inventoryban nem jelennek meg)
 for (let l = 1; l <= 8; l++) {
   const w = fluidId(FLUID_WATER, l), v = fluidId(FLUID_LAVA, l);
-  BLOCKS[w] = { name: 'Víz', top: 'water', bottom: 'water', side: 'water', opaque: false, hidden: true, base: B.WATER };
-  BLOCKS[v] = { name: 'Láva', top: 'lava', bottom: 'lava', side: 'lava', opaque: false, hidden: true, base: B.LAVA };
+  BLOCKS[w] = { name: 'Water', top: 'water', bottom: 'water', side: 'water', opaque: false, hidden: true, base: B.WATER };
+  BLOCKS[v] = { name: 'Lava', top: 'lava', bottom: 'lava', side: 'lava', opaque: false, hidden: true, base: B.LAVA };
 }
+
+/** 'oak_stairs' -> 'Oak Stairs' */
+export const titleCase = (key: string): string =>
+  key.split('_').map((w) => (w === 'tnt' ? 'TNT' : w.charAt(0).toUpperCase() + w.slice(1))).join(' ');
 
 /** Két keresztezett lap (növények, tűz): a Minecraft cross modellje */
 function crossParts(tex: TexName): ShapePart[] {
@@ -287,17 +291,17 @@ function shapeDef(b: GeneratedBlock, dir: number, flip: number): BlockDef {
   }
   const leafy = LEAF_LIKE.test(b.name);
   const tintColor: RGB | undefined = b.tinted ? (leafy ? LEAF_TINT : GRASS_TINT) : undefined;
-  const name = b.name.replace(/_/g, ' ');
+  const name = titleCase(b.name);
   const kind = connKindOf(b.name);
   if (kind) {
     // kerítés, fal, üvegtábla: az oszlop dobozai, a karok a szomszédoktól függően kerülnek hozzá
     return {
-      name: name.charAt(0).toUpperCase() + name.slice(1), key: b.name, top, bottom, side, opaque: false,
+      name, key: b.name, top, bottom, side, opaque: false,
       parts, rots, tintColor, boxes: [POST_SHAPES[kind].coll], pick: [POST_SHAPES[kind].pick], conn: makeConn(kind, side),
     };
   }
   return {
-    name: name.charAt(0).toUpperCase() + name.slice(1),
+    name,
     key: b.name,
     top, bottom, side,
     opaque: false,
@@ -443,10 +447,10 @@ export function registerGenerated(pack: GeneratedPack): number[] {
 
   for (const b of cubes) {
     if (next > MAX_BLOCK_ID) break;
-    const name = b.name.replace(/_/g, ' ');
+    const name = titleCase(b.name);
     const leafy = LEAF_LIKE.test(b.name);
     BLOCKS[next] = {
-      name: name.charAt(0).toUpperCase() + name.slice(1),
+      name,
       key: b.name,
       top: b.top!,
       bottom: b.bottom!,

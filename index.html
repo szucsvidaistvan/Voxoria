@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="hu">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <link rel="manifest" href="./manifest.webmanifest" />
@@ -24,40 +24,40 @@
     <div id="mine"><div id="mine-bar"></div></div>
     <div id="hotwrap">
       <div id="vitals">
-        <div id="hearts" aria-label="Életerő"></div>
-        <div id="air" hidden aria-label="Levegő"></div>
+        <div id="hearts" aria-label="Health"></div>
+        <div id="air" hidden aria-label="Air"></div>
       </div>
       <div id="hotbar"></div>
     </div>
-    <button id="btn-menu" class="touch-only" type="button">Menü</button>
-    <button id="btn-inv" class="touch-only" type="button">Tárgyak</button>
+    <button id="btn-menu" class="touch-only" type="button">Menu</button>
+    <button id="btn-inv" class="touch-only" type="button">Items</button>
     <div id="joy" class="touch-only"><div id="joy-knob"></div></div>
     <div id="touch-actions" class="touch-only">
-      <button id="btn-break" type="button">Bont</button>
-      <button id="btn-place" type="button">Épít</button>
-      <button id="btn-jump" type="button">Ugrás</button>
+      <button id="btn-break" type="button">Break</button>
+      <button id="btn-place" type="button">Place</button>
+      <button id="btn-jump" type="button">Jump</button>
     </div>
   </div>
 
   <div id="rotate">
     <div class="phone"></div>
-    <p>Fordítsd vízszintesbe a telefont: a játék fekvő helyzetben játszható jól.</p>
-    <button id="rotate-ok" class="btn" type="button">Mégis így játszom</button>
+    <p>Rotate your phone to landscape: the game plays best sideways.</p>
+    <button id="rotate-ok" class="btn" type="button">Play anyway</button>
   </div>
   <div id="hurt"></div>
   <div id="fire-overlay"></div>
-  <section id="death" hidden aria-label="Meghaltál">
-    <h2>Meghaltál</h2>
+  <section id="death" hidden aria-label="You died">
+    <h2>You died</h2>
     <p id="death-reason" class="hint"></p>
-    <button id="btn-respawn" class="btn" type="button">Újraéledés</button>
+    <button id="btn-respawn" class="btn" type="button">Respawn</button>
   </section>
 
   <section id="bag" hidden aria-label="Inventory">
     <div class="bag-panel">
       <header>
         <h2 id="bag-title">Inventory</h2>
-        <button id="bag-split" class="btn touch-only" type="button">Fél</button>
-        <button id="bag-close" class="btn" type="button">Bezár</button>
+        <button id="bag-split" class="btn touch-only" type="button">Half</button>
+        <button id="bag-close" class="btn" type="button">Close</button>
       </header>
       <div id="craft-area">
         <div id="craft-grid"></div>
@@ -66,41 +66,42 @@
       </div>
       <div id="bag-main"></div>
       <div id="bag-hot"></div>
-      <p class="hint" id="bag-hint">Kattintás: felvesz / lerak. Jobb gomb: felét veszi fel / egyet rak le. Shift+kattintás: gyorsmozgatás.</p>
+      <p class="hint" id="bag-hint">Click: pick up / place. Right click: take half / place one. Shift+click: quick move.</p>
     </div>
     <div id="bag-cursor" hidden></div>
   </section>
 
-  <section id="inventory" hidden aria-label="Blokkok">
+  <section id="inventory" hidden aria-label="Blocks and items">
     <div class="inv-panel">
       <header>
-        <input id="inv-search" type="search" placeholder="Keresés (pl. kő, deszka, érc)" autocomplete="off" spellcheck="false" />
-        <button id="inv-close" class="btn" type="button">Bezár</button>
+        <input id="inv-search" type="search" placeholder="Search (e.g. stone, planks, ore)" autocomplete="off" spellcheck="false" />
+        <button id="inv-close" class="btn" type="button">Close</button>
       </header>
       <p id="inv-info" class="hint"></p>
+      <div id="inv-tabs" role="tablist"></div>
       <div id="inv-grid"></div>
     </div>
   </section>
 
   <main id="menu">
     <h1>Voxoria</h1>
-    <p class="lead">Építs, ásj, fedezd fel a végtelen kockavilágot.</p>
+    <p class="lead">Build, dig and explore an endless block world.</p>
 
-    <button id="btn-continue" class="btn" type="button" hidden>Folytatás</button>
-    <button id="btn-new" class="btn" type="button">Új világ (túlélő)</button>
-    <button id="btn-new-creative" class="btn" type="button">Új világ (kreatív)</button>
-    <button id="btn-settings" class="btn" type="button" aria-expanded="false" aria-controls="settings">Beállítások</button>
+    <button id="btn-continue" class="btn" type="button" hidden>Continue</button>
+    <button id="btn-new" class="btn" type="button">New World (Survival)</button>
+    <button id="btn-new-creative" class="btn" type="button">New World (Creative)</button>
+    <button id="btn-settings" class="btn" type="button" aria-expanded="false" aria-controls="settings">Settings</button>
 
     <section id="settings" hidden>
-      <label for="set-dist">Látótávolság: <output id="set-dist-val"></output> chunk</label>
+      <label for="set-dist">Render distance: <output id="set-dist-val"></output> chunks</label>
       <input id="set-dist" type="range" min="3" max="10" step="1" />
-      <label for="set-sens">Nézés érzékenysége</label>
+      <label for="set-sens">Look sensitivity</label>
       <input id="set-sens" type="range" min="0.4" max="2.5" step="0.1" />
     </section>
 
     <p id="controls" class="hint"></p>
-    <p id="credits" class="hint">Textúrák: Good Vibes, készítette Acaitart (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>).</p>
-    <p id="pack-note" class="hint" hidden>A textúracsomag nincs kicsomagolva, ezért egyszerű színekkel fut a játék. Lásd a README-t.</p>
+    <p id="credits" class="hint">Textures: Good Vibes by Acaitart (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>).</p>
+    <p id="pack-note" class="hint" hidden>The texture pack is not extracted, so the game runs with plain colors. See the README.</p>
   </main>
 
   <script type="module" src="/src/client/main.ts"></script>

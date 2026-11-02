@@ -25,28 +25,28 @@ export const I = {
 } as const;
 
 export const ITEMS: Record<number, ItemDef> = {
-  [I.STICK]: { name: 'Pálca', tex: 'stick', stack: 64, color: '#8a6a3a' },
-  [I.COAL]: { name: 'Szén', tex: 'coal', stack: 64, color: '#2b2b2b' },
-  [I.DIAMOND]: { name: 'Gyémánt', tex: 'diamond', stack: 64, color: '#4be3e0' },
-  [I.IRON_INGOT]: { name: 'Vasrúd', tex: 'iron_ingot', stack: 64, color: '#d8d8d8' },
-  [I.GOLD_INGOT]: { name: 'Aranyrúd', tex: 'gold_ingot', stack: 64, color: '#f5d442' },
-  [I.FLINT]: { name: 'Kova', tex: 'flint', stack: 64, color: '#55555a' },
-  [I.APPLE]: { name: 'Alma', tex: 'apple', stack: 64, heal: 4, color: '#d33a2c' },
-  [I.BUCKET]: { name: 'Vödör', tex: 'bucket', stack: 16, color: '#b5b5b5' },
-  [I.WATER_BUCKET]: { name: 'Vizes vödör', tex: 'water_bucket', stack: 1, color: '#3a6fd8' },
-  [I.LAVA_BUCKET]: { name: 'Lávás vödör', tex: 'lava_bucket', stack: 1, color: '#e86a14' },
-  [I.FLINT_AND_STEEL]: { name: 'Kova és acél', tex: 'flint_and_steel', stack: 1, color: '#777b88' },
+  [I.STICK]: { name: 'Stick', tex: 'stick', stack: 64, color: '#8a6a3a' },
+  [I.COAL]: { name: 'Coal', tex: 'coal', stack: 64, color: '#2b2b2b' },
+  [I.DIAMOND]: { name: 'Diamond', tex: 'diamond', stack: 64, color: '#4be3e0' },
+  [I.IRON_INGOT]: { name: 'Iron Ingot', tex: 'iron_ingot', stack: 64, color: '#d8d8d8' },
+  [I.GOLD_INGOT]: { name: 'Gold Ingot', tex: 'gold_ingot', stack: 64, color: '#f5d442' },
+  [I.FLINT]: { name: 'Flint', tex: 'flint', stack: 64, color: '#55555a' },
+  [I.APPLE]: { name: 'Apple', tex: 'apple', stack: 64, heal: 4, color: '#d33a2c' },
+  [I.BUCKET]: { name: 'Bucket', tex: 'bucket', stack: 16, color: '#b5b5b5' },
+  [I.WATER_BUCKET]: { name: 'Water Bucket', tex: 'water_bucket', stack: 1, color: '#3a6fd8' },
+  [I.LAVA_BUCKET]: { name: 'Lava Bucket', tex: 'lava_bucket', stack: 1, color: '#e86a14' },
+  [I.FLINT_AND_STEEL]: { name: 'Flint and Steel', tex: 'flint_and_steel', stack: 1, color: '#777b88' },
 };
 
 // eszközök: 5 anyag x 4 típus
 const MATERIALS = [
-  { id: 'wooden', name: 'Fa', tier: 1, speed: 2, color: '#a07a44' },
-  { id: 'stone', name: 'Kő', tier: 2, speed: 4, color: '#8f8f8f' },
-  { id: 'iron', name: 'Vas', tier: 3, speed: 6, color: '#d8d8d8' },
-  { id: 'golden', name: 'Arany', tier: 1, speed: 12, color: '#f5d442' },
-  { id: 'diamond', name: 'Gyémánt', tier: 4, speed: 8, color: '#4be3e0' },
+  { id: 'wooden', name: 'Wooden', tier: 1, speed: 2, color: '#a07a44' },
+  { id: 'stone', name: 'Stone', tier: 2, speed: 4, color: '#8f8f8f' },
+  { id: 'iron', name: 'Iron', tier: 3, speed: 6, color: '#d8d8d8' },
+  { id: 'golden', name: 'Golden', tier: 1, speed: 12, color: '#f5d442' },
+  { id: 'diamond', name: 'Diamond', tier: 4, speed: 8, color: '#4be3e0' },
 ];
-const TOOLS: [ToolType, string][] = [['pickaxe', 'csákány'], ['axe', 'balta'], ['shovel', 'ásó'], ['sword', 'kard']];
+const TOOLS: [ToolType, string][] = [['pickaxe', 'Pickaxe'], ['axe', 'Axe'], ['shovel', 'Shovel'], ['sword', 'Sword']];
 /** TOOL_ID[anyag][típus] */
 export const TOOL_ID: Record<string, Record<ToolType, number>> = {};
 MATERIALS.forEach((m, mi) => {

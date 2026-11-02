@@ -6,6 +6,7 @@ import {
 } from '../shared/blocks';
 import { FluidSim, isReplaceable } from '../shared/fluids';
 import { I, ITEMS, isItem, itemName } from '../shared/items';
+import { CATEGORIES, categoryOf } from '../shared/categories';
 import { initRecipes } from '../shared/recipes';
 import { breakTime, dropFor } from '../shared/survival';
 import { raycast, type RayHit } from '../shared/raycast';
@@ -407,48 +408,86 @@ async function main(): Promise<void> {
     if (state === 'playing' && !input.touch && !input.locked) input.lock();
   });
 
-  // ---------- kreatív inventory ----------
-  const invEl = $('inventory'), invGrid = $('inv-grid'), invInfo = $('inv-info');
+  // ---------- kreatív blokk- és tárgyválasztó ----------
+  // Minden blokk és tárgy csoportokba rendezve; a "All" fülön a csoportok egymás után, címsorral.
+  const invEl = $('inventory'), invGrid = $('inv-grid'), invInfo = $('inv-info'), invTabs = $('inv-tabs');
   const invSearch = $<HTMLInputElement>('inv-search');
-  type InvItem = { id: number; el: HTMLButtonElement; text: string };
+  type InvItem = { id: number; cat: string; el: HTMLButtonElement; text: string };
   let invItems: InvItem[] = [];
+  const invHeads = new Map<string, HTMLElement>();
+  const tabBtns = new Map<string, HTMLButtonElement>();
+  let invTab = 'all';
 
   const buildInventory = () => {
+    const ids = [...placeableBlocks(), ...Object.keys(ITEMS).map(Number)];
+    const byCat = new Map<string, number[]>();
+    for (const id of ids) {
+      const c = categoryOf(id);
+      if (!byCat.has(c)) byCat.set(c, []);
+      byCat.get(c)!.push(id);
+    }
     const frag = document.createDocumentFragment();
-    invItems = placeableBlocks().map((id) => {
-      const def = BLOCKS[id];
-      const el = document.createElement('button');
-      el.type = 'button';
-      el.className = 'inv-item';
-      el.title = def.name;
-      el.setAttribute('aria-label', def.name);
-      const c = document.createElement('canvas');
-      c.width = c.height = TILE;
-      drawIcon(c, id);
-      el.appendChild(c);
-      el.addEventListener('click', () => {
-        inv.slots[input.hotbar] = { id, n: 1 };
-        paintHotbar();
-        closeUI();
-        announce(input.hotbar);
-      });
-      frag.appendChild(el);
-      return { id, el, text: `${def.name} ${def.key ?? ''}`.toLowerCase() };
-    });
+    invItems = [];
+    for (const cat of CATEGORIES) {
+      const list = (byCat.get(cat.id) ?? []).sort((x, y) => itemName(x).localeCompare(itemName(y)));
+      if (!list.length) continue;
+      const head = document.createElement('h3');
+      head.className = 'inv-group';
+      head.textContent = cat.name;
+      invHeads.set(cat.id, head);
+      frag.appendChild(head);
+      for (const id of list) {
+        const name = itemName(id);
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'inv-item';
+        el.title = name;
+        el.setAttribute('aria-label', name);
+        const c = document.createElement('canvas');
+        c.width = c.height = TILE;
+        paintStack(c, id);
+        el.appendChild(c);
+        el.addEventListener('click', () => {
+          inv.slots[input.hotbar] = { id, n: 1 };
+          paintHotbar();
+          closeUI();
+          announce(input.hotbar);
+        });
+        frag.appendChild(el);
+        invItems.push({ id, cat: cat.id, el, text: `${name} ${blockKey(id)}`.toLowerCase() });
+      }
+    }
     invGrid.replaceChildren(frag);
+
+    // fülek: az összes, és csoportonként egy
+    const tabs = [{ id: 'all', name: 'All' }, ...CATEGORIES.filter((c) => byCat.has(c.id))];
+    invTabs.replaceChildren();
+    for (const t of tabs) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'inv-tab';
+      btn.textContent = t.name;
+      btn.addEventListener('click', () => { invTab = t.id; filterInventory(); });
+      invTabs.appendChild(btn);
+      tabBtns.set(t.id, btn);
+    }
   };
 
   const filterInventory = () => {
     const q = invSearch.value.trim().toLowerCase().replace(/\s+/g, '_');
     const words = q.split('_').filter(Boolean);
     let shown = 0;
+    const shownIn = new Set<string>();
     for (const it of invItems) {
       const hay = it.text.replace(/\s+/g, '_');
-      const ok = words.every((w) => hay.includes(w));
+      const ok = (invTab === 'all' || it.cat === invTab) && words.every((w) => hay.includes(w));
       it.el.hidden = !ok;
-      if (ok) shown++;
+      if (ok) { shown++; shownIn.add(it.cat); }
     }
-    invInfo.textContent = `${shown} blokk` + (extraCount ? '' : ' (a teljes lista a textúracsomag kicsomagolása után jelenik meg, lásd a README-t)');
+    // a csoportcímek csak az "All" fülön látszanak, és csak ha van találat alattuk
+    for (const [cat, head] of invHeads) head.hidden = invTab !== 'all' || !shownIn.has(cat);
+    for (const [id, btn] of tabBtns) btn.classList.toggle('active', id === invTab);
+    invInfo.textContent = `${shown} ${shown === 1 ? 'entry' : 'entries'}` + (extraCount ? '' : ' (the full list appears once the texture pack is extracted, see the README)');
   };
   invSearch.addEventListener('input', filterInventory);
 
@@ -512,10 +551,10 @@ async function main(): Promise<void> {
     input.reset();
     highlight.visible = false;
     if (document.pointerLockElement) document.exitPointerLock();
-    const cause = player.inLava ? 'Lávában égtél el.'
-      : health.burn > 0 || player.inFire ? 'Megégtél.'
-        : health.air <= 0 ? 'Vízbe fulladtál.'
-          : performance.now() / 1000 - lastFallAt < 1 ? 'Túl magasról estél le.' : 'Meghaltál.';
+    const cause = player.inLava ? 'You burned to death in lava.'
+      : health.burn > 0 || player.inFire ? 'You burned to death.'
+        : health.air <= 0 ? 'You drowned.'
+          : performance.now() / 1000 - lastFallAt < 1 ? 'You fell from a high place.' : 'You died.';
     $('death-reason').textContent = cause;
     deathEl.hidden = false;
     updateVitals(health, false);
@@ -567,8 +606,9 @@ async function main(): Promise<void> {
   });
 
   $('controls').textContent = input.touch
-    ? 'Bal oldalon a joystick, a jobb oldalon húzással nézel körül. A Bont gombot tartsd nyomva (túlélő módban a bontás időbe telik), az Épít gomb lerak vagy használ (munkapad, vödör, étel). A Tárgyak gomb az inventory.'
-    : 'WASD mozgás, szóköz ugrás/úszás, bal gomb (tartva) bont, jobb gomb épít vagy használ (munkapad, vödör, kova és acél, alma), 1–9 vagy görgő a választáshoz, E az inventory, Esc a menü.';
+    ? 'Move with the joystick on the left, look around by dragging on the right. Hold Break to mine (in survival mining takes time), Place puts down a block or uses what you hold (crafting table, door, bucket, food). Items opens your inventory.'
+    : 'WASD to move, Space to jump or swim, hold left click to mine, right click to place or use (crafting table, doors, bucket, flint and steel, apple), 1–9 or scroll to choose a slot, E for the inventory, Esc for the menu.';
+  if (input.touch) $('bag-hint').textContent = 'Tap: pick up / place. Long press: take half / place one. Drag a stack to move it. Tap outside to close.';
   $('pack-note').hidden = atlas.usingPack;
 
   // ---------- indulás ----------
@@ -866,5 +906,5 @@ async function main(): Promise<void> {
 
 main().catch((err) => {
   console.error(err);
-  document.body.insertAdjacentHTML('beforeend', '<p style="position:fixed;inset:1rem;color:#fff">Hiba történt az indításkor. Nézd meg a böngésző konzolját.</p>');
+  document.body.insertAdjacentHTML('beforeend', '<p style="position:fixed;inset:1rem;color:#fff">Something went wrong while starting. Check the browser console.</p>');
 });

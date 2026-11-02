@@ -250,7 +250,7 @@ export class BagUI {
       this.craftEl.appendChild(v.el);
       this.craftViews.push(v);
     }
-    this.titleEl.textContent = size === 3 ? 'Munkapad' : 'Inventory';
+    this.titleEl.textContent = size === 3 ? 'Crafting Table' : 'Inventory';
     this.cursor = null;
     this.root.hidden = false;
     this.render();

@@ -1,5 +1,7 @@
 # Voxoria
 
+A játék felülete, a blokkok és a tárgyak nevei angolul vannak; ez a README magyarul.
+
 Böngészős, Minecraft-szerű kockajáték. Gépen és telefonon is fut, később közös (co-op) játékkal.
 
 **Technológia:** TypeScript, Three.js, Vite.
@@ -56,7 +58,7 @@ A játék fekvő helyzetben játszható jól: álló helyzetben egy kérés jele
 
 Az **Új világ (túlélő)** és az **Új világ (kreatív)** gomb közül választasz; a mentés megjegyzi a módot.
 
-- **Kreatív:** végtelen blokk, nincs sebzés, az **E** a kereshető blokklistát nyitja, a bontás egy kattintás.
+- **Kreatív:** végtelen blokk, nincs sebzés, a bontás egy kattintás. Az **E** a kereshető blokk- és tárgyválasztót nyitja: fülekre bontva (Building Blocks, Natural Blocks, Stairs, Slabs & Walls, Doors, Fences & Ladders, Plants, Decoration, Functional, Fluids & Fire, Tools, Materials & Food), az „All” fülön csoportcímekkel. Itt minden blokk és minden tárgy (eszközök, vödör, kova és acél, alma ...) elérhető.
 - **Túlélő:** üres kézzel indulsz. A bontás a blokk keménységétől és a kezedben lévő szerszámtól függ (tartsd nyomva), közben repedések jelennek meg a blokkon, a bontáskor törmelék repül szét, a blokk pedig a földre esik. Ha a közelébe érsz, a játékos felveszi (ha tele a tároló, a földön marad). Életerő (10 szív), esési sebzés, fulladás (buborékok), égés és láva sebzés, természetes gyógyulás. Halál után újraélesztés a kiinduló helyen, a tárgyaid megmaradnak.
 
 ### Inventory és barkácsolás
