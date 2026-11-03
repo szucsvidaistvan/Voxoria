@@ -4,6 +4,8 @@ import { I, TOOL_ID, type ToolType } from './items';
 export interface Stack {
   id: number;
   n: number;
+  /** eszköz kopása: ennyi használat már elfogyott belőle (nincs megadva: új) */
+  d?: number;
 }
 
 /** Egy összetevő: konkrét azonosító, vagy címke ('planks', 'log') */

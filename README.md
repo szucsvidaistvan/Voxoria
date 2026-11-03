@@ -45,6 +45,9 @@ A korábbi, saját textúralapokból kivágott textúrákat a `scripts/slice-tex
 - **Tűzhely:** 8 kőből barkácsolható (gyűrű alakban), jobb klikkel nyílik. Bemenet + üzemanyag (szén, faszén, fa, deszka, bot ...), 10 másodperc tárgyanként. A vas- és aranyérc most már érc blokkot ad, amit meg kell olvasztani. A rönk faszénné olvad, a homok üveggé, a macskakő kővé.
 - **Fadöntés:** baltával kivágva a természetes fák a töve körül, a játékostól elfelé ledőlnek (a beállításokban: tárgyként esnek le, blokkként lefekszenek, vagy kikapcsolva). Rönkházat és fa nélküli rönkoszlopot nem dönt ki.
 - **Irányítás:** játék közben a böngésző Ctrl-gyorsbillentyűi le vannak tiltva (a Ctrl+W, Ctrl+T, Ctrl+N megnyomását a weboldalak nem tilthatják le, csak teljes képernyőn). Az Esc után bármelyik billentyű vagy kattintás visszaadja az irányítást, a menüben az Enter folytatja a játékot.
+- **Éhség:** 10 húscomb; a mozgás, az ugrás, a bontás és a sebzés kimerít, a telítettség előbb fogy, mint az éhség. 18 éhség fölött az életerő magától töltődik, nulla éhségnél az életerő 1 pontig csökken. Étel jobb klikkre (csak éhesen): alma, nyers és sült hús, rothadt hús. A nyers húst a tűzhelyben lehet megsütni.
+- **Szerszámok kopása:** fa 59, kő 131, vas 250, arany 32, gyémánt 1561 használat. Minden bontott blokk, kidöntött rönk és ütés kopasztja; a kard a harcban, a többi eszköz a bontásban bírja jobban. A kopás csíkként látszik az ikonon, és a mentésben megmarad.
+- **Mobok:** disznó, tehén, birka, csirke (nyers húst, gyapjút adnak), zombi (éjjel jön, napfényben ég), creeper (sistereg, majd felrobban és lyukat vág a földbe). Kard 4–7, balta 3–6, kéz 1 sebzés; esés közben kritikus. A beállításokban kikapcsolhatók, vagy békés módban csak az állatok maradnak.
 
 ## Irányítás
 

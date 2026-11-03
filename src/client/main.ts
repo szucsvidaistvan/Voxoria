@@ -11,13 +11,15 @@ import { initRecipes } from '../shared/recipes';
 import { Furnace, initSmelting } from '../shared/smelting';
 import { LIGHT, isOpaque } from '../shared/blocks';
 import { resetLightCache } from '../shared/light';
-import { breakTime, dropFor } from '../shared/survival';
+import { breakRule, breakTime, dropFor } from '../shared/survival';
 import { raycast, type RayHit } from '../shared/raycast';
 import { CH, CS, SEA_LEVEL, World } from '../shared/world';
 import { buildAtlas, TILE } from './atlas';
 import { DAY_SECONDS, START_TIME, formatClock, skyAt } from './daynight';
 import { createMoonTexture, createSunTexture } from './sky';
 import { createFelling } from './felling';
+import { createMobView } from './mobview';
+import { MobManager, mobDrops, type Mob, type MobCtx } from '../shared/mobs';
 import { fallDirection, findTree, isLogBlock, landingCell } from '../shared/tree';
 import { BagUI, HOTBAR_SIZE, Inventory, SlotView, createItemPainter } from './inventory';
 import { Health, createVitals } from './health';
@@ -139,7 +141,7 @@ async function main(): Promise<void> {
   const inv = new Inventory();
   const input = new Input(canvas, HOTBAR_SIZE);
   if (input.touch) document.body.classList.add('touch');
-  const settings = loadSettings({ renderDistance: input.touch ? 4 : 6, sensitivity: 1, felling: 'items' });
+  const settings = loadSettings({ renderDistance: input.touch ? 4 : 6, sensitivity: 1, felling: 'items', mobs: 'on' });
 
   let fogFar = 100;
   const applySettings = () => {
@@ -151,6 +153,7 @@ async function main(): Promise<void> {
   let world: World;
   let player: Player;
   let sim: FluidSim;
+  let mobs: MobManager;
   type Mode = 'survival' | 'creative';
   let mode: Mode = 'survival';
   const health = new Health();
@@ -287,6 +290,8 @@ async function main(): Promise<void> {
     clearWorld();
     world = new World(seed);
     sim = new FluidSim(world, (x, _y, z) => markDirty(x, z));
+    mobs = new MobManager(world);
+    mobView.clear();
     dirty.clear();
     drops.clear();
     if (save) world.importEdits(save.edits);
@@ -305,6 +310,7 @@ async function main(): Promise<void> {
     paintHotbar();
     health.reset();
     if (save?.hp !== undefined) health.hp = Math.max(1, Math.min(health.max, save.hp));
+    if (save?.food !== undefined) { health.food = Math.max(0, Math.min(20, save.food)); health.saturation = Math.max(0, Math.min(health.food, save.sat ?? 5)); }
     findSpawn(world);
     player = new Player(world);
     stream(spawn.x, spawn.z, 2, Infinity, Infinity);
@@ -326,7 +332,7 @@ async function main(): Promise<void> {
     const p = player.pos;
     writeSave({
       seed: world.seed, edits: world.exportEdits(), pos: [p.x, p.y, p.z], yaw: player.yaw, pitch: player.pitch,
-      time: timeOfDay, day: dayCount, furnaces: [...furnaces].map(([k, f]) => [...k.split(',').map(Number), ...f.toFlat()]), mode, hp: health.hp, inv: inv.toFlat(),
+      time: timeOfDay, day: dayCount, furnaces: [...furnaces].map(([k, f]) => [...k.split(',').map(Number), ...f.toFlat()]), mode, hp: health.hp, food: health.food, sat: health.saturation, inv: inv.toFlat(),
     });
   };
 
@@ -345,6 +351,7 @@ async function main(): Promise<void> {
 
   const drops = createDrops(scene, atlas, material, paintStack);
   const fell = createFelling(scene, atlas, material);
+  const mobView = createMobView(scene);
   const hotbarEl = $('hotbar');
   const hotViews: SlotView[] = [];
   const held = () => inv.slots[input.hotbar];
@@ -378,7 +385,7 @@ async function main(): Promise<void> {
   paintHotbar();
 
   // ---------- életerő ----------
-  const updateVitals = createVitals($('hearts'), $('air'));
+  const updateVitals = createVitals($('hearts'), $('air'), $('food'));
   const hurtEl = $('hurt'), fireEl = $('fire-overlay');
   health.onHurt = () => {
     hurtEl.classList.remove('flash');
@@ -386,6 +393,9 @@ async function main(): Promise<void> {
     hurtEl.classList.add('flash');
   };
   let lastFallAt = -99;
+  const now = () => performance.now() / 1000;
+  let lastMobHit = -99;
+  let lastMobHitBy = 'slain by a monster';
 
   // ---------- inventory és barkácsolás ----------
   const bag = new BagUI(inv, paintStack);
@@ -589,7 +599,8 @@ async function main(): Promise<void> {
     input.reset();
     highlight.visible = false;
     if (document.pointerLockElement) document.exitPointerLock();
-    const cause = player.inLava ? 'You burned to death in lava.'
+    const cause = now() - lastMobHit < 1 ? `You were ${lastMobHitBy}.`
+      : player.inLava ? 'You burned to death in lava.'
       : health.burn > 0 || player.inFire ? 'You burned to death.'
         : health.air <= 0 ? 'You drowned.'
           : performance.now() / 1000 - lastFallAt < 1 ? 'You fell from a high place.' : 'You died.';
@@ -640,6 +651,15 @@ async function main(): Promise<void> {
     distVal.textContent = distEl.value;
     applySettings();
     writeSettings(settings);
+  });
+  const mobsEl = $<HTMLSelectElement>('set-mobs');
+  mobsEl.value = settings.mobs;
+  mobsEl.addEventListener('change', () => {
+    settings.mobs = mobsEl.value as typeof settings.mobs;
+    writeSettings(settings);
+    mobsEl.blur();
+    // kikapcsoláskor eltűnnek a mobok (a békésnél csak a szörnyek)
+    mobs.mobs = settings.mobs === 'off' ? [] : settings.mobs === 'peaceful' ? mobs.mobs.filter((m) => !m.def.hostile) : mobs.mobs;
   });
   const fellEl = $<HTMLSelectElement>('set-fell');
   fellEl.value = settings.felling;
@@ -704,6 +724,20 @@ async function main(): Promise<void> {
     if (d) drops.spawn(d.id, d.n, x + 0.5, y + 0.5, z + 0.5);
   };
 
+  /** A kézben tartott eszköz kopása (csak túlélőben): a törött eszköz eltűnik */
+  const wearHeld = (amount: number) => {
+    if (mode !== 'survival') return;
+    const st = held();
+    const t = toolOf(st?.id);
+    if (!st || !t) return;
+    st.d = (st.d ?? 0) + amount;
+    if (st.d >= t.durability) {
+      inv.slots[input.hotbar] = null;
+      particles.burst(Math.floor(player.pos.x), Math.floor(player.pos.y) + 1, Math.floor(player.pos.z), B.PLANKS);
+    }
+    paintHotbar();
+  };
+
   /**
    * Fadöntés: ha egy természetes fa rönkjét baltával bontják, a rönk és a fölötte lévő rész (ágak, lomb) kikerül a
    * világból, a töve körül ledől a játékostól elfelé, és a becsapódáskor tárgyakat ad vagy blokkokként lefekszik.
@@ -713,6 +747,8 @@ async function main(): Promise<void> {
     if (toolOf(held()?.id)?.type !== 'axe') return false;
     const tree = findTree(world, x, y, z);
     if (!tree) return false;
+    wearHeld(tree.logs.length); // minden kidöntött rönk egy használat
+    health.exhaust(0.005 * tree.logs.length);
     const base = { x, y, z };
     const dir = fallDirection(x, z, player.pos.x, player.pos.z);
     const cells = [...tree.logs, ...tree.leaves];
@@ -763,7 +799,14 @@ async function main(): Promise<void> {
         particles.burst(x, oy, z, oid);
       }
     }
-    if (mode === 'survival') giveDrop(id, x, y, z);
+    if (mode === 'survival') {
+      giveDrop(id, x, y, z);
+      // a bontás kopasztja az eszközt (a kard kétszer annyira) és kimeríti a játékost; a pillanatok alatt törő dolgok (fű) nem
+      if (breakRule(id).hardness > 0) {
+        health.exhaust(0.005);
+        wearHeld(toolOf(held()?.id)?.type === 'sword' ? 2 : 1);
+      }
+    }
     // a rajta álló növény, fáklya, tűz vele együtt leesik
     for (let yy = y + 1; yy < CH; yy++) {
       const up = world.getBlock(x, yy, z);
@@ -828,12 +871,10 @@ async function main(): Promise<void> {
       return;
     }
     // étel
-    const heal = ITEMS[id]?.heal;
-    if (heal) {
-      if (health.hp < health.max) {
-        health.heal(heal);
-        if (mode === 'survival') { inv.takeOne(input.hotbar); paintHotbar(); }
-      }
+    const food = ITEMS[id]?.food;
+    if (food) {
+      // csak éhesen lehet enni (kreatívban nincs éhség)
+      if (mode === 'survival' && health.eat(food.hunger, food.sat)) { inv.takeOne(input.hotbar); paintHotbar(); }
       return;
     }
     if (!hit) return;
@@ -914,10 +955,83 @@ async function main(): Promise<void> {
     }
   };
 
+  // ---------- mobok: sebzés, robbanás, halál, támadás ----------
+
+  /** A mob halála: a dropok a földre esnek (túlélőben); a felrobbant creeper nem ejt semmit */
+  const onMobDie = (m: Mob) => {
+    if (m.exploded || mode !== 'survival') return;
+    for (const d of mobDrops(m.kind)) drops.spawn(d.id, d.n, m.x, m.y + 0.4, m.z);
+  };
+
+  /** Robbanás: kisebb gömbben eltűnnek a blokkak (a bedrock és az obszidián kivételével), a játékos megsérül és hátralökődik */
+  const explode = (x: number, y: number, z: number, power: number) => {
+    const cx = Math.floor(x), cy = Math.floor(y), cz = Math.floor(z);
+    const R = Math.ceil(power);
+    for (let dx = -R; dx <= R; dx++) for (let dy = -R; dy <= R; dy++) for (let dz = -R; dz <= R; dz++) {
+      if (dx * dx + dy * dy + dz * dz > power * power + 0.5) continue;
+      const bx = cx + dx, by = cy + dy, bz = cz + dz;
+      if (by <= 0) continue;
+      const id = world.getBlock(bx, by, bz);
+      if (id === AIR) continue;
+      const key = blockKey(id);
+      if (key === 'bedrock' || key === 'obsidian') continue;
+      setBlockAt(bx, by, bz, AIR);
+    }
+    particles.burst(cx, cy, cz, B.COBBLE);
+    const d = Math.hypot(player.pos.x - x, player.pos.y + 0.9 - y, player.pos.z - z);
+    if (mode === 'survival' && d < power * 2 && !health.dead) {
+      health.damage(Math.max(1, Math.round((1 - d / (power * 2)) * 16)));
+      lastMobHit = now(); lastMobHitBy = 'blown up by a Creeper';
+      const kd = d || 1;
+      player.knock.x += ((player.pos.x - x) / kd) * 9;
+      player.knock.z += ((player.pos.z - z) / kd) * 9;
+      if (player.onGround) player.vel.y = 6;
+    }
+    flushDirty(9);
+  };
+
+  const makeMobCtx = (sky: { elevation: number }): MobCtx => ({
+    px: player.pos.x, py: player.pos.y, pz: player.pos.z,
+    target: mode === 'survival' && !health.dead,
+    day: sky.elevation > 0.15,
+    hurtPlayer: (dmg, fx, fz) => {
+      if (mode !== 'survival' || health.dead) return;
+      health.damage(dmg);
+      lastMobHit = now(); lastMobHitBy = 'slain by a Zombie';
+      const d = Math.hypot(player.pos.x - fx, player.pos.z - fz) || 1;
+      player.knock.x += ((player.pos.x - fx) / d) * 5;
+      player.knock.z += ((player.pos.z - fz) / d) * 5;
+    },
+    explode,
+    onDie: onMobDie,
+  });
+
+  let lastAttack = 0;
+  /** A játékos ütése: a kézben tartott eszköz sebzése (kézzel 1), esés közben kritikus (1,5x); kreatívban egy ütés elég */
+  const attackMob = (m: Mob) => {
+    if (now() - lastAttack < 0.4) return;
+    lastAttack = now();
+    const tool = toolOf(held()?.id);
+    let dmg = mode === 'creative' ? 999 : tool?.damage ?? 1;
+    if (!player.onGround && player.vel.y < 0 && !player.inWater) dmg *= 1.5;
+    if (m.hurt(dmg, player.pos.x, player.pos.z)) onMobDie(m);
+    if (mode === 'survival') {
+      health.exhaust(0.1);
+      // a kard 1, a többi eszköz 2 kopást kap egy ütéstől
+      if (tool) wearHeld(tool.type === 'sword' ? 1 : 2);
+    }
+  };
+
   const interact = (dt: number) => {
     camera.getWorldDirection(dir);
     const p = camera.position;
-    const hit: RayHit | null = raycast(world, p.x, p.y, p.z, dir.x, dir.y, dir.z, 6);
+    const blockHit: RayHit | null = raycast(world, p.x, p.y, p.z, dir.x, dir.y, dir.z, 6);
+    // ha egy mob közelebb van, mint a megcélzott blokk, őt célozzuk
+    const mobHit = settings.mobs === 'off' ? null : mobs.pick(p.x, p.y, p.z, dir.x, dir.y, dir.z, 3.6);
+    const blockDist = blockHit ? Math.hypot(blockHit.hx - p.x, blockHit.hy - p.y, blockHit.hz - p.z) : Infinity;
+    const mobFirst = !!mobHit && mobHit.t < blockDist;
+    const hit: RayHit | null = mobFirst ? null : blockHit;
+    if (mobFirst && (input.breakQueued || input.breakHeld)) attackMob(mobHit!.mob);
     highlight.visible = !!hit;
     if (hit) {
       const [x0, y0, z0, x1, y1, z1] = hit.box;
@@ -965,7 +1079,13 @@ async function main(): Promise<void> {
       player.pitch = Math.max(-1.55, Math.min(1.55, player.pitch + input.dPitch));
       input.dYaw = input.dPitch = 0;
       const { mx, mz } = input.getMove();
+      const wasGround = player.onGround, px0 = player.pos.x, pz0 = player.pos.z;
       player.update(dt, mx, mz, input.jump);
+      if (mode === 'survival') {
+        // a mozgás (méterenként) és az ugrás kimerít
+        health.exhaust(Math.hypot(player.pos.x - px0, player.pos.z - pz0) * 0.02);
+        if (wasGround && !player.onGround && player.vel.y > 0) health.exhaust(0.05);
+      }
 
       // esés- és környezeti sebzés
       const fall = player.landing;
@@ -1042,6 +1162,15 @@ async function main(): Promise<void> {
       // a tűzhelyek folyamatosan dolgoznak (akkor is, ha épp nem nézed őket)
       for (const f of furnaces.values()) f.update(dt);
       fell.update(dt);
+      // mobok: a szimuláció csak játék közben fut; békés módban nincsenek szörnyek, kikapcsolva semmi
+      if (settings.mobs !== 'off') {
+        if (state !== 'dead') {
+          const night = sky.elevation < -0.05;
+          mobs.spawnTick(dt, player.pos.x, player.pos.z, night, mode === 'survival' && settings.mobs === 'on');
+        }
+        mobs.update(dt, makeMobCtx(sky));
+      }
+      mobView.sync(mobs.mobs, sky.light, now / 1000);
       if (state === 'inventory') bag.tick();
       particles.update(dt);
       drops.update(dt, world, player.pos.x, player.pos.y, player.pos.z, (id, n) => {

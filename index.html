@@ -27,7 +27,10 @@
     <div id="hotwrap">
       <div id="vitals">
         <div id="hearts" aria-label="Health"></div>
-        <div id="air" hidden aria-label="Air"></div>
+        <div id="vitals-right">
+          <div id="air" hidden aria-label="Air"></div>
+          <div id="food" aria-label="Hunger"></div>
+        </div>
       </div>
       <div id="hotbar"></div>
     </div>
@@ -104,6 +107,12 @@
         <option value="items">Falls, drops items</option>
         <option value="blocks">Falls, logs stay as blocks</option>
         <option value="off">Off</option>
+      </select>
+      <label for="set-mobs">Mobs</label>
+      <select id="set-mobs">
+        <option value="on">Animals and monsters</option>
+        <option value="peaceful">Peaceful (animals only)</option>
+        <option value="off">No mobs</option>
       </select>
     </section>
 

@@ -10,8 +10,8 @@ export const TOTAL_SLOTS = 36;
 export class Inventory {
   slots: (Stack | null)[] = new Array(TOTAL_SLOTS).fill(null);
 
-  /** Hozzáadás; visszaadja, hány darab nem fért el */
-  add(id: number, n: number): number {
+  /** Hozzáadás; visszaadja, hány darab nem fért el. A `d` az eszköz kopása (csak az 1-es stackeknél). */
+  add(id: number, n: number, d?: number): number {
     const max = maxStack(id);
     for (const s of this.slots) {
       if (n <= 0) break;
@@ -24,7 +24,7 @@ export class Inventory {
     for (let i = 0; i < this.slots.length && n > 0; i++) {
       if (!this.slots[i]) {
         const m = Math.min(max, n);
-        this.slots[i] = { id, n: m };
+        this.slots[i] = d ? { id, n: m, d } : { id, n: m };
         n -= m;
       }
     }
@@ -40,15 +40,17 @@ export class Inventory {
 
   /** [id, n, id, n, ...] a mentéshez (0, 0: üres hely) */
   toFlat(): number[] {
-    return this.slots.flatMap((s) => (s ? [s.id, s.n] : [0, 0]));
+    // az eszköz kopása a darabszám fölött tárolódik (n + d * 1000), így a régi mentések is betöltődnek
+    return this.slots.flatMap((s) => (s ? [s.id, s.n + (s.d ?? 0) * 1000] : [0, 0]));
   }
 
   fromFlat(flat: number[]): void {
     this.slots.fill(null);
     for (let i = 0; i < TOTAL_SLOTS && i * 2 + 1 < flat.length; i++) {
-      const id = flat[i * 2], n = flat[i * 2 + 1];
+      const id = flat[i * 2], raw = flat[i * 2 + 1];
+      const n = raw % 1000, d = Math.floor(raw / 1000);
       // csak a most is ismert blokkokat és elemeket töltjük vissza
-      if (id && n > 0 && (BLOCKS[id] || ITEMS[id])) this.slots[i] = { id, n: Math.min(n, maxStack(id)) };
+      if (id && n > 0 && (BLOCKS[id] || ITEMS[id])) this.slots[i] = { id, n: Math.min(n, maxStack(id)), ...(d ? { d } : {}) };
     }
   }
 }
@@ -60,13 +62,18 @@ export class SlotView {
   readonly el = document.createElement('div');
   private canvas = document.createElement('canvas');
   private count = document.createElement('span');
+  private bar = document.createElement('div');
+  private barFill = document.createElement('i');
   private lastId = -1;
 
   constructor(private paint: Painter, className = 'islot') {
     this.el.className = className;
     this.canvas.width = this.canvas.height = 64;
     this.count.className = 'cnt';
-    this.el.append(this.canvas, this.count);
+    this.bar.className = 'dur';
+    this.bar.hidden = true;
+    this.bar.appendChild(this.barFill);
+    this.el.append(this.canvas, this.count, this.bar);
   }
 
   set(s: Stack | null, hideCount = false): void {
@@ -79,6 +86,14 @@ export class SlotView {
       this.el.title = id ? itemName(id) : '';
     }
     this.count.textContent = s && s.n > 1 && !hideCount ? String(s.n) : '';
+    // tartósságcsík: csak a megkopott eszközön látszik, zöldtől pirosig
+    const max = s ? ITEMS[s.id]?.tool?.durability : undefined;
+    if (max && s!.d) {
+      const f = Math.max(0, 1 - s!.d! / max);
+      this.bar.hidden = false;
+      this.barFill.style.width = `${Math.max(6, f * 100)}%`;
+      this.barFill.style.background = `hsl(${Math.round(f * 120)}, 85%, 50%)`;
+    } else this.bar.hidden = true;
   }
 
   /** Kényszerített újrarajzolás (pl. ha az elem textúrája később töltődött be) */
@@ -272,7 +287,7 @@ export class BagUI {
     this.craft = [];
     this.furnace = null;
     this.root.classList.remove('furnace');
-    for (const s of back) if (s) this.inv.add(s.id, s.n); // ami nem fér el, elvész
+    for (const s of back) if (s) this.inv.add(s.id, s.n, s.d); // ami nem fér el, elvész
     this.root.hidden = true;
     this.onChange();
   }
@@ -346,13 +361,13 @@ export class BagUI {
           if (s && s.id === from.id && s.n < maxStack(from.id)) { const m = Math.min(maxStack(from.id) - s.n, left); s.n += m; left -= m; }
         }
         for (let i = a; i < b && left > 0; i++) {
-          if (!this.inv.slots[i]) { const m = Math.min(maxStack(from.id), left); this.inv.slots[i] = { id: from.id, n: m }; left -= m; }
+          if (!this.inv.slots[i]) { const m = Math.min(maxStack(from.id), left); this.inv.slots[i] = { id: from.id, n: m, d: from.d }; left -= m; }
         }
       };
       if (area === 'craft') tryRange(0, TOTAL_SLOTS);
       else if (idx < HOTBAR_SIZE) tryRange(HOTBAR_SIZE, TOTAL_SLOTS);
       else tryRange(0, HOTBAR_SIZE);
-      if (left > 0) list[idx] = { id: from.id, n: left };
+      if (left > 0) list[idx] = { id: from.id, n: left, d: from.d };
     } else if (button === 0) {
       const c = this.cursor;
       if (!c) { if (ref) { this.cursor = ref; list[idx] = null; } }
@@ -368,12 +383,12 @@ export class BagUI {
       if (!c) {
         if (ref) {
           const half = Math.ceil(ref.n / 2);
-          this.cursor = { id: ref.id, n: half };
+          this.cursor = { id: ref.id, n: half, d: ref.d };
           ref.n -= half;
           if (ref.n <= 0) list[idx] = null;
         }
       } else if (!ref) {
-        list[idx] = { id: c.id, n: 1 };
+        list[idx] = { id: c.id, n: 1, d: c.d };
         if (--c.n <= 0) this.cursor = null;
       } else if (ref.id === c.id && ref.n < maxStack(ref.id)) {
         ref.n++;
