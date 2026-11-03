@@ -40,7 +40,15 @@ export class Input {
   }
 
   lock(): void {
-    if (!this.touch) this.canvas.requestPointerLock();
+    if (this.touch) return;
+    try {
+      // Chrome Promise-t ad vissza, és elutasíthatja (pl. ha nem volt felhasználói gesztus): ez nem hiba
+      const r = this.canvas.requestPointerLock() as unknown as Promise<void> | undefined;
+      r?.catch?.(() => {});
+    } catch { /* nem támogatott */ }
+    // teljes képernyőn a böngésző gyorsbillentyűi (Ctrl+W, Ctrl+T, Ctrl+N, Tab ...) is lefoglalhatók
+    const kb = (navigator as Navigator & { keyboard?: { lock?: (keys?: string[]) => Promise<void> } }).keyboard;
+    if (document.fullscreenElement) kb?.lock?.().catch(() => {});
   }
 
   getMove(): { mx: number; mz: number } {
@@ -69,6 +77,12 @@ export class Input {
   private bindDesktop(): void {
     document.addEventListener('keydown', (e) => {
       if (!this.enabled) return;
+      // játék közben a böngésző Ctrl/Cmd gyorsbillentyűi (mentés, keresés, nyomtatás, nagyítás ...) nem működnek.
+      // A Ctrl+W, Ctrl+T, Ctrl+N megnyomását a weboldalak nem tilthatják le (csak teljes képernyőn, lásd lock()).
+      if (e.ctrlKey || e.metaKey) e.preventDefault();
+      // az Esc nem számít felhasználói gesztusnak, ezért vele nem lehet visszazárni az egeret (inventory bezárása után).
+      // Bármelyik másik billentyű viszont igen: az első leütés visszaadja az irányítást, külön kattintás nélkül.
+      if (!this.touch && !this.locked && e.code !== 'Escape' && !e.repeat) this.lock();
       if (e.code === 'Space') { this.jump = true; e.preventDefault(); }
       if (e.code === 'KeyE') {
         // a main.ts záró kezelője ne kapja meg ugyanezt a leütést, különben azonnal bezárná az inventoryt
@@ -98,8 +112,11 @@ export class Input {
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     this.canvas.addEventListener('wheel', (e) => {
       if (!this.enabled) return;
+      if (e.ctrlKey) e.preventDefault(); // Ctrl + görgő: böngésző-nagyítás
       this.select(this.hotbar + (e.deltaY > 0 ? 1 : -1));
-    }, { passive: true });
+    }, { passive: false });
+    // a gesztusos nagyítás (Ctrl+görgő, touchpad csípés) a játékon kívül is tiltva, amíg a játék fut
+    window.addEventListener('wheel', (e) => { if (this.enabled && e.ctrlKey) e.preventDefault(); }, { passive: false });
     document.addEventListener('pointerlockchange', () => {
       if (!this.locked && this.enabled && !this.touch && performance.now() >= this.ignoreUnlockUntil) this.onPause();
     });

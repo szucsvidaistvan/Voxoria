@@ -122,6 +122,27 @@ html, body {
 }
 #held-name.show { opacity: 1; transition: opacity 0.05s; }
 
+#resume-hint {
+  position: fixed;
+  left: 50%;
+  top: 18%;
+  transform: translateX(-50%);
+  padding: 0.4rem 1rem;
+  color: var(--chalk);
+  background: rgba(14, 26, 51, 0.8);
+  box-shadow: inset 0 0 0 2px var(--gold);
+  pointer-events: none;
+}
+#set-fell {
+  width: 100%;
+  padding: 0.5rem;
+  font: inherit;
+  color: var(--chalk);
+  background: var(--night-deep);
+  border: 0;
+  box-shadow: inset 0 0 0 2px var(--edge);
+}
+
 /* a nap sorszáma és a játékbeli idő a sarokban */
 #clock {
   position: fixed;
@@ -188,11 +209,16 @@ body.touch .slot { flex: 1; width: auto; height: auto; aspect-ratio: 1; padding:
   display: flex;
   flex-direction: column;
   width: min(48rem, 100%);
-  max-height: 100%;
+  /* fix magasság: a rács a maradék helyen görgethető, a panel sosem lóg ki a képernyőről */
+  height: min(46rem, 100%);
+  min-height: 0;
+  overflow: hidden;
   padding: 1rem;
   background: var(--night);
   border: 4px solid var(--gold);
 }
+/* a fejléc, a súgó és a fülek mérete nem zsugorodhat, különben a rács rájuk csúszik */
+.inv-panel > header, .inv-panel > .hint, .inv-panel > #inv-tabs { flex: none; }
 .inv-panel header { display: flex; gap: 0.6rem; margin: 0 0 0.5rem; }
 #inv-search {
   flex: 1;
@@ -213,7 +239,14 @@ body.touch .slot { flex: 1; width: auto; height: auto; aspect-ratio: 1; padding:
 #inv-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  grid-auto-rows: min-content;
+  align-content: start;
   gap: 4px;
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+  padding-right: 6px;
+  scrollbar-gutter: stable;
   overflow-y: auto;
   touch-action: pan-y;
   overscroll-behavior: contain;
@@ -344,7 +377,7 @@ body.creative #vitals { display: none; }
   overflow: auto;
   touch-action: manipulation;
 }
-#bag .bag-panel { margin: auto; }
+#bag .bag-panel { margin: auto; max-height: 100%; overflow-y: auto; }
 .bag-panel {
   --slot: min(52px, calc((100vw - 3rem) / 9 - 4px), calc((100vh - 11rem) / 6.6));
   padding: 0.8rem;
@@ -442,8 +475,11 @@ body.creative #vitals { display: none; }
   gap: 0.35rem;
   margin: 0 0 0.6rem;
   overflow-x: auto;
-  padding-bottom: 0.2rem;
+  padding-bottom: 0.45rem;
   scrollbar-width: thin;
+  position: relative;
+  z-index: 2;
+  background: var(--night);
 }
 .inv-tab {
   flex: none;
@@ -460,9 +496,15 @@ body.creative #vitals { display: none; }
 .inv-tab.active { background: var(--sky); box-shadow: inset 0 0 0 2px var(--gold); }
 .inv-group {
   grid-column: 1 / -1;
-  margin: 0.6rem 0 0.1rem;
+  /* ragadós címsor: görgetés közben fent marad, és saját háttere takarja az alatta elcsúszó ikonokat */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 0.5rem 0 0.25rem;
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--gold);
+  background: var(--night);
+  box-shadow: 0 3px 0 var(--night);
 }
-.inv-group:first-child { margin-top: 0; }

@@ -43,6 +43,8 @@ A korábbi, saját textúralapokból kivágott textúrákat a `scripts/slice-tex
 - **Nap-éjszaka:** egy teljes nap 20 perc (kb. 12,5 perc nappal, 7,5 perc éjszaka). A hajnal rózsaszín, az alkonyat narancs, majd lila; a hold 8 napos fázisokon megy át (telihold idején világosabb az éjszaka). A jobb felső sarokban a nap sorszáma és a játékbeli idő látszik.
 - **Fény:** a fáklya (14), a láva, a tűz, az izzókő, a tengerlámpa és a tökfaragás világít, a fény blokkonként gyengül. A barlangok és a tető alatti terek sötétek, napfény az oldalról szivárog be. A fáklya a padlóra vagy a fal oldalára tehető (plafonra nem); ha a fal eltűnik, leesik.
 - **Tűzhely:** 8 kőből barkácsolható (gyűrű alakban), jobb klikkel nyílik. Bemenet + üzemanyag (szén, faszén, fa, deszka, bot ...), 10 másodperc tárgyanként. A vas- és aranyérc most már érc blokkot ad, amit meg kell olvasztani. A rönk faszénné olvad, a homok üveggé, a macskakő kővé.
+- **Fadöntés:** baltával kivágva a természetes fák a töve körül, a játékostól elfelé ledőlnek (a beállításokban: tárgyként esnek le, blokkként lefekszenek, vagy kikapcsolva). Rönkházat és fa nélküli rönkoszlopot nem dönt ki.
+- **Irányítás:** játék közben a böngésző Ctrl-gyorsbillentyűi le vannak tiltva (a Ctrl+W, Ctrl+T, Ctrl+N megnyomását a weboldalak nem tilthatják le, csak teljes képernyőn). Az Esc után bármelyik billentyű vagy kattintás visszaadja az irányítást, a menüben az Enter folytatja a játékot.
 
 ## Irányítás
 

@@ -26,6 +26,8 @@ export interface SaveData {
 export interface Settings {
   renderDistance: number;
   sensitivity: number;
+  /** fadöntés: ki, a rönkök tárgyként esnek le, vagy blokkként lefekszenek */
+  felling: 'off' | 'items' | 'blocks';
 }
 
 function read<T>(key: string): T | null {
