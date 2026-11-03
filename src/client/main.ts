@@ -18,7 +18,7 @@ import { buildAtlas, TILE } from './atlas';
 import { DAY_SECONDS, START_TIME, formatClock, skyAt } from './daynight';
 import { createMoonTexture, createSunTexture } from './sky';
 import { createFelling } from './felling';
-import { createMobView } from './mobview';
+import { createMobView, createPlayerView } from './mobview';
 import { MobManager, mobDrops, type Mob, type MobCtx } from '../shared/mobs';
 import { fallDirection, findTree, isLogBlock, landingCell } from '../shared/tree';
 import { BagUI, HOTBAR_SIZE, Inventory, SlotView, createItemPainter } from './inventory';
@@ -352,6 +352,10 @@ async function main(): Promise<void> {
   const drops = createDrops(scene, atlas, material, paintStack);
   const fell = createFelling(scene, atlas, material);
   const mobView = createMobView(scene);
+  // harmadik személyű nézet (V): a játékos saját modellje a kamera előtt
+  const playerView = createPlayerView(scene);
+  let thirdPerson = false;
+  let walkPhase = 0;
   const hotbarEl = $('hotbar');
   const hotViews: SlotView[] = [];
   const held = () => inv.slots[input.hotbar];
@@ -581,6 +585,7 @@ async function main(): Promise<void> {
     } else input.lock();
   }
   bag.onClose = () => closeUI();
+  input.onView = () => { if (state === 'playing') thirdPerson = !thirdPerson; };
   input.onInventory = () => (state === 'inventory' ? closeUI() : mode === 'creative' ? openPicker() : openBag(2));
   $('inv-close').addEventListener('click', () => closeUI());
   document.addEventListener('keydown', (e) => {
@@ -1076,6 +1081,15 @@ async function main(): Promise<void> {
       camera.rotation.set(player.pitch, player.yaw, 0);
       if (state === 'playing') interact(dt);
       else { mine.active = false; mineEl.classList.remove('on'); }
+      // harmadik személy: a kamera a játékos mögé kerül (az interakció a szemből történt, a fenti sor után)
+      walkPhase += Math.hypot(player.pos.x - px0, player.pos.z - pz0);
+      playerView.visible = thirdPerson && state === 'playing';
+      if (playerView.visible) {
+        const sy = Math.sin(player.yaw), cy = Math.cos(player.yaw), cp = Math.cos(player.pitch), sp = Math.sin(player.pitch);
+        const dist = 3.5;
+        camera.position.set(player.pos.x + sy * cp * dist, player.pos.y + EYE - sp * dist, player.pos.z + cy * cp * dist);
+        playerView.set(player.pos.x, player.pos.y, player.pos.z, player.yaw, walkPhase, Math.hypot(player.vel.x, player.vel.z) / 4, skyAt(timeOfDay, dayCount).light);
+      }
       cx = player.pos.x;
       cz = player.pos.z;
     } else {

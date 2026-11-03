@@ -21,6 +21,8 @@ export class Input {
   /** eddig az időpontig (performance.now) a kurzor felszabadulása nem nyitja meg a menüt */
   ignoreUnlockUntil = 0;
   onInventory: () => void = () => {};
+  /** V: váltás az első és a harmadik személyű nézet között */
+  onView: () => void = () => {};
 
   private keys = new Set<string>();
   private joy = { x: 0, y: 0 };
@@ -90,6 +92,7 @@ export class Input {
         if (!e.repeat) this.onInventory();
         return;
       }
+      if (e.code === 'KeyV' && !e.repeat) this.onView();
       const d = /^Digit([1-9])$/.exec(e.code);
       if (d && Number(d[1]) <= this.slots) this.select(Number(d[1]) - 1);
       this.keys.add(e.code);
