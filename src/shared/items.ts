@@ -11,9 +11,9 @@ export interface ItemDef {
   tex: string;
   stack: number;
   /** eszköz: típus, szint (1 fa, 2 kő, 3 vas, 4 gyémánt), és a bontás sebessége */
-  tool?: { type: ToolType; tier: number; speed: number };
-  /** ennyi életerőt tölt vissza (fél szívekben) */
-  heal?: number;
+  tool?: { type: ToolType; tier: number; speed: number; /** ennyi használat után törik el */ durability: number; /** sebzés támadáskor (fél szívben) */ damage: number };
+  /** étel: ennyi éhséget tölt vissza (fél húscomb) és ennyi telítettséget ad */
+  food?: { hunger: number; sat: number };
   /** a kijelzés színe, ha a textúra hiányzik */
   color: string;
 }
@@ -22,6 +22,10 @@ export const I = {
   STICK: ITEM_BASE + 1, COAL: ITEM_BASE + 2, DIAMOND: ITEM_BASE + 3, IRON_INGOT: ITEM_BASE + 4,
   GOLD_INGOT: ITEM_BASE + 5, FLINT: ITEM_BASE + 6, APPLE: ITEM_BASE + 7, CHARCOAL: ITEM_BASE + 12,
   BUCKET: ITEM_BASE + 8, WATER_BUCKET: ITEM_BASE + 9, LAVA_BUCKET: ITEM_BASE + 10, FLINT_AND_STEEL: ITEM_BASE + 11,
+  // ételek és mobdropok (a 20..39 az eszközöké)
+  RAW_BEEF: ITEM_BASE + 13, COOKED_BEEF: ITEM_BASE + 14, RAW_PORK: ITEM_BASE + 15, COOKED_PORK: ITEM_BASE + 16,
+  RAW_CHICKEN: ITEM_BASE + 17, COOKED_CHICKEN: ITEM_BASE + 18, RAW_MUTTON: ITEM_BASE + 19,
+  COOKED_MUTTON: ITEM_BASE + 40, ROTTEN_FLESH: ITEM_BASE + 41, GUNPOWDER: ITEM_BASE + 42,
 } as const;
 
 export const ITEMS: Record<number, ItemDef> = {
@@ -31,7 +35,17 @@ export const ITEMS: Record<number, ItemDef> = {
   [I.IRON_INGOT]: { name: 'Iron Ingot', tex: 'iron_ingot', stack: 64, color: '#d8d8d8' },
   [I.GOLD_INGOT]: { name: 'Gold Ingot', tex: 'gold_ingot', stack: 64, color: '#f5d442' },
   [I.FLINT]: { name: 'Flint', tex: 'flint', stack: 64, color: '#55555a' },
-  [I.APPLE]: { name: 'Apple', tex: 'apple', stack: 64, heal: 4, color: '#d33a2c' },
+  [I.APPLE]: { name: 'Apple', tex: 'apple', stack: 64, food: { hunger: 4, sat: 2.4 }, color: '#d33a2c' },
+  [I.RAW_BEEF]: { name: 'Raw Beef', tex: 'raw_beef', stack: 64, food: { hunger: 3, sat: 1.8 }, color: '#c0504d' },
+  [I.COOKED_BEEF]: { name: 'Steak', tex: 'cooked_beef', stack: 64, food: { hunger: 8, sat: 12.8 }, color: '#7a4a2b' },
+  [I.RAW_PORK]: { name: 'Raw Porkchop', tex: 'raw_porkchop', stack: 64, food: { hunger: 3, sat: 1.8 }, color: '#e59a9a' },
+  [I.COOKED_PORK]: { name: 'Cooked Porkchop', tex: 'cooked_porkchop', stack: 64, food: { hunger: 8, sat: 12.8 }, color: '#a8683f' },
+  [I.RAW_CHICKEN]: { name: 'Raw Chicken', tex: 'raw_chicken', stack: 64, food: { hunger: 2, sat: 1.2 }, color: '#e8c9b5' },
+  [I.COOKED_CHICKEN]: { name: 'Cooked Chicken', tex: 'cooked_chicken', stack: 64, food: { hunger: 6, sat: 7.2 }, color: '#c98a45' },
+  [I.RAW_MUTTON]: { name: 'Raw Mutton', tex: 'raw_mutton', stack: 64, food: { hunger: 2, sat: 1.2 }, color: '#b8605a' },
+  [I.COOKED_MUTTON]: { name: 'Cooked Mutton', tex: 'cooked_mutton', stack: 64, food: { hunger: 6, sat: 9.6 }, color: '#8a5230' },
+  [I.ROTTEN_FLESH]: { name: 'Rotten Flesh', tex: 'rotten_flesh', stack: 64, food: { hunger: 4, sat: 0.8 }, color: '#6f7d3c' },
+  [I.GUNPOWDER]: { name: 'Gunpowder', tex: 'gunpowder', stack: 64, color: '#6b6b6b' },
   [I.CHARCOAL]: { name: 'Charcoal', tex: 'charcoal', stack: 64, color: '#3a3330' },
   [I.BUCKET]: { name: 'Bucket', tex: 'bucket', stack: 16, color: '#b5b5b5' },
   [I.WATER_BUCKET]: { name: 'Water Bucket', tex: 'water_bucket', stack: 1, color: '#3a6fd8' },
@@ -41,12 +55,15 @@ export const ITEMS: Record<number, ItemDef> = {
 
 // eszközök: 5 anyag x 4 típus
 const MATERIALS = [
-  { id: 'wooden', name: 'Wooden', tier: 1, speed: 2, color: '#a07a44' },
-  { id: 'stone', name: 'Stone', tier: 2, speed: 4, color: '#8f8f8f' },
-  { id: 'iron', name: 'Iron', tier: 3, speed: 6, color: '#d8d8d8' },
-  { id: 'golden', name: 'Golden', tier: 1, speed: 12, color: '#f5d442' },
-  { id: 'diamond', name: 'Diamond', tier: 4, speed: 8, color: '#4be3e0' },
+  // durability: ennyi használat után törik el; bonus: a támadás sebzéséhez adódik
+  { id: 'wooden', name: 'Wooden', tier: 1, speed: 2, color: '#a07a44', durability: 59, bonus: 0 },
+  { id: 'stone', name: 'Stone', tier: 2, speed: 4, color: '#8f8f8f', durability: 131, bonus: 1 },
+  { id: 'iron', name: 'Iron', tier: 3, speed: 6, color: '#d8d8d8', durability: 250, bonus: 2 },
+  { id: 'golden', name: 'Golden', tier: 1, speed: 12, color: '#f5d442', durability: 32, bonus: 0 },
+  { id: 'diamond', name: 'Diamond', tier: 4, speed: 8, color: '#4be3e0', durability: 1561, bonus: 3 },
 ];
+/** Alap támadás-sebzés típusonként (fél szív): a kard a legerősebb */
+const BASE_DAMAGE: Record<ToolType, number> = { sword: 4, axe: 3, pickaxe: 2, shovel: 2 };
 const TOOLS: [ToolType, string][] = [['pickaxe', 'Pickaxe'], ['axe', 'Axe'], ['shovel', 'Shovel'], ['sword', 'Sword']];
 /** TOOL_ID[anyag][típus] */
 export const TOOL_ID: Record<string, Record<ToolType, number>> = {};
@@ -55,7 +72,7 @@ MATERIALS.forEach((m, mi) => {
   TOOLS.forEach(([type, hu], ti) => {
     const id = ITEM_BASE + 20 + mi * 4 + ti;
     TOOL_ID[m.id][type] = id;
-    ITEMS[id] = { name: `${m.name} ${hu}`, tex: `${m.id}_${type}`, stack: 1, tool: { type, tier: m.tier, speed: m.speed }, color: m.color };
+    ITEMS[id] = { name: `${m.name} ${hu}`, tex: `${m.id}_${type}`, stack: 1, tool: { type, tier: m.tier, speed: m.speed, durability: m.durability, damage: BASE_DAMAGE[type] + m.bonus }, color: m.color };
   });
 });
 

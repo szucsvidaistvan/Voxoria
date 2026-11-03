@@ -1,4 +1,4 @@
-/** Életerő: 20 pont = 10 szív (egy szív két pont). Sebzés, gyógyulás, fulladás, égés. */
+/** Életerő: 20 pont = 10 szív (egy szív két pont). Sebzés, gyógyulás, fulladás, égés; éhség (20 pont = 10 húscomb). */
 export interface Env {
   inLava: boolean;
   inFire: boolean;
@@ -18,6 +18,12 @@ export class Health {
   readonly maxAir = MAX_AIR;
   /** ennyi másodpercig ég még a játékos */
   burn = 0;
+  /** éhség 0..20 (10 húscomb); a telítettség és a kimerültség a Minecraftéhoz hasonló rejtett számláló */
+  food = 20;
+  saturation = 5;
+  private exhaustion = 0;
+  private foodT = 0;
+  private starveT = 0;
   dead = false;
   /** a legutóbbi sebzés óta eltelt idő */
   private since = 99;
@@ -34,15 +40,41 @@ export class Health {
     this.hp = this.max;
     this.air = MAX_AIR;
     this.burn = 0;
+    this.food = 20;
+    this.saturation = 5;
+    this.exhaustion = this.foodT = this.starveT = 0;
     this.dead = false;
     this.since = 99;
     this.lavaT = this.fireT = this.burnT = this.drownT = this.regenT = 0;
+  }
+
+  /**
+   * Kimerültség: mozgás, ugrás, bontás, harc növeli. 4 fölött először a telítettségből, majd az éhségből vesz el egy pontot.
+   * Kreatívban nincs éhség.
+   */
+  exhaust(n: number): void {
+    if (this.dead) return;
+    this.exhaustion += n;
+    while (this.exhaustion >= 4) {
+      this.exhaustion -= 4;
+      if (this.saturation > 0) this.saturation = Math.max(0, this.saturation - 1);
+      else this.food = Math.max(0, this.food - 1);
+    }
+  }
+
+  /** Evés: éhség és telítettség visszatöltése. Igaz, ha ettünk (tele éhséggel nem lehet enni). */
+  eat(hunger: number, sat: number): boolean {
+    if (this.dead || this.food >= 20) return false;
+    this.food = Math.min(20, this.food + hunger);
+    this.saturation = Math.min(this.food, this.saturation + sat);
+    return true;
   }
 
   damage(n: number): void {
     if (this.dead || n <= 0) return;
     this.hp = Math.max(0, this.hp - n);
     this.since = 0;
+    this.exhaust(0.1);
     this.onHurt(n);
     if (this.hp <= 0) this.dead = true;
   }
@@ -101,11 +133,22 @@ export class Health {
       this.drownT = 0;
     }
 
-    // természetes gyógyulás: sebzés után 3 mp-cel, 2 másodpercenként egy pont
-    if (this.hp < this.max && this.since >= 3 && this.burn <= 0) {
-      this.regenT += dt;
-      if (this.regenT >= 2) { this.regenT -= 2; this.heal(1); }
-    } else this.regenT = 0;
+    // természetes gyógyulás az éhségtől függ: 18 fölött 4 másodpercenként egy pont; tele éhséggel és telítettséggel gyorsabb;
+    // gyógyuláskor kimerül a játékos. Éhezés (0 éhség): 4 másodpercenként egy pont sebzés, de 1 pont életerőnél megáll.
+    if (this.food >= 18 && this.hp < this.max && this.burn <= 0) {
+      const fast = this.food >= 20 && this.saturation > 0;
+      this.foodT += dt;
+      if (this.foodT >= (fast ? 0.5 : 4)) {
+        this.foodT = 0;
+        this.heal(1);
+        this.exhaust(fast ? 3 : 6);
+      }
+      this.starveT = 0;
+    } else if (this.food <= 0) {
+      this.foodT = 0;
+      this.starveT += dt;
+      if (this.starveT >= 4) { this.starveT = 0; if (this.hp > 1) this.damage(1); }
+    } else this.foodT = this.starveT = 0;
   }
 }
 
@@ -120,6 +163,17 @@ const HEART = [
   '..OXXXO..',
   '...OXO...',
   '....O....',
+];
+const DRUMSTICK = [
+  '.....OOO.',
+  '...OOXXXO',
+  '..OXXHXXO',
+  '..OXXXXXO',
+  '..OXXXXO.',
+  '.OBOXXO..',
+  'OBWBOO...',
+  'OWBO.....',
+  '.OO......',
 ];
 const BUBBLE = [
   '..BBBBB..',
@@ -151,7 +205,7 @@ function sprite(rows: string[], colors: Record<string, string>, fillTo = 9): str
   return c.toDataURL();
 }
 
-export function createVitals(heartsEl: HTMLElement, airEl: HTMLElement) {
+export function createVitals(heartsEl: HTMLElement, airEl: HTMLElement, foodEl: HTMLElement) {
   const heartColors = { O: '#2a0b0b', X: '#e0302a', H: '#ff9a8f', E: '#4b1a1a' };
   const urls = {
     full: sprite(HEART, heartColors),
@@ -160,6 +214,13 @@ export function createVitals(heartsEl: HTMLElement, airEl: HTMLElement) {
     burn: sprite(HEART, { ...heartColors, X: '#f59a1b', H: '#ffe08a' }),
     air: sprite(BUBBLE, { B: '#1d4a8a', W: '#e8f4ff', w: '#8fc4ff', E: '#8fc4ff' }),
   };
+  const meat = { O: '#3a1e0e', X: '#c9702f', H: '#f0a45a', B: '#cfc6b0', W: '#f3efe0', E: '#4a2d17' };
+  const food = {
+    full: sprite(DRUMSTICK, meat),
+    half: sprite(DRUMSTICK, meat, 5),
+    empty: sprite(DRUMSTICK, meat, 0),
+  };
+  const drums: HTMLElement[] = [];
   const hearts: HTMLElement[] = [];
   const bubbles: HTMLElement[] = [];
   for (let i = 0; i < 10; i++) {
@@ -172,16 +233,26 @@ export function createVitals(heartsEl: HTMLElement, airEl: HTMLElement) {
     b.style.backgroundImage = `url(${urls.air})`;
     airEl.appendChild(b);
     bubbles.push(b);
+    const d = document.createElement('span');
+    d.className = 'vital';
+    foodEl.appendChild(d);
+    drums.push(d);
   }
   let last = '';
   return (hp: Health, shake: boolean) => {
-    const sig = `${hp.hp}|${hp.burn > 0}|${Math.ceil((hp.air / hp.maxAir) * 10)}|${shake}`;
+    const sig = `${hp.hp}|${hp.burn > 0}|${Math.ceil((hp.air / hp.maxAir) * 10)}|${shake}|${hp.food}|${hp.saturation > 0}`;
     if (sig === last) return;
     last = sig;
     hearts.forEach((el, i) => {
       const v = hp.hp - i * 2;
       el.style.backgroundImage = `url(${hp.burn > 0 && v > 0 ? urls.burn : v >= 2 ? urls.full : v === 1 ? urls.half : urls.empty})`;
       el.classList.toggle('shake', shake && hp.hp <= 6);
+    });
+    // éhség: a húscombok balról jobbra ürülnek (a jobb szélső tölt utoljára, mint a Minecraftban); a rázkódás jelzi, ha nincs telítettség és éhes a játékos
+    drums.forEach((el, i) => {
+      const v = hp.food - i * 2; // a sor jobbról balra épül (row-reverse), az első húscomb a jobb szélső
+      el.style.backgroundImage = `url(${v >= 2 ? food.full : v === 1 ? food.half : food.empty})`;
+      el.classList.toggle('shake', shake && hp.food <= 6 && hp.saturation <= 0);
     });
     const shown = hp.air < hp.maxAir;
     airEl.hidden = !shown;

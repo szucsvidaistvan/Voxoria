@@ -133,7 +133,7 @@ html, body {
   box-shadow: inset 0 0 0 2px var(--gold);
   pointer-events: none;
 }
-#set-fell {
+#set-fell, #set-mobs {
   width: 100%;
   padding: 0.5rem;
   font: inherit;
@@ -312,8 +312,9 @@ body.touch #touch-actions { display: grid; }
   width: 100%;
   pointer-events: none;
 }
-#hearts, #air { display: flex; gap: 2px; min-height: 22px; }
-#air { margin-left: auto; }
+#hearts, #air, #food { display: flex; gap: 2px; min-height: 22px; }
+#vitals-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+#food { flex-direction: row-reverse; }
 .vital {
   width: 20px;
   height: 20px;
@@ -345,6 +346,10 @@ body.creative #vitals { display: none; }
 @keyframes hurt { 0% { opacity: 1; } 100% { opacity: 0; } }
 #fire-overlay { background: linear-gradient(to top, rgba(255, 120, 0, 0.55), rgba(255, 120, 0, 0) 55%); }
 #fire-overlay.on { opacity: 1; }
+
+/* tartósságcsík a megkopott eszközön */
+.dur { position: absolute; left: 14%; right: 14%; bottom: 7%; height: 4px; background: #000; pointer-events: none; }
+.dur > i { display: block; height: 100%; }
 
 /* a hotbar darabszámai */
 .slot { position: relative; }

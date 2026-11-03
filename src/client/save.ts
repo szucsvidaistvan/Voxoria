@@ -19,6 +19,9 @@ export interface SaveData {
   mode?: 'survival' | 'creative';
   /** életerő, 0..20 */
   hp?: number;
+  /** éhség 0..20 és telítettség (a régi mentésekben nincs: tele) */
+  food?: number;
+  sat?: number;
   /** a tároló: [id, darab, id, darab, ...] 36 helyre */
   inv?: number[];
 }
@@ -28,6 +31,8 @@ export interface Settings {
   sensitivity: number;
   /** fadöntés: ki, a rönkök tárgyként esnek le, vagy blokkként lefekszenek */
   felling: 'off' | 'items' | 'blocks';
+  /** mobok: mind, csak békés (állatok), vagy semmi */
+  mobs: 'on' | 'peaceful' | 'off';
 }
 
 function read<T>(key: string): T | null {

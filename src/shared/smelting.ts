@@ -21,6 +21,11 @@ export function initSmelting(): void {
   add('iron_ore', { id: I.IRON_INGOT, n: 1 });
   add('gold_ore', { id: I.GOLD_INGOT, n: 1 });
   add('coal_ore', { id: I.COAL, n: 1 });
+  // nyers hús: sütés
+  add(I.RAW_BEEF, { id: I.COOKED_BEEF, n: 1 });
+  add(I.RAW_PORK, { id: I.COOKED_PORK, n: 1 });
+  add(I.RAW_CHICKEN, { id: I.COOKED_CHICKEN, n: 1 });
+  add(I.RAW_MUTTON, { id: I.COOKED_MUTTON, n: 1 });
   add('diamond_ore', { id: I.DIAMOND, n: 1 });
   add('sand', blk('glass'));
   add('red_sand', blk('glass'));
