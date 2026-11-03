@@ -1,5 +1,5 @@
 import { BLOCKS, B, FLUID_LAVA, FLUID_WATER, blockId, dynamicBoxes, fluidKind, isOpaque, isSolid } from './blocks';
-import { I } from './items';
+import { EXTRA_ID, I } from './items';
 import { CH, type World } from './world';
 
 /**
@@ -38,8 +38,8 @@ export function mobDrops(kind: MobKind, rand: () => number = Math.random): { id:
   const add = (id: number | undefined, n: number) => { if (id !== undefined && n > 0) out.push({ id, n }); };
   switch (kind) {
     case 'pig': add(I.RAW_PORK, r(1, 3)); break;
-    case 'cow': add(I.RAW_BEEF, r(1, 3)); break;
-    case 'chicken': add(I.RAW_CHICKEN, 1); break;
+    case 'cow': add(I.RAW_BEEF, r(1, 3)); add(EXTRA_ID.leather, r(0, 2)); break;
+    case 'chicken': add(I.RAW_CHICKEN, 1); add(EXTRA_ID.feather, r(0, 2)); break;
     case 'sheep': add(blockId('white_wool'), 1); add(I.RAW_MUTTON, r(1, 2)); break;
     case 'zombie': add(I.ROTTEN_FLESH, r(0, 2)); break;
   }

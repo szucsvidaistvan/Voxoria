@@ -130,3 +130,10 @@ shulker, redstone és a hozzá tartozó mechanikák, stb.); az `scripts/apply-co
 A mobok (malac, tehén, birka, csirke, zombi) általános, folklór- vagy háziállat-alapúak, a modelljeik saját tervek.
 A textúrák: Good Vibes by Acaitart, CC BY 4.0 (lásd `public/textures/CREDITS-GoodVibes.txt`).
 Ez saját besorolás, nem jogi tanács.
+
+### Tárgyak a Good Vibes csomagból
+
+A tárgytextúrák besorolása a `scripts/item-policy.json` fájlban van: `import` (átvéve, `scripts/import-items.mjs`),
+`later` (általános tárgy, de a játék még nem tud vele mit kezdeni: páncél, ajtó, hajó, íj stb.), `remove`
+(Minecraft saját tárgyai: blaze, ender, nether, redstone, bájitalok, lemezek, totem stb.). A csomag
+`biomesoplenty/` része egy mod saját tartalma, ezt nem használjuk.

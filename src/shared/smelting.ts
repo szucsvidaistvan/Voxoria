@@ -1,5 +1,5 @@
 import { B, BLOCKS, blockId, blockKey } from './blocks';
-import { I, maxStack } from './items';
+import { EXTRA_ID as X, I, maxStack } from './items';
 import type { Stack } from './recipes';
 
 /** Ennyi másodpercig tart egy tárgy megolvasztása */
@@ -26,6 +26,11 @@ export function initSmelting(): void {
   add(I.RAW_PORK, { id: I.COOKED_PORK, n: 1 });
   add(I.RAW_CHICKEN, { id: I.COOKED_CHICKEN, n: 1 });
   add(I.RAW_MUTTON, { id: I.COOKED_MUTTON, n: 1 });
+  add(X.cod, { id: X.cooked_cod, n: 1 });
+  add(X.salmon, { id: X.cooked_salmon, n: 1 });
+  add(X.rabbit, { id: X.cooked_rabbit, n: 1 });
+  add(X.potato, { id: X.baked_potato, n: 1 });
+  add(X.clay_ball, { id: X.brick, n: 1 });
   add('diamond_ore', { id: I.DIAMOND, n: 1 });
   add('sand', blk('glass'));
   add('red_sand', blk('glass'));

@@ -53,6 +53,32 @@ export const ITEMS: Record<number, ItemDef> = {
   [I.FLINT_AND_STEEL]: { name: 'Flint and Steel', tex: 'flint_and_steel', stack: 1, color: '#777b88' },
 };
 
+// A Good Vibes csomagból átvett általános tárgyak (a lista a scripts/item-policy.json "import" részéből jön).
+// [kulcs, név, étel: éhség/telítettség, halmaz]
+const EXTRA: [string, string, [number, number]?, number?][] = [
+  ['bread', 'Bread', [5, 6]], ['cookie', 'Cookie', [2, 0.4]], ['baked_potato', 'Baked Potato', [5, 6]], ['potato', 'Potato', [1, 0.6]],
+  ['carrot', 'Carrot', [3, 3.6]], ['cod', 'Raw Cod', [2, 0.4]], ['cooked_cod', 'Cooked Cod', [5, 6]], ['salmon', 'Raw Salmon', [2, 0.4]],
+  ['cooked_salmon', 'Cooked Salmon', [6, 9.6]], ['rabbit', 'Raw Rabbit', [3, 1.8]], ['cooked_rabbit', 'Cooked Rabbit', [5, 6]],
+  ['melon_slice', 'Melon Slice', [2, 1.2]], ['pumpkin_pie', 'Pumpkin Pie', [8, 4.8]], ['mushroom_stew', 'Mushroom Stew', [6, 7.2], 1],
+  ['beetroot', 'Beetroot', [1, 1.2]], ['beetroot_soup', 'Beetroot Soup', [6, 7.2], 1],
+  ['leather', 'Leather'], ['feather', 'Feather'], ['bone', 'Bone'], ['bone_meal', 'Bone Meal'], ['paper', 'Paper'], ['book', 'Book'],
+  ['string', 'String'], ['sugar', 'Sugar'], ['clay_ball', 'Clay Ball'], ['brick', 'Brick'], ['iron_nugget', 'Iron Nugget'],
+  ['gold_nugget', 'Gold Nugget'], ['lapis_lazuli', 'Lapis Lazuli'], ['emerald', 'Emerald'], ['quartz', 'Quartz'], ['wheat', 'Wheat'],
+  ['wheat_seeds', 'Wheat Seeds'], ['melon_seeds', 'Melon Seeds'], ['pumpkin_seeds', 'Pumpkin Seeds'], ['beetroot_seeds', 'Beetroot Seeds'],
+  ['egg', 'Egg', undefined, 16], ['bowl', 'Bowl'], ['glass_bottle', 'Glass Bottle'], ['snowball', 'Snowball', undefined, 16],
+  ['cocoa_beans', 'Cocoa Beans'], ['sugar_cane', 'Sugar Cane'], ['milk_bucket', 'Milk Bucket', undefined, 1],
+  ['cyan_dye', 'Cyan Dye'], ['gray_dye', 'Gray Dye'], ['light_blue_dye', 'Light Blue Dye'], ['light_gray_dye', 'Light Gray Dye'],
+  ['lime_dye', 'Lime Dye'], ['magenta_dye', 'Magenta Dye'], ['orange_dye', 'Orange Dye'], ['pink_dye', 'Pink Dye'],
+  ['purple_dye', 'Purple Dye'], ['rose_red', 'Red Dye'], ['dandelion_yellow', 'Yellow Dye'], ['cactus_green', 'Green Dye'],
+];
+/** EXTRA_ID[kulcs]: a tárgy azonosítója (ITEM_BASE + 100-tól, a fenti sorrendben) */
+export const EXTRA_ID: Record<string, number> = {};
+EXTRA.forEach(([key, name, food, stack], i) => {
+  const id = ITEM_BASE + 100 + i;
+  EXTRA_ID[key] = id;
+  ITEMS[id] = { name, tex: key, stack: stack ?? 64, ...(food ? { food: { hunger: food[0], sat: food[1] } } : {}), color: '#a0a0a0' };
+});
+
 // eszközök: 5 anyag x 4 típus
 const MATERIALS = [
   // durability: ennyi használat után törik el; bonus: a támadás sebzéséhez adódik
