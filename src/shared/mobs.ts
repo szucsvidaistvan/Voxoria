@@ -7,7 +7,7 @@ import { CH, type World } from './world';
  * A megjelenítés a client/mobview.ts-ben van.
  */
 
-export type MobKind = 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie';
+export type MobKind = 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'skeleton';
 
 export interface MobDef {
   name: string;
@@ -27,6 +27,7 @@ export const MOB_DEFS: Record<MobKind, MobDef> = {
   sheep: { name: 'Sheep', hostile: false, hp: 8, speed: 1.5, hw: 0.4, h: 1.3 },
   chicken: { name: 'Chicken', hostile: false, hp: 4, speed: 1.4, hw: 0.2, h: 0.7 },
   zombie: { name: 'Zombie', hostile: true, hp: 20, speed: 2.6, hw: 0.3, h: 1.95 },
+  skeleton: { name: 'Skeleton', hostile: true, hp: 20, speed: 2.2, hw: 0.3, h: 1.95 },
 };
 
 export const PASSIVE_KINDS: MobKind[] = ['pig', 'cow', 'sheep', 'chicken'];
@@ -42,6 +43,7 @@ export function mobDrops(kind: MobKind, rand: () => number = Math.random): { id:
     case 'chicken': add(I.RAW_CHICKEN, 1); add(EXTRA_ID.feather, r(0, 2)); break;
     case 'sheep': add(blockId('white_wool'), 1); add(I.RAW_MUTTON, r(1, 2)); break;
     case 'zombie': add(I.ROTTEN_FLESH, r(0, 2)); break;
+    case 'skeleton': add(EXTRA_ID.bone, r(0, 2)); break;
   }
   return out;
 }
@@ -188,6 +190,16 @@ export interface MobCtx {
 const lookAt = (m: Mob, tx: number, tz: number) => { m.yaw = Math.atan2(-(tx - m.x), -(tz - m.z)); };
 const forward = (yaw: number): [number, number] => [-Math.sin(yaw), -Math.cos(yaw)];
 
+/** Van-e szabad rálátás a két pont között (nincs átlátszatlan blokk az úton)? */
+function clearShot(world: World, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number): boolean {
+  const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0, z1 - z0) * 2);
+  for (let i = 1; i < n; i++) {
+    const t = i / n;
+    if (isOpaque(world.getBlock(Math.floor(x0 + (x1 - x0) * t), Math.floor(y0 + (y1 - y0) * t), Math.floor(z0 + (z1 - z0) * t)))) return false;
+  }
+  return true;
+}
+
 function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx): void {
   const priv = m;
   const def = m.def;
@@ -200,10 +212,19 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx): void {
   if (def.hostile && ctx.target && dist < 24 && Math.abs(dy) < 12) {
     // üldözés
     lookAt(m, ctx.px, ctx.pz);
-    speed = dist > 0.9 ? def.speed : 0;
-    if (dist < 1.4 && Math.abs(dy) < 1.8 && priv.atkCd <= 0) {
-      priv.atkCd = 1;
-      ctx.hurtPlayer(3, m.x, m.z);
+    if (m.kind === 'skeleton') {
+      // a csontváz távolról lő: 7 blokknál közelebb megáll, 14 blokkon belül, szabad rálátással kétmásodpercenként lő
+      speed = dist > 7 ? def.speed : 0;
+      if (dist < 14 && priv.atkCd <= 0 && clearShot(world, m.x, m.y + 1.5, m.z, ctx.px, ctx.py + 1.5, ctx.pz)) {
+        priv.atkCd = 2;
+        if (Math.random() < 0.65) ctx.hurtPlayer(2, m.x, m.z);
+      }
+    } else {
+      speed = dist > 0.9 ? def.speed : 0;
+      if (dist < 1.4 && Math.abs(dy) < 1.8 && priv.atkCd <= 0) {
+        priv.atkCd = 1;
+        ctx.hurtPlayer(3, m.x, m.z);
+      }
     }
   } else {
     if (priv.panicT > 0) {
@@ -295,7 +316,7 @@ export class MobManager {
         }
       }
       // a zombi napfényben ég
-      if (m.kind === 'zombie' && ctx.day && m.exposed && !m.inWater) {
+      if ((m.kind === 'zombie' || m.kind === 'skeleton') && ctx.day && m.exposed && !m.inWater) {
         priv.burnT += dt;
         if (priv.burnT >= 1) { priv.burnT -= 1; m.hp -= 2; m.hurtT = 0.3; }
       }
@@ -316,7 +337,7 @@ export class MobManager {
 
     if (passiveN < MOB_CAP_PASSIVE) this.trySpawn(px, pz, PASSIVE_KINDS[Math.floor(Math.random() * PASSIVE_KINDS.length)], 20, 44, 'surface');
     if (hostileAllowed && this.count(true) < MOB_CAP_HOSTILE) {
-      const kind: MobKind = 'zombie';
+      const kind: MobKind = Math.random() < 0.6 ? 'zombie' : 'skeleton';
       if (night) this.trySpawn(px, pz, kind, 18, 40, 'surface');
       else if (Math.random() < 0.35) this.trySpawn(px, pz, kind, 14, 30, 'cave'); // barlangokban nappal is
     }

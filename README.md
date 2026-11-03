@@ -59,6 +59,7 @@ A korábbi, saját textúralapokból kivágott textúrákat a `scripts/slice-tex
 | Bontás / építés | bal / jobb egérgomb | Bont / Épít gomb |
 | Kiválasztás a sávban | 1–9, görgő | koppintás a hotbaron |
 | Inventory (kreatívban blokklista) | E | Tárgyak gomb |
+| Nézet váltása (első / harmadik személy) | V | – |
 | Menü | Esc | Menü gomb |
 
 ## Telefon
@@ -137,3 +138,11 @@ A tárgytextúrák besorolása a `scripts/item-policy.json` fájlban van: `impor
 `later` (általános tárgy, de a játék még nem tud vele mit kezdeni: páncél, ajtó, hajó, íj stb.), `remove`
 (Minecraft saját tárgyai: blaze, ender, nether, redstone, bájitalok, lemezek, totem stb.). A csomag
 `biomesoplenty/` része egy mod saját tartalma, ezt nem használjuk.
+
+### Lények és a játékos modellje
+
+A háziállatok (malac, tehén, birka, csirke) a Good Vibes csomag lény-skinjeivel (`public/textures/entity/`) vannak textúrázva.
+A modellek adata a `src/client/mobmodels.ts` fájlban van (a dobozok pixelmérete, helye és a képen lévő részük), a dobozok
+UV-kiosztását a `src/client/boxuv.ts` végzi. A zombi saját tervű, színes dobozokból áll; a csontváz (távolról lő, nappal ég, csontot ejt) a csomag skeleton skinjét használja.
+A játékos modellje: az `entity/player.png` a projekt tulajdonosa által megadott skin (nem a Minecraft Steve/Alex karaktere); játék közben a **V** billentyűvel
+látható (harmadik személyű nézet), és a későbbi co-op társak megjelenítésére is ez szolgál.

@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 import type { Mob, MobKind } from '../shared/mobs';
+import { TEXTURED, partGeom, type TexName } from './mobmodels';
 
 /**
- * A mobok megjelenítése: színes dobozokból épített modellek (a textúracsomagban nincsenek lényekhez képek),
+ * A mobok megjelenítése: a háziállatok a Good Vibes csomag lény-skinjeivel textúrázott dobozmodellek (mobmodels.ts),
+ * a zombi színes dobozokból épített saját terv,
  * járás-animációval, sebzés-villanással, és a halál utáni eldőléssel.
  * A koordináták a lábak alatti ponttól számítanak; az előre a −z irány (a mob yaw szögével forgatva).
  */
@@ -42,58 +44,8 @@ function boxGeo(s: V3, c: string): THREE.BufferGeometry {
   return g;
 }
 
-const eyes = (y: number, z: number, dx = 0.12, size = 0.07, c = '#141414'): Part[] => [
-  { s: [size, size, 0.02], p: [-dx, y, z], c },
-  { s: [size, size, 0.02], p: [dx, y, z], c },
-];
-/** négy láb: az első pár (z < 0) és a hátsó; átlósan lendülnek */
-const quadLegs = (x: number, zFront: number, zBack: number, h: number, w: number, c: string): Part[] => [
-  { s: [w, h, w], p: [-x, h / 2, zFront], pivot: [-x, h, zFront], c, swing: 1 },
-  { s: [w, h, w], p: [x, h / 2, zFront], pivot: [x, h, zFront], c, swing: -1 },
-  { s: [w, h, w], p: [-x, h / 2, zBack], pivot: [-x, h, zBack], c, swing: -1 },
-  { s: [w, h, w], p: [x, h / 2, zBack], pivot: [x, h, zBack], c, swing: 1 },
-];
-
-const MODELS: Record<MobKind, Part[]> = {
-  pig: [
-    { s: [0.62, 0.5, 0.9], p: [0, 0.62, 0.05], c: '#eea0a8' },
-    { s: [0.5, 0.45, 0.45], p: [0, 0.7, -0.6], c: '#eea0a8' },
-    { s: [0.26, 0.18, 0.12], p: [0, 0.62, -0.87], c: '#f6bcc2' },
-    { s: [0.05, 0.06, 0.02], p: [-0.06, 0.62, -0.93], c: '#8a4a52' },
-    { s: [0.05, 0.06, 0.02], p: [0.06, 0.62, -0.93], c: '#8a4a52' },
-    ...eyes(0.77, -0.835, 0.16),
-    ...quadLegs(0.19, -0.3, 0.38, 0.38, 0.2, '#dc8d96'),
-  ],
-  cow: [
-    { s: [0.7, 0.6, 1.1], p: [0, 0.97, 0.1], c: '#4a3322' },
-    { s: [0.704, 0.3, 0.4], p: [0, 1.0, 0.22], c: '#e9e6df' },
-    { s: [0.2, 0.604, 0.3], p: [0.2, 0.97, -0.3], c: '#e9e6df' },
-    { s: [0.5, 0.5, 0.45], p: [0, 1.27, -0.75], c: '#4a3322' },
-    { s: [0.32, 0.2, 0.1], p: [0, 1.15, -1.0], c: '#cdb89c' },
-    { s: [0.08, 0.14, 0.08], p: [-0.28, 1.56, -0.72], c: '#e8dcc0' },
-    { s: [0.08, 0.14, 0.08], p: [0.28, 1.56, -0.72], c: '#e8dcc0' },
-    ...eyes(1.33, -0.975, 0.17),
-    ...quadLegs(0.22, -0.4, 0.62, 0.67, 0.22, '#3a2818'),
-  ],
-  sheep: [
-    { s: [0.8, 0.7, 1.0], p: [0, 0.92, 0.1], c: '#f0eee8' },
-    { s: [0.4, 0.42, 0.42], p: [0, 1.06, -0.68], c: '#b8a88f' },
-    { s: [0.46, 0.14, 0.46], p: [0, 1.32, -0.62], c: '#f0eee8' },
-    ...eyes(1.1, -0.895, 0.1, 0.06),
-    ...quadLegs(0.22, -0.32, 0.5, 0.57, 0.2, '#8a7a68'),
-  ],
-  chicken: [
-    { s: [0.32, 0.3, 0.42], p: [0, 0.4, 0.02], c: '#f2f2ee' },
-    { s: [0.2, 0.24, 0.2], p: [0, 0.63, -0.22], c: '#f2f2ee' },
-    { s: [0.1, 0.07, 0.1], p: [0, 0.6, -0.36], c: '#e8b030' },
-    { s: [0.06, 0.1, 0.12], p: [0, 0.79, -0.24], c: '#d03030' },
-    { s: [0.04, 0.07, 0.04], p: [0, 0.52, -0.34], c: '#d03030' },
-    ...eyes(0.66, -0.325, 0.07, 0.04),
-    { s: [0.05, 0.25, 0.05], p: [-0.08, 0.125, 0.02], pivot: [-0.08, 0.25, 0.02], c: '#e8b030', swing: 1 },
-    { s: [0.05, 0.25, 0.05], p: [0.08, 0.125, 0.02], pivot: [0.08, 0.25, 0.02], c: '#e8b030', swing: -1 },
-    { s: [0.05, 0.2, 0.3], p: [-0.19, 0.42, 0.02], pivot: [-0.19, 0.52, 0.02], c: '#e4e4de', flap: 1 },
-    { s: [0.05, 0.2, 0.3], p: [0.19, 0.42, 0.02], pivot: [0.19, 0.52, 0.02], c: '#e4e4de', flap: -1 },
-  ],
+/** A színes dobozokból épített modellek (a textúrázottak a mobmodels.ts-ben vannak) */
+const MODELS: Partial<Record<MobKind, Part[]>> = {
   // egy görnyedt, hosszú karú, rongyokba burkolt kísértet (saját terv, nem a kockajátékok megszokott zombija)
   zombie: [
     { s: [0.2, 0.7, 0.22], p: [-0.12, 0.35, 0], pivot: [-0.12, 0.7, 0], c: '#4a4238', swing: 1 },
@@ -113,38 +65,90 @@ const MODELS: Record<MobKind, Part[]> = {
 
 interface View {
   root: THREE.Group;
-  mat: THREE.MeshBasicMaterial;
+  /** a lény anyagai (a textúrázottak textúránként egy; a színes részeké `plain`); mind kapja a napszak-színezést */
+  mats: THREE.MeshBasicMaterial[];
   limbs: { g: THREE.Group; swing: number; tilt: number; flap: number }[];
 }
 
-export function createMobView(scene: THREE.Scene) {
-  const views = new Map<number, View>();
+/** A lény-skinek betöltése (közös, egyszer) */
+const skins = new Map<TexName, THREE.Texture>();
+function skin(base: string, name: TexName): THREE.Texture {
+  let t = skins.get(name);
+  if (!t) {
+    t = new THREE.TextureLoader().load(`${base}textures/entity/${name}.png`);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    skins.set(name, t);
+  }
+  return t;
+}
 
-  const build = (kind: MobKind): View => {
+/** Egy textúrázott rész BufferGeometry-je: a v tengely a three flipY-os textúrájához megfordítva */
+function texturedGeo(part: Parameters<typeof partGeom>[0]): THREE.BufferGeometry {
+  const g = partGeom(part);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(g.pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(g.uv.map((x, i) => (i % 2 ? 1 - x : x)), 2));
+  const col: number[] = [];
+  for (const sh of g.shade) col.push(sh, sh, sh);
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.setIndex(g.index);
+  return geo;
+}
+
+function buildView(kind: string, scene: THREE.Scene, base: string): View {
+  {
     const root = new THREE.Group();
-    const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
+    const mats: THREE.MeshBasicMaterial[] = [];
     const limbs: View['limbs'] = [];
-    for (const part of MODELS[kind]) {
-      const mesh = new THREE.Mesh(boxGeo(part.s, part.c), mat);
+    const matFor = new Map<string, THREE.MeshBasicMaterial>();
+    const material = (tex?: TexName): THREE.MeshBasicMaterial => {
+      const key = tex ?? 'plain';
+      let m = matFor.get(key);
+      if (!m) {
+        // a gyapjú és a lábak áttetsző pixeleket tartalmaznak: alphaTest
+        m = new THREE.MeshBasicMaterial(tex ? { vertexColors: true, map: skin(base, tex), alphaTest: 0.5 } : { vertexColors: true });
+        matFor.set(key, m); mats.push(m);
+      }
+      return m;
+    };
+    /** a rész a (pivot) csomóponton lóg, a doboz a közepénél van */
+    const attach = (mesh: THREE.Mesh, p: V3, pivot: V3 | undefined, tilt: number | undefined, swing: number | undefined, flap: number | undefined) => {
       mesh.frustumCulled = false;
-      if (part.pivot || part.tilt) {
-        const pv = part.pivot ?? part.p;
+      if (pivot || tilt) {
+        const pv = pivot ?? p;
         const g = new THREE.Group();
         g.position.set(...pv);
-        mesh.position.set(part.p[0] - pv[0], part.p[1] - pv[1], part.p[2] - pv[2]);
+        mesh.position.set(p[0] - pv[0], p[1] - pv[1], p[2] - pv[2]);
         g.add(mesh);
         root.add(g);
-        if (part.swing !== undefined || part.flap !== undefined || part.tilt) {
-          limbs.push({ g, swing: part.swing ?? 0, tilt: part.tilt ?? 0, flap: part.flap ?? 0 });
-        }
+        if (swing !== undefined || flap !== undefined || tilt) limbs.push({ g, swing: swing ?? 0, tilt: tilt ?? 0, flap: flap ?? 0 });
       } else {
-        mesh.position.set(...part.p);
+        mesh.position.set(...p);
         root.add(mesh);
+      }
+    };
+    const textured = TEXTURED[kind];
+    if (textured) {
+      const k = 1 / 16;
+      for (const part of textured) {
+        const mesh = new THREE.Mesh(texturedGeo(part), material(part.tex));
+        attach(mesh, part.p.map((x) => x * k) as V3, part.pivot?.map((x) => x * k) as V3 | undefined, part.tilt, part.swing, part.flap);
+      }
+    } else {
+      for (const part of MODELS[kind as MobKind] ?? []) {
+        attach(new THREE.Mesh(boxGeo(part.s, part.c), material()), part.p, part.pivot, part.tilt, part.swing, part.flap);
       }
     }
     scene.add(root);
-    return { root, mat, limbs };
-  };
+    return { root, mats, limbs };
+  }
+}
+
+export function createMobView(scene: THREE.Scene, base: string = import.meta.env.BASE_URL) {
+  const views = new Map<number, View>();
+  const build = (kind: MobKind): View => buildView(kind, scene, base);
 
   return {
     /**
@@ -179,18 +183,43 @@ export function createMobView(scene: THREE.Scene) {
         const base = m.exposed ? 1 : 0.55;
         let r = Math.max(light[0] * base, 0.3), g = Math.max(light[1] * base, 0.3), b = Math.max(light[2] * base, 0.34);
         if (m.hurtT > 0 || m.dead) { g *= 0.4; b *= 0.4; r = Math.min(1.2, r * 1.3 + 0.1); }
-        v.mat.color.setRGB(r, g, b);
+        for (const mt of v.mats) mt.color.setRGB(r, g, b);
       }
       for (const [id, v] of views) {
         if (alive.has(id)) continue;
         scene.remove(v.root);
-        v.mat.dispose();
+        for (const mt of v.mats) mt.dispose();
         views.delete(id);
       }
     },
     clear(): void {
-      for (const v of views.values()) { scene.remove(v.root); v.mat.dispose(); }
+      for (const v of views.values()) { scene.remove(v.root); for (const mt of v.mats) mt.dispose(); }
       views.clear();
     },
+  };
+}
+
+/**
+ * A játékos modellje (saját terv, public/textures/entity/player.png): a kamera mögötti nézethez és a későbbi társakhoz.
+ * `set` állítja a helyét, az irányát és a járás-animációt.
+ */
+export function createPlayerView(scene: THREE.Scene, base: string = import.meta.env.BASE_URL) {
+  const v = buildView('player', scene, base);
+  v.root.visible = false;
+  return {
+    get visible() { return v.root.visible; },
+    set visible(on: boolean) { v.root.visible = on; },
+    /**
+     * @param walk a megtett út fázisa (nő járás közben), @param speed 0..1 a járás üteme, @param light a napszak színe (RGB)
+     * @param sneak lehajolás nincs, a paraméter a későbbi bővítésé
+     */
+    set(x: number, y: number, z: number, yaw: number, walk: number, speed: number, light: [number, number, number]): void {
+      v.root.position.set(x, y, z);
+      v.root.rotation.y = yaw;
+      const sw = Math.sin(walk * 3.2) * 0.85 * Math.min(1, speed);
+      for (const l of v.limbs) l.g.rotation.x = l.tilt + sw * l.swing;
+      for (const mt of v.mats) mt.color.setRGB(Math.max(light[0], 0.35), Math.max(light[1], 0.35), Math.max(light[2], 0.4));
+    },
+    dispose(): void { scene.remove(v.root); for (const mt of v.mats) mt.dispose(); },
   };
 }
