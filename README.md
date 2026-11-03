@@ -2,7 +2,7 @@
 
 A játék felülete, a blokkok és a tárgyak nevei angolul vannak; ez a README magyarul.
 
-Böngészős, Minecraft-szerű kockajáték. Gépen és telefonon is fut, később közös (co-op) játékkal.
+Böngészős kockajáték (voxel sandbox). Gépen és telefonon is fut, később közös (co-op) játékkal.
 
 **Technológia:** TypeScript, Three.js, Vite.
 
@@ -120,3 +120,13 @@ A világ állapota és a megjelenítés külön van választva. Ez teszi lehető
 - [ ] Mentés IndexedDB-be (nagy világokhoz)
 - [ ] Szerver (Node.js + WebSocket), közös világ
 - [ ] RPG-rendszerek (karakter, küldetések, NPC-k)
+
+## Tartalmi szabályok (szerzői jog / védjegy)
+
+A játék nem használ olyan elemeket, amelyek egy másik játék saját, kitalált tartalmának számítanak.
+A `scripts/content-policy.json` sorolja fel a kiszűrt blokkcsaládokat (Nether, End, purpur, prismarine,
+shulker, redstone és a hozzá tartozó mechanikák, stb.); az `scripts/apply-content-policy.mjs` alkalmazza őket,
+és a `build-blocks.mjs` is meghívja, így a blokklista újragenerálása sem hozza vissza őket.
+A mobok (malac, tehén, birka, csirke, zombi) általános, folklór- vagy háziállat-alapúak, a modelljeik saját tervek.
+A textúrák: Good Vibes by Acaitart, CC BY 4.0 (lásd `public/textures/CREDITS-GoodVibes.txt`).
+Ez saját besorolás, nem jogi tanács.

@@ -33,8 +33,8 @@ export function breakRule(id: number): BreakRule {
   if (/leaves$/.test(key)) return { hardness: 0.2, tool: null, tier: 0 };
   if (/glass|ice$/.test(key)) return { hardness: 0.3, tool: null, tier: 0 };
   if (/wool$|^hay_block$/.test(key)) return { hardness: 0.8, tool: null, tier: 0 };
-  if (/stone|cobble|brick|stairs|slab|wall|terracotta|concrete|prismarine|andesite|diorite|granite|netherrack|quartz|purpur|magma|basalt|deepslate|tuff|blackstone|furnace|lantern|iron_bars/.test(key)) {
-    return { hardness: /^netherrack$/.test(key) ? 0.4 : 1.5, tool: 'pickaxe', tier: 1 };
+  if (/stone|cobble|brick|stairs|slab|wall|terracotta|concrete|andesite|diorite|granite|quartz|magma|basalt|deepslate|tuff|blackstone|furnace|lantern|iron_bars/.test(key)) {
+    return { hardness: 1.5, tool: 'pickaxe', tier: 1 };
   }
   return { hardness: 1, tool: null, tier: 0 };
 }

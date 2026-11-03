@@ -163,7 +163,7 @@ export const LIGHT = new Uint8Array(MAX_BLOCK_ID + 1);
 export const lightOf = (id: number): number => LIGHT[id];
 /** Ezek a generált blokkok világítanak (kulcs: Minecraft-név, érték: fényerő) */
 const EMITTERS: Record<string, number> = {
-  glowstone: 15, sea_lantern: 15, jack_o_lantern: 15, magma: 3, torch: 14, redstone_torch: 7,
+  jack_o_lantern: 15, magma: 3, torch: 14,
 };
 /** Újraszámolja a LIGHT táblát. A blokkok regisztrálása után kell hívni. */
 export function refreshLight(): void {
@@ -339,7 +339,7 @@ function shapeDef(b: GeneratedBlock, dir: number, flip: number): BlockDef {
 }
 
 /** Ezeknek a fáklyáknak van fali változata */
-const TORCHES = new Set(['torch', 'redstone_torch']);
+const TORCHES = new Set(['torch']);
 /** A fali fáklya modellje a nyugati falra (x = 0) van rajzolva, ez a `wall` iránya */
 const WALL_TORCH_SIDE = 2;
 
