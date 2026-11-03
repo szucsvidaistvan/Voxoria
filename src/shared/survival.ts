@@ -39,8 +39,9 @@ export function breakRule(id: number): BreakRule {
   return { hardness: 1, tool: null, tier: 0 };
 }
 
-/** Meddig tart a blokk bontása a kézben tartott dologgal (másodperc). Infinity: nem bontható. */
-export function breakTime(id: number, held: number | undefined): number {
+/** Meddig tart a blokk bontása a kézben tartott dologgal (másodperc). Infinity: nem bontható.
+ * @param underLog fa gyökerei alatt van-e (közvetlenül fölötte rönk): ott a föld kézzel sokkal nehezebben jön ki */
+export function breakTime(id: number, held: number | undefined, underLog = false): number {
   const r = breakRule(id);
   if (!isFinite(r.hardness)) return Infinity;
   if (r.hardness <= 0) return 0;
@@ -48,7 +49,13 @@ export function breakTime(id: number, held: number | undefined): number {
   const matches = !!r.tool && !!tool && tool.type === r.tool;
   const speed = matches ? tool!.speed : 1;
   const can = !r.tool || r.tier === 0 || (matches && tool!.tier >= r.tier);
-  return (r.hardness * (can ? 1.5 : 5)) / speed;
+  let t = (r.hardness * (can ? 1.5 : 5)) / speed;
+  const key = blockKey(id);
+  // a fát kézzel (vagy nem baltával) is ki lehet ütni, de sokkal tovább tart
+  if (/(_log|_wood)$/.test(key) && !(matches && tool!.type === 'axe')) t *= 4;
+  // a fa gyökerei közt a talajt kézzel (ásó nélkül) nehéz kiszedni
+  if (underLog && SOFT.test(key) && !(matches && tool!.type === 'shovel')) t *= 4;
+  return t;
 }
 
 /** Mit ad a blokk, ha a kézben lévő dologgal bontják? null: semmit. */
