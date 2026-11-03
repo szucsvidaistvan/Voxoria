@@ -5,7 +5,7 @@ import {
   registerGenerated, type GeneratedPack, type RGB,
 } from '../shared/blocks';
 import { FluidSim, isReplaceable } from '../shared/fluids';
-import { I, ITEMS, isItem, itemName } from '../shared/items';
+import { I, ITEMS, isItem, itemName, toolOf } from '../shared/items';
 import { CATEGORIES, categoryOf } from '../shared/categories';
 import { initRecipes } from '../shared/recipes';
 import { Furnace, initSmelting } from '../shared/smelting';
@@ -17,6 +17,8 @@ import { CH, CS, SEA_LEVEL, World } from '../shared/world';
 import { buildAtlas, TILE } from './atlas';
 import { DAY_SECONDS, START_TIME, formatClock, skyAt } from './daynight';
 import { createMoonTexture, createSunTexture } from './sky';
+import { createFelling } from './felling';
+import { fallDirection, findTree, isLogBlock, landingCell } from '../shared/tree';
 import { BagUI, HOTBAR_SIZE, Inventory, SlotView, createItemPainter } from './inventory';
 import { Health, createVitals } from './health';
 import { createCracks, createDrops, createParticles } from './effects';
@@ -137,7 +139,7 @@ async function main(): Promise<void> {
   const inv = new Inventory();
   const input = new Input(canvas, HOTBAR_SIZE);
   if (input.touch) document.body.classList.add('touch');
-  const settings = loadSettings({ renderDistance: input.touch ? 4 : 6, sensitivity: 1 });
+  const settings = loadSettings({ renderDistance: input.touch ? 4 : 6, sensitivity: 1, felling: 'items' });
 
   let fogFar = 100;
   const applySettings = () => {
@@ -342,6 +344,7 @@ async function main(): Promise<void> {
   const paintStack = (c: HTMLCanvasElement, id: number) => (isItem(id) ? itemPainter(c, id) : drawIcon(c, id));
 
   const drops = createDrops(scene, atlas, material, paintStack);
+  const fell = createFelling(scene, atlas, material);
   const hotbarEl = $('hotbar');
   const hotViews: SlotView[] = [];
   const held = () => inv.slots[input.hotbar];
@@ -412,7 +415,9 @@ async function main(): Promise<void> {
     } catch { /* nem támogatott */ }
   };
   $('rotate-ok').addEventListener('click', () => document.body.classList.add('allow-portrait'));
+  const dropFocus = () => (document.activeElement as HTMLElement | null)?.blur?.();
   const play = () => {
+    dropFocus();
     tryLandscape();
     state = 'playing';
     menu.hidden = true;
@@ -549,6 +554,7 @@ async function main(): Promise<void> {
     invEl.hidden = true;
     invSearch.blur();
     bag.close();
+    dropFocus();
     state = 'playing';
     input.reset();
     input.enabled = true;
@@ -602,6 +608,10 @@ async function main(): Promise<void> {
     play();
   });
 
+  // a menüben az Enter folytatja a játékot (az Esc nem tudja visszaadni az egeret, az Enter igen: az már felhasználói gesztus)
+  document.addEventListener('keydown', (e) => {
+    if (state === 'menu' && e.code === 'Enter' && !btnContinue.hidden && document.activeElement?.tagName !== 'BUTTON') btnContinue.click();
+  });
   btnContinue.addEventListener('click', () => {
     if (!started) {
       const save = loadSave();
@@ -631,6 +641,13 @@ async function main(): Promise<void> {
     applySettings();
     writeSettings(settings);
   });
+  const fellEl = $<HTMLSelectElement>('set-fell');
+  fellEl.value = settings.felling;
+  fellEl.addEventListener('change', () => {
+    settings.felling = fellEl.value as typeof settings.felling;
+    writeSettings(settings);
+    fellEl.blur();
+  });
   sensEl.addEventListener('input', () => {
     settings.sensitivity = Number(sensEl.value);
     applySettings();
@@ -659,6 +676,7 @@ async function main(): Promise<void> {
   let frame = 0;
   let simAcc = 0;
   const clockEl = $('clock');
+  const resumeEl = $('resume-hint');
   let clockText = '';
 
   // ---------- blokkok bontása, lerakása, tárgyak használata ----------
@@ -686,7 +704,44 @@ async function main(): Promise<void> {
     if (d) drops.spawn(d.id, d.n, x + 0.5, y + 0.5, z + 0.5);
   };
 
+  /**
+   * Fadöntés: ha egy természetes fa rönkjét baltával bontják, a rönk és a fölötte lévő rész (ágak, lomb) kikerül a
+   * világból, a töve körül ledől a játékostól elfelé, és a becsapódáskor tárgyakat ad vagy blokkokként lefekszik.
+   */
+  const tryFell = (x: number, y: number, z: number): boolean => {
+    if (settings.felling === 'off' || !isLogBlock(world.getBlock(x, y, z))) return false;
+    if (toolOf(held()?.id)?.type !== 'axe') return false;
+    const tree = findTree(world, x, y, z);
+    if (!tree) return false;
+    const base = { x, y, z };
+    const dir = fallDirection(x, z, player.pos.x, player.pos.z);
+    const cells = [...tree.logs, ...tree.leaves];
+    for (const c of cells) setBlockAt(c.x, c.y, c.z, AIR);
+    particles.burst(x, y, z, tree.logs[0].id);
+    flushDirty(9);
+    const asBlocks = settings.felling === 'blocks';
+    fell.start(cells, base, dir, () => {
+      for (const c of tree.logs) {
+        const at = landingCell(world, base, dir, c);
+        const [lx, ly, lz] = at ?? [c.x, c.y, c.z];
+        if (at) particles.burst(lx, ly, lz, c.id);
+        // blokkként: a lefektetett rönk a helyén marad (ha nem a játékos testébe esne), különben tárgy lesz belőle
+        if (asBlocks && at && !player.intersectsBlock(lx, ly, lz)) setBlockAt(lx, ly, lz, c.id);
+        else if (mode === 'survival') giveDrop(c.id, lx, ly, lz);
+      }
+      if (mode === 'survival') {
+        for (const c of tree.leaves) {
+          const at = landingCell(world, base, dir, c);
+          giveDrop(c.id, ...(at ?? [c.x, c.y, c.z]));
+        }
+      }
+      flushDirty(9);
+    });
+    return true;
+  };
+
   const breakBlock = (x: number, y: number, z: number) => {
+    if (tryFell(x, y, z)) return;
     const id = world.getBlock(x, y, z);
     if (!setBlockAt(x, y, z, AIR)) return;
     particles.burst(x, y, z, id);
@@ -982,9 +1037,11 @@ async function main(): Promise<void> {
       while (simAcc >= 0.05) { simAcc -= 0.05; sim.update(); }
     }
     flushDirty(3);
+    resumeEl.hidden = !(state === 'playing' && !input.touch && !input.locked);
     if (state !== 'menu') {
       // a tűzhelyek folyamatosan dolgoznak (akkor is, ha épp nem nézed őket)
       for (const f of furnaces.values()) f.update(dt);
+      fell.update(dt);
       if (state === 'inventory') bag.tick();
       particles.update(dt);
       drops.update(dt, world, player.pos.x, player.pos.y, player.pos.z, (id, n) => {

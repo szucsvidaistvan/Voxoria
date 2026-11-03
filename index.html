@@ -22,6 +22,7 @@
     <div id="crosshair"></div>
     <div id="held-name" aria-live="polite"></div>
     <div id="clock" aria-hidden="true"></div>
+    <div id="resume-hint" hidden>Click or press any key to take control</div>
     <div id="mine"><div id="mine-bar"></div></div>
     <div id="hotwrap">
       <div id="vitals">
@@ -98,6 +99,12 @@
       <input id="set-dist" type="range" min="3" max="10" step="1" />
       <label for="set-sens">Look sensitivity</label>
       <input id="set-sens" type="range" min="0.4" max="2.5" step="0.1" />
+      <label for="set-fell">Tree felling (chop a tree with an axe)</label>
+      <select id="set-fell">
+        <option value="items">Falls, drops items</option>
+        <option value="blocks">Falls, logs stay as blocks</option>
+        <option value="off">Off</option>
+      </select>
     </section>
 
     <p id="controls" class="hint"></p>
