@@ -17,10 +17,9 @@ import { CH, CS, SEA_LEVEL, World } from '../shared/world';
 import { buildAtlas, TILE } from './atlas';
 import { DAY_SECONDS, START_TIME, formatClock, skyAt } from './daynight';
 import { createMoonTexture, createSunTexture } from './sky';
-import { createFelling } from './felling';
 import { createMobView, createPlayerView } from './mobview';
 import { MobManager, mobDrops, type Mob, type MobCtx } from '../shared/mobs';
-import { fallDirection, findTree, isLogBlock, landingCell } from '../shared/tree';
+import { findTree, isLogBlock } from '../shared/tree';
 import { BagUI, HOTBAR_SIZE, Inventory, SlotView, createItemPainter } from './inventory';
 import { Health, createVitals } from './health';
 import { createCracks, createDrops, createParticles } from './effects';
@@ -141,7 +140,7 @@ async function main(): Promise<void> {
   const inv = new Inventory();
   const input = new Input(canvas, HOTBAR_SIZE);
   if (input.touch) document.body.classList.add('touch');
-  const settings = loadSettings({ renderDistance: input.touch ? 4 : 6, sensitivity: 1, felling: 'items', mobs: 'on' });
+  const settings = loadSettings({ renderDistance: input.touch ? 4 : 6, sensitivity: 1, mobs: 'on' });
 
   let fogFar = 100;
   const applySettings = () => {
@@ -341,16 +340,26 @@ async function main(): Promise<void> {
   const drawIcon = createBlockIcons(atlas);
 
   /** Az elem textúrák betöltése után minden ikon újrarajzolódik */
+  /** a választó tárgyainak újrarajzolása, ha új textúra töltődött be (lekérve, hogy sok betöltés egy rajzolás legyen) */
+  let pickerDirty = false;
+  const repaintPicker = () => {
+    if (pickerDirty) return;
+    pickerDirty = true;
+    requestAnimationFrame(() => {
+      pickerDirty = false;
+      for (const it of invItems) if (isItem(it.id)) paintStack(it.canvas, it.id);
+    });
+  };
   const itemPainter = createItemPainter(import.meta.env.BASE_URL, () => {
     hotViews.forEach((v) => v.invalidate());
     paintHotbar();
     bag.invalidate();
     drops.refreshIcons();
+    repaintPicker();
   });
   const paintStack = (c: HTMLCanvasElement, id: number) => (isItem(id) ? itemPainter(c, id) : drawIcon(c, id));
 
   const drops = createDrops(scene, atlas, material, paintStack);
-  const fell = createFelling(scene, atlas, material);
   const mobView = createMobView(scene);
   // harmadik személyű nézet (V): a játékos saját modellje a kamera előtt
   const playerView = createPlayerView(scene);
@@ -463,7 +472,7 @@ async function main(): Promise<void> {
   // Minden blokk és tárgy csoportokba rendezve; a "All" fülön a csoportok egymás után, címsorral.
   const invEl = $('inventory'), invGrid = $('inv-grid'), invInfo = $('inv-info'), invTabs = $('inv-tabs');
   const invSearch = $<HTMLInputElement>('inv-search');
-  type InvItem = { id: number; cat: string; el: HTMLButtonElement; text: string };
+  type InvItem = { id: number; cat: string; el: HTMLButtonElement; text: string; canvas: HTMLCanvasElement };
   let invItems: InvItem[] = [];
   const invHeads = new Map<string, HTMLElement>();
   const tabBtns = new Map<string, HTMLButtonElement>();
@@ -505,7 +514,7 @@ async function main(): Promise<void> {
           announce(input.hotbar);
         });
         frag.appendChild(el);
-        invItems.push({ id, cat: cat.id, el, text: `${name} ${blockKey(id)}`.toLowerCase() });
+        invItems.push({ id, cat: cat.id, el, canvas: c, text: `${name} ${blockKey(id)}`.toLowerCase() });
       }
     }
     invGrid.replaceChildren(frag);
@@ -666,13 +675,6 @@ async function main(): Promise<void> {
     // kikapcsoláskor eltűnnek a mobok (a békésnél csak a szörnyek)
     mobs.mobs = settings.mobs === 'off' ? [] : settings.mobs === 'peaceful' ? mobs.mobs.filter((m) => !m.def.hostile) : mobs.mobs;
   });
-  const fellEl = $<HTMLSelectElement>('set-fell');
-  fellEl.value = settings.felling;
-  fellEl.addEventListener('change', () => {
-    settings.felling = fellEl.value as typeof settings.felling;
-    writeSettings(settings);
-    fellEl.blur();
-  });
   sensEl.addEventListener('input', () => {
     settings.sensitivity = Number(sensEl.value);
     applySettings();
@@ -744,40 +746,23 @@ async function main(): Promise<void> {
   };
 
   /**
-   * Fadöntés: ha egy természetes fa rönkjét baltával bontják, a rönk és a fölötte lévő rész (ágak, lomb) kikerül a
-   * világból, a töve körül ledől a játékostól elfelé, és a becsapódáskor tárgyakat ad vagy blokkokként lefekszik.
+   * Fadöntés: ha egy természetes fa rönkjét kiütik (kézzel is, csak lassan), az egész fa (rönkök és lomb) szétesik: a blokkok
+   * a helyükön tárgyakká válnak, és onnan esnek le a földre. Kreatívban csak a törmelék pattan szét.
    */
   const tryFell = (x: number, y: number, z: number): boolean => {
-    if (settings.felling === 'off' || !isLogBlock(world.getBlock(x, y, z))) return false;
-    if (toolOf(held()?.id)?.type !== 'axe') return false;
+    if (!isLogBlock(world.getBlock(x, y, z))) return false;
     const tree = findTree(world, x, y, z);
     if (!tree) return false;
     wearHeld(tree.logs.length); // minden kidöntött rönk egy használat
     health.exhaust(0.005 * tree.logs.length);
-    const base = { x, y, z };
-    const dir = fallDirection(x, z, player.pos.x, player.pos.z);
-    const cells = [...tree.logs, ...tree.leaves];
-    for (const c of cells) setBlockAt(c.x, c.y, c.z, AIR);
+    for (const c of [...tree.logs, ...tree.leaves]) setBlockAt(c.x, c.y, c.z, AIR);
     particles.burst(x, y, z, tree.logs[0].id);
+    for (const c of tree.logs) {
+      if (c.y > y + 1) particles.burst(c.x, c.y, c.z, c.id);
+      if (mode === 'survival') giveDrop(c.id, c.x, c.y, c.z);
+    }
+    if (mode === 'survival') for (const c of tree.leaves) giveDrop(c.id, c.x, c.y, c.z);
     flushDirty(9);
-    const asBlocks = settings.felling === 'blocks';
-    fell.start(cells, base, dir, () => {
-      for (const c of tree.logs) {
-        const at = landingCell(world, base, dir, c);
-        const [lx, ly, lz] = at ?? [c.x, c.y, c.z];
-        if (at) particles.burst(lx, ly, lz, c.id);
-        // blokkként: a lefektetett rönk a helyén marad (ha nem a játékos testébe esne), különben tárgy lesz belőle
-        if (asBlocks && at && !player.intersectsBlock(lx, ly, lz)) setBlockAt(lx, ly, lz, c.id);
-        else if (mode === 'survival') giveDrop(c.id, lx, ly, lz);
-      }
-      if (mode === 'survival') {
-        for (const c of tree.leaves) {
-          const at = landingCell(world, base, dir, c);
-          giveDrop(c.id, ...(at ?? [c.x, c.y, c.z]));
-        }
-      }
-      flushDirty(9);
-    });
     return true;
   };
 
@@ -1023,7 +1008,7 @@ async function main(): Promise<void> {
     } else if (input.breakHeld && hit && hit.y > 0) {
       const id = world.getBlock(hit.x, hit.y, hit.z);
       if (!mine.active || mine.x !== hit.x || mine.y !== hit.y || mine.z !== hit.z) {
-        Object.assign(mine, { x: hit.x, y: hit.y, z: hit.z, t: 0, need: breakTime(id, held()?.id), active: true });
+        Object.assign(mine, { x: hit.x, y: hit.y, z: hit.z, t: 0, need: breakTime(id, held()?.id, isLogBlock(world.getBlock(hit.x, hit.y + 1, hit.z))), active: true });
       }
       mine.t += dt;
       if (mine.t >= mine.need) {
@@ -1147,7 +1132,6 @@ async function main(): Promise<void> {
     if (state !== 'menu') {
       // a tűzhelyek folyamatosan dolgoznak (akkor is, ha épp nem nézed őket)
       for (const f of furnaces.values()) f.update(dt);
-      fell.update(dt);
       // mobok: a szimuláció csak játék közben fut; békés módban nincsenek szörnyek, kikapcsolva semmi
       if (settings.mobs !== 'off') {
         if (state !== 'dead') {

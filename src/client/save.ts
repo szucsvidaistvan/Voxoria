@@ -29,8 +29,6 @@ export interface SaveData {
 export interface Settings {
   renderDistance: number;
   sensitivity: number;
-  /** fadöntés: ki, a rönkök tárgyként esnek le, vagy blokkként lefekszenek */
-  felling: 'off' | 'items' | 'blocks';
   /** mobok: mind, csak békés (állatok), vagy semmi */
   mobs: 'on' | 'peaceful' | 'off';
 }
