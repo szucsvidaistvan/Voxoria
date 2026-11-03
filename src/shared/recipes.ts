@@ -1,5 +1,5 @@
 import { B, blockId, blockKey } from './blocks';
-import { I, TOOL_ID, type ToolType } from './items';
+import { EXTRA_ID as X, I, TOOL_ID, type ToolType } from './items';
 
 export interface Stack {
   id: number;
@@ -119,6 +119,18 @@ export function initRecipes(): void {
   });
 
   add({ shape: ['I I', ' I '], keys: { I: I.IRON_INGOT }, out: { id: I.BUCKET, n: 1 } });
+  // kis tárgyak: rúd <-> kilenc darab, tál, kenyér, süti, ásványok
+  add({ shapeless: [I.IRON_INGOT], out: { id: X.iron_nugget, n: 9 } });
+  add({ shapeless: [I.GOLD_INGOT], out: { id: X.gold_nugget, n: 9 } });
+  add({ shape: ['NNN', 'NNN', 'NNN'], keys: { N: X.iron_nugget }, out: { id: I.IRON_INGOT, n: 1 } });
+  add({ shape: ['NNN', 'NNN', 'NNN'], keys: { N: X.gold_nugget }, out: { id: I.GOLD_INGOT, n: 1 } });
+  add({ shape: ['P P', ' P '], keys: { P: 'planks' }, out: { id: X.bowl, n: 4 } });
+  add({ shape: ['WWW'], keys: { W: X.wheat }, out: { id: X.bread, n: 1 } });
+  add({ shape: ['WCW'], keys: { W: X.wheat, C: X.cocoa_beans }, out: { id: X.cookie, n: 8 } });
+  add({ shape: ['SSS'], keys: { S: X.sugar_cane }, out: { id: X.paper, n: 3 } });
+  add({ shapeless: [X.paper, X.paper, X.paper, X.leather], out: { id: X.book, n: 1 } });
+  add({ shape: ['G G', ' G '], keys: { G: blockId('glass') ?? -1 }, out: { id: X.glass_bottle, n: 3 } });
+  add({ shapeless: [X.bone], out: { id: X.bone_meal, n: 3 } });
   add({ shapeless: [I.IRON_INGOT, I.FLINT], out: { id: I.FLINT_AND_STEEL, n: 1 } });
 
   // eszközök
