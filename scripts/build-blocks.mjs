@@ -489,6 +489,13 @@ for (let i = blocks.length - 1; i >= 0; i--) {
 }
 blocks.sort((a, b) => a.name.localeCompare(b.name));
 
+// tartalmi szabályok: a tiltott blokkok (scripts/content-policy.json) nem kerülnek be
+{
+  const { applyPolicy } = await import('./apply-content-policy.mjs');
+  const { keep } = applyPolicy(blocks);
+  blocks.length = 0; blocks.push(...keep);
+}
+
 // a használt textúrák
 const used = new Set();
 for (const b of blocks) {

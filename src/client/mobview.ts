@@ -3,7 +3,7 @@ import type { Mob, MobKind } from '../shared/mobs';
 
 /**
  * A mobok megjelenítése: színes dobozokból épített modellek (a textúracsomagban nincsenek lényekhez képek),
- * járás-animációval, sebzés-villanással, a creeper puffadásával és a halál utáni eldőléssel.
+ * járás-animációval, sebzés-villanással, és a halál utáni eldőléssel.
  * A koordináták a lábak alatti ponttól számítanak; az előre a −z irány (a mob yaw szögével forgatva).
  */
 
@@ -94,28 +94,20 @@ const MODELS: Record<MobKind, Part[]> = {
     { s: [0.05, 0.2, 0.3], p: [-0.19, 0.42, 0.02], pivot: [-0.19, 0.52, 0.02], c: '#e4e4de', flap: 1 },
     { s: [0.05, 0.2, 0.3], p: [0.19, 0.42, 0.02], pivot: [0.19, 0.52, 0.02], c: '#e4e4de', flap: -1 },
   ],
+  // egy görnyedt, hosszú karú, rongyokba burkolt kísértet (saját terv, nem a kockajátékok megszokott zombija)
   zombie: [
-    { s: [0.25, 0.75, 0.25], p: [-0.125, 0.375, 0], pivot: [-0.125, 0.75, 0], c: '#2c3a8c', swing: 1 },
-    { s: [0.25, 0.75, 0.25], p: [0.125, 0.375, 0], pivot: [0.125, 0.75, 0], c: '#2c3a8c', swing: -1 },
-    { s: [0.5, 0.75, 0.25], p: [0, 1.125, 0], c: '#2f8f9f' },
-    { s: [0.5, 0.5, 0.5], p: [0, 1.7, 0], c: '#5d9140' },
-    ...eyes(1.74, -0.255, 0.12, 0.09),
-    { s: [0.22, 0.06, 0.02], p: [0, 1.6, -0.255], c: '#2c4a22' },
-    // az előretartott karok: a vállnál lendülnek, alapból vízszintesen előre
-    { s: [0.25, 0.75, 0.25], p: [-0.375, 1.075, 0], pivot: [-0.375, 1.45, 0], c: '#5d9140', tilt: 1.45, swing: 0.15 },
-    { s: [0.25, 0.75, 0.25], p: [0.375, 1.075, 0], pivot: [0.375, 1.45, 0], c: '#5d9140', tilt: 1.45, swing: -0.15 },
-  ],
-  creeper: [
-    { s: [0.5, 0.75, 0.28], p: [0, 0.775, 0], c: '#4caf3a' },
-    { s: [0.5, 0.5, 0.5], p: [0, 1.4, 0], c: '#58bb46' },
-    ...eyes(1.46, -0.255, 0.12, 0.12),
-    { s: [0.12, 0.1, 0.02], p: [0, 1.36, -0.255], c: '#141414' },
-    { s: [0.24, 0.1, 0.02], p: [0, 1.28, -0.255], c: '#141414' },
-    { s: [0.08, 0.12, 0.02], p: [-0.08, 1.2, -0.255], c: '#141414' },
-    { s: [0.08, 0.12, 0.02], p: [0.08, 1.2, -0.255], c: '#141414' },
-    { s: [0.07, 0.07, 0.01], p: [-0.12, 0.9, -0.145], c: '#3a8a2c' },
-    { s: [0.09, 0.09, 0.01], p: [0.1, 0.7, -0.145], c: '#3a8a2c' },
-    ...quadLegs(0.125, -0.25, 0.25, 0.4, 0.25, '#3f9a30'),
+    { s: [0.2, 0.7, 0.22], p: [-0.12, 0.35, 0], pivot: [-0.12, 0.7, 0], c: '#4a4238', swing: 1 },
+    { s: [0.2, 0.7, 0.22], p: [0.12, 0.35, 0], pivot: [0.12, 0.7, 0], c: '#4a4238', swing: -1 },
+    { s: [0.56, 0.7, 0.3], p: [0, 1.05, 0.04], c: '#5b5a3c' },
+    { s: [0.6, 0.18, 0.34], p: [0, 0.78, 0.04], c: '#3d3a2a' },
+    { s: [0.62, 0.14, 0.36], p: [0, 1.36, 0.02], c: '#6d6b4a' },
+    { s: [0.44, 0.42, 0.44], p: [0, 1.62, -0.12], c: '#9aa38a' },
+    { s: [0.5, 0.12, 0.5], p: [0, 1.86, -0.1], c: '#3a3328' },
+    { s: [0.07, 0.05, 0.02], p: [-0.1, 1.64, -0.345], c: '#ffb020' },
+    { s: [0.07, 0.05, 0.02], p: [0.1, 1.64, -0.345], c: '#ffb020' },
+    { s: [0.2, 0.04, 0.02], p: [0, 1.5, -0.345], c: '#2a2a22' },
+    { s: [0.18, 0.8, 0.18], p: [-0.38, 1.0, -0.05], pivot: [-0.38, 1.4, -0.05], c: '#8c9580', tilt: 1.2, swing: 0.15 },
+    { s: [0.18, 0.8, 0.18], p: [0.38, 1.0, -0.05], pivot: [0.38, 1.4, -0.05], c: '#8c9580', tilt: 1.2, swing: -0.15 },
   ],
 };
 
@@ -176,20 +168,17 @@ export function createMobView(scene: THREE.Scene) {
           if (l.flap) l.g.rotation.z = l.flap * (m.onGround ? 0.1 : 0.9 + Math.sin(time * 30) * 0.5);
         }
 
-        // halál: oldalra dől; creeper: a gyújtózsinórtól felfújódik és villog
+        // halál: oldalra dől; 
         if (m.dead) {
           const k = Math.min(1, m.deadT / 0.25);
           v.root.rotation.z = (Math.PI / 2) * k;
           v.root.position.y += 0.2 * k;
         } else v.root.rotation.z = 0;
-        const puff = m.kind === 'creeper' && m.fuse > 0 ? 1 + Math.min(0.35, m.fuse * 0.25) : 1;
-        v.root.scale.set(puff, puff, puff);
 
-        // szín: napszak szerinti fény; sebzéskor piros, sistergő creepernél fehéren villog
+        // szín: napszak szerinti fény; sebzéskor piros
         const base = m.exposed ? 1 : 0.55;
         let r = Math.max(light[0] * base, 0.3), g = Math.max(light[1] * base, 0.3), b = Math.max(light[2] * base, 0.34);
         if (m.hurtT > 0 || m.dead) { g *= 0.4; b *= 0.4; r = Math.min(1.2, r * 1.3 + 0.1); }
-        if (m.kind === 'creeper' && m.fuse > 0 && Math.floor(m.fuse * 8) % 2 === 0) { r = g = b = 2.2; }
         v.mat.color.setRGB(r, g, b);
       }
       for (const [id, v] of views) {

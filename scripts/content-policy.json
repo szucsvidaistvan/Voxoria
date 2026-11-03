@@ -1,0 +1,12 @@
+{
+  "note": "Blokkok, amiket NEM tartunk meg, mert a nevük vagy a megjelenésük a Minecraft (Mojang/Microsoft) saját kitalációja. A szabályok a blokkok Minecraft-stílusú azonosítójára (pl. 'nether_bricks') illeszkednek. Ez saját besorolás, nem jogi tanács.",
+  "remove": [
+    { "id": "nether", "why": "A Nether a Minecraft fikciójának helyszíne; az innen elnevezett blokkok a játék saját világához tartoznak.", "pattern": "^(nether_|red_nether_)|^(netherrack|soul_sand)$" },
+    { "id": "end", "why": "Az End a Minecraft fikciójának helyszíne (End kő és változatai).", "pattern": "^end_stone" },
+    { "id": "purpur", "why": "A purpur a Minecraft saját kitalált anyaga (a chorus növényből).", "pattern": "^purpur" },
+    { "id": "prismarine", "why": "A prismarine a Minecraft saját kitalált anyaga (az óceáni emlékművekből).", "pattern": "prismarine" },
+    { "id": "shulker", "why": "A shulker a Minecraft saját lénye, a shulker box a róla elnevezett tároló.", "pattern": "shulker_box$" },
+    { "id": "redstone", "why": "A redstone a Minecraft saját kitalált anyaga és áramköri rendszere; a hozzá kötött sínek is.", "pattern": "^redstone_|^(powered|detector|activator)_rail$" },
+    { "id": "mc-mechanic", "why": "A Minecraft saját kitalált blokkjai és játékelemei (a nevük és a működésük is az övék).", "pattern": "^(spawner|observer|note_block|daylight_detector|enchanting_table|sea_lantern|glowstone|slime_block|dried_kelp_block)$" }
+  ]
+}

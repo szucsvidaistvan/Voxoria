@@ -955,39 +955,12 @@ async function main(): Promise<void> {
     }
   };
 
-  // ---------- mobok: sebzés, robbanás, halál, támadás ----------
+  // ---------- mobok: sebzés, halál, támadás ----------
 
-  /** A mob halála: a dropok a földre esnek (túlélőben); a felrobbant creeper nem ejt semmit */
+  /** A mob halála: a dropok a földre esnek (túlélőben) */
   const onMobDie = (m: Mob) => {
-    if (m.exploded || mode !== 'survival') return;
+    if (mode !== 'survival') return;
     for (const d of mobDrops(m.kind)) drops.spawn(d.id, d.n, m.x, m.y + 0.4, m.z);
-  };
-
-  /** Robbanás: kisebb gömbben eltűnnek a blokkak (a bedrock és az obszidián kivételével), a játékos megsérül és hátralökődik */
-  const explode = (x: number, y: number, z: number, power: number) => {
-    const cx = Math.floor(x), cy = Math.floor(y), cz = Math.floor(z);
-    const R = Math.ceil(power);
-    for (let dx = -R; dx <= R; dx++) for (let dy = -R; dy <= R; dy++) for (let dz = -R; dz <= R; dz++) {
-      if (dx * dx + dy * dy + dz * dz > power * power + 0.5) continue;
-      const bx = cx + dx, by = cy + dy, bz = cz + dz;
-      if (by <= 0) continue;
-      const id = world.getBlock(bx, by, bz);
-      if (id === AIR) continue;
-      const key = blockKey(id);
-      if (key === 'bedrock' || key === 'obsidian') continue;
-      setBlockAt(bx, by, bz, AIR);
-    }
-    particles.burst(cx, cy, cz, B.COBBLE);
-    const d = Math.hypot(player.pos.x - x, player.pos.y + 0.9 - y, player.pos.z - z);
-    if (mode === 'survival' && d < power * 2 && !health.dead) {
-      health.damage(Math.max(1, Math.round((1 - d / (power * 2)) * 16)));
-      lastMobHit = now(); lastMobHitBy = 'blown up by a Creeper';
-      const kd = d || 1;
-      player.knock.x += ((player.pos.x - x) / kd) * 9;
-      player.knock.z += ((player.pos.z - z) / kd) * 9;
-      if (player.onGround) player.vel.y = 6;
-    }
-    flushDirty(9);
   };
 
   const makeMobCtx = (sky: { elevation: number }): MobCtx => ({
@@ -1002,7 +975,6 @@ async function main(): Promise<void> {
       player.knock.x += ((player.pos.x - fx) / d) * 5;
       player.knock.z += ((player.pos.z - fz) / d) * 5;
     },
-    explode,
     onDie: onMobDie,
   });
 
