@@ -7,7 +7,7 @@ import { CH, type World } from './world';
  * A megjelenítés a client/mobview.ts-ben van.
  */
 
-export type MobKind = 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'creeper';
+export type MobKind = 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie';
 
 export interface MobDef {
   name: string;
@@ -27,7 +27,6 @@ export const MOB_DEFS: Record<MobKind, MobDef> = {
   sheep: { name: 'Sheep', hostile: false, hp: 8, speed: 1.5, hw: 0.4, h: 1.3 },
   chicken: { name: 'Chicken', hostile: false, hp: 4, speed: 1.4, hw: 0.2, h: 0.7 },
   zombie: { name: 'Zombie', hostile: true, hp: 20, speed: 2.6, hw: 0.3, h: 1.95 },
-  creeper: { name: 'Creeper', hostile: true, hp: 20, speed: 2.8, hw: 0.3, h: 1.7 },
 };
 
 export const PASSIVE_KINDS: MobKind[] = ['pig', 'cow', 'sheep', 'chicken'];
@@ -43,7 +42,6 @@ export function mobDrops(kind: MobKind, rand: () => number = Math.random): { id:
     case 'chicken': add(I.RAW_CHICKEN, 1); break;
     case 'sheep': add(blockId('white_wool'), 1); add(I.RAW_MUTTON, r(1, 2)); break;
     case 'zombie': add(I.ROTTEN_FLESH, r(0, 2)); break;
-    case 'creeper': add(I.GUNPOWDER, r(0, 2)); break;
   }
   return out;
 }
@@ -66,12 +64,8 @@ export class Mob {
   deadT = -1;
   /** a járás animációjának fázisa (a megtett úttal nő) */
   walk = 0;
-  /** a creeper gyújtózsinórja: 0: nem sistereg, különben eltelt másodperc */
-  fuse = 0;
   /** nyílt ég alatt áll-e (a zombi csak ott ég napfényben) */
   exposed = true;
-  /** felrobbant (a creeper): nem ejt semmit */
-  exploded = false;
   // AI-állapot (a mobs.ts belső használatára)
   wx = 0; wz = 0; // a kívánt sebesség
   wanderT = 0;
@@ -188,7 +182,6 @@ export interface MobCtx {
   /** süt a nap (a zombik égnek) */
   day: boolean;
   hurtPlayer(dmg: number, fromX: number, fromZ: number): void;
-  explode(x: number, y: number, z: number, power: number): void;
   onDie(m: Mob): void;
 }
 
@@ -207,33 +200,12 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx): void {
   if (def.hostile && ctx.target && dist < 24 && Math.abs(dy) < 12) {
     // üldözés
     lookAt(m, ctx.px, ctx.pz);
-    if (m.kind === 'creeper') {
-      if (dist < 3.2 && Math.abs(dy) < 2) {
-        // a creeper megáll és sistereg; ha a játékos elszalad, a zsinór lassan kialszik
-        m.fuse += dt;
-        speed = 0;
-        if (m.fuse >= 1.5) {
-          ctx.explode(m.x, m.y + 0.6, m.z, 3);
-          m.hp = 0;
-          m.deadT = 0;
-          m.fuse = 0;
-          m.exploded = true;
-          ctx.onDie(m);
-          return;
-        }
-      } else {
-        m.fuse = Math.max(0, m.fuse - dt * 1.5);
-        speed = def.speed;
-      }
-    } else {
-      speed = dist > 0.9 ? def.speed : 0;
-      if (dist < 1.4 && Math.abs(dy) < 1.8 && priv.atkCd <= 0) {
-        priv.atkCd = 1;
-        ctx.hurtPlayer(3, m.x, m.z);
-      }
+    speed = dist > 0.9 ? def.speed : 0;
+    if (dist < 1.4 && Math.abs(dy) < 1.8 && priv.atkCd <= 0) {
+      priv.atkCd = 1;
+      ctx.hurtPlayer(3, m.x, m.z);
     }
   } else {
-    m.fuse = 0;
     if (priv.panicT > 0) {
       // menekülés: a sebzőtől elfelé, gyorsabban
       priv.panicT -= dt;
@@ -322,7 +294,7 @@ export class MobManager {
           if (isOpaque(this.world.getBlock(Math.floor(m.x), y, Math.floor(m.z)))) { m.exposed = false; break; }
         }
       }
-      // a zombi napfényben ég (a creeper nem)
+      // a zombi napfényben ég
       if (m.kind === 'zombie' && ctx.day && m.exposed && !m.inWater) {
         priv.burnT += dt;
         if (priv.burnT >= 1) { priv.burnT -= 1; m.hp -= 2; m.hurtT = 0.3; }
@@ -344,7 +316,7 @@ export class MobManager {
 
     if (passiveN < MOB_CAP_PASSIVE) this.trySpawn(px, pz, PASSIVE_KINDS[Math.floor(Math.random() * PASSIVE_KINDS.length)], 20, 44, 'surface');
     if (hostileAllowed && this.count(true) < MOB_CAP_HOSTILE) {
-      const kind: MobKind = Math.random() < 0.65 ? 'zombie' : 'creeper';
+      const kind: MobKind = 'zombie';
       if (night) this.trySpawn(px, pz, kind, 18, 40, 'surface');
       else if (Math.random() < 0.35) this.trySpawn(px, pz, kind, 14, 30, 'cave'); // barlangokban nappal is
     }

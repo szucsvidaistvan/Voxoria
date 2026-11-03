@@ -20,11 +20,11 @@ export const CATEGORIES: Category[] = [
   { id: 'materials', name: 'Materials & Food' },
 ];
 
-const NATURAL = /^(grass_block|dirt|coarse_dirt|podzol|mycelium|dirt_path|farmland|sand|red_sand|gravel|clay|snow|snow_block|ice|packed_ice|blue_ice|frosted_ice|bedrock|obsidian|netherrack|soul_sand|magma|end_stone|stone|andesite|diorite|granite|tuff|deepslate|basalt|calcite|sponge|mud|moss_block|cobweb)$|_ore$|_log$|_wood$|^stripped_|leaves$/;
+const NATURAL = /^(grass_block|dirt|coarse_dirt|podzol|mycelium|dirt_path|farmland|sand|red_sand|gravel|clay|snow|snow_block|ice|packed_ice|blue_ice|frosted_ice|bedrock|obsidian|magma|stone|andesite|diorite|granite|tuff|deepslate|basalt|calcite|sponge|mud|moss_block|cobweb)$|_ore$|_log$|_wood$|^stripped_|leaves$/;
 const PLANTS = /(sapling|tulip|poppy|dandelion|allium|orchid|bluet|daisy|mushroom$|^short_grass$|^fern$|dead_bush|sugar_cane|seagrass|lily_pad|^vine$|^cactus$|bush|flower)/;
 const DOORS = /(_door$|_trapdoor$|_fence$|_fence_gate$|^ladder$)/;
 const DECOR = /(_wool$|_carpet$|glass|_pane$|^iron_bars$|lantern|banner|^flower_pot$|_terracotta$|_concrete$)/;
-const FUNCTIONAL = /^(crafting_table|furnace|blast_furnace|smoker|tnt|jukebox|note_block|enchanting_table|daylight_detector|bookshelf|cake|torch|redstone_torch|observer|lodestone|.*rail)$/;
+const FUNCTIONAL = /^(crafting_table|furnace|blast_furnace|smoker|tnt|jukebox|bookshelf|cake|torch|lodestone|.*rail)$/;
 
 /** A blokk vagy tárgy csoportja a kreatív blokkválasztóban */
 export function categoryOf(id: number): string {

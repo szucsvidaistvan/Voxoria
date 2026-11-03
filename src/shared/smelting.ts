@@ -33,7 +33,6 @@ export function initSmelting(): void {
   add('stone_bricks', blk('cracked_stone_bricks'));
   add('clay', blk('terracotta'));
   add('wet_sponge', blk('sponge'));
-  add('netherrack', blk('nether_bricks'));
   add('sandstone', blk('cut_sandstone'));
   add('red_sandstone', blk('cut_red_sandstone'));
   add('quartz_block', blk('smooth_quartz'));
@@ -48,7 +47,7 @@ export function initSmelting(): void {
     if (/(_log|_wood)$/.test(k) || /_planks$/.test(k) || k === 'crafting_table' || k === 'bookshelf') FUEL.set(Number(id), 15);
     else if (/_wool$/.test(k)) FUEL.set(Number(id), 5);
     else if (k === 'coal_block') FUEL.set(Number(id), 800);
-    else if (/_(fence|trapdoor|door)$/.test(k) && !/(iron|nether)/.test(k)) FUEL.set(Number(id), 15);
+    else if (/_(fence|trapdoor|door)$/.test(k) && !/iron/.test(k)) FUEL.set(Number(id), 15);
     else if (/_(slab)$/.test(k) && /(oak|spruce|birch|jungle|acacia|dark_oak)/.test(k)) FUEL.set(Number(id), 7);
     else if (/(sapling)$/.test(k)) FUEL.set(Number(id), 5);
     else if (k === 'ladder') FUEL.set(Number(id), 15);

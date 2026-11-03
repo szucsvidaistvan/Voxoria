@@ -84,9 +84,9 @@ export function initRecipes(): void {
 
   // kő-féle blokkcsaládok: lap (3 -> 6), lépcső (6 -> 4), fal (6 -> 6), ha a csomagban van
   const families = [
-    'stone_brick', 'mossy_stone_brick', 'sandstone', 'red_sandstone', 'cut_sandstone', 'cut_red_sandstone', 'brick', 'nether_brick',
-    'red_nether_brick', 'andesite', 'diorite', 'granite', 'polished_andesite', 'polished_diorite', 'polished_granite',
-    'quartz', 'smooth_quartz', 'purpur', 'prismarine', 'prismarine_brick', 'dark_prismarine', 'end_stone_brick', 'mossy_cobblestone',
+    'stone_brick', 'mossy_stone_brick', 'sandstone', 'red_sandstone', 'cut_sandstone', 'cut_red_sandstone', 'brick',
+    'andesite', 'diorite', 'granite', 'polished_andesite', 'polished_diorite', 'polished_granite',
+    'quartz', 'smooth_quartz', 'mossy_cobblestone',
   ];
   for (const f of families) {
     const base = blockId(f) ?? blockId(`${f}s`) ?? blockId(`${f}_block`);
