@@ -116,7 +116,7 @@ A világ állapota és a megjelenítés külön van választva. Ez teszi lehető
 - [x] Folyadékok (víz, láva), tűz, obszidián és kavics a láva és a víz találkozásából
 - [x] Inventory, életerő, túlélő és kreatív mód, barkácsolás, szerszámok, vödör
 - [ ] Összekapcsolódó kerítések, falak és üvegtáblák; ajtók, ágyak, kemence (olvasztás), láda
-- [ ] Éhség, szörnyek, szerszám-kopás
+- [x] Éhség, szörnyek, szerszám-kopás
 - [ ] Mentés IndexedDB-be (nagy világokhoz)
 - [ ] Szerver (Node.js + WebSocket), közös világ
 - [ ] RPG-rendszerek (karakter, küldetések, NPC-k)
