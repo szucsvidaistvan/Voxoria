@@ -1,13 +1,29 @@
 import { BLOCKS, type ShapePart } from '../shared/blocks';
 import { TILE, type Atlas } from './atlas';
 
-/** Ezek a blokkok laposak vagy vékonyak: sima képként (nem kockaként) jelennek meg az ikonokon */
-const FLAT = /(torch|sapling|rail|ladder|_pane$|^iron_bars$|carpet$|fence|_wall$|^fire$|lily_pad|button|pressure_plate|door|tulip|poppy|dandelion|allium|orchid|bluet|daisy|mushroom|^short_grass$|^fern$|dead_bush|sugar_cane|seagrass|cobweb|lever|tripwire)/;
-
-// izometrikus vetítés: a blokk 16 egységes koordinátáiból pixel (64x64-es ikon). Az x kelet (jobbra le), a z dél (balra le).
-const P = (x: number, y: number, z: number): [number, number] => [32 + (x - z) * 1.5, 30 + (x + z) * 0.75 - y * 1.625];
+/** Ezek a blokkok laposak vagy vékonyak: sima képként (nem kockaként) jelennek meg az ikonokon (a kerítés, szőnyeg, fal, ajtó és csapóajtó dobozokból épített alakot kap) */
+const FLAT = /(torch|sapling|rail|ladder|_pane$|^iron_bars$|^fire$|lily_pad|button|pressure_plate|tulip|poppy|dandelion|allium|orchid|bluet|daisy|mushroom|^short_grass$|^fern$|dead_bush|sugar_cane|seagrass|cobweb|lever|tripwire)/;
 
 type Pt = [number, number];
+type Proj = (x: number, y: number, z: number) => Pt;
+
+// izometrikus vetítés: a blokk 16 egységes koordinátáiból pixel (64x64-es ikon). Az x kelet (jobbra le), a z dél (balra le).
+const P: Proj = (x, y, z) => [32 + (x - z) * 1.5, 30 + (x + z) * 0.75 - y * 1.625];
+/** Kisebbített vetítés a két blokk magas dolgokhoz (az ajtóhoz): az ikon közepe (ox, oy), a lépték s */
+const scaled = (s: number, ox: number, oy: number): Proj => (x, y, z) => [ox + (x - z) * 1.5 * s, oy + (x + z) * 0.75 * s - y * 1.625 * s];
+
+/** Egy doboz a megadott lapok textúrájával (a kerítés és a fal ikonjának karjaihoz) */
+const arm = (from: [number, number, number], to: [number, number, number], tex: string): ShapePart => {
+  const [x1, y1, z1] = from, [x2, y2, z2] = to;
+  return {
+    from, to,
+    faces: {
+      up: { uv: [x1, z1, x2, z2], tex },
+      south: { uv: [x1, 16 - y2, x2, 16 - y1], tex },
+      east: { uv: [z1, 16 - y2, z2, 16 - y1], tex },
+    },
+  } as ShapePart;
+};
 
 /**
  * Blokk-ikonok: a tömör blokkok izometrikus kockaként (felső, bal és jobb lap), a nem kocka alakúak
@@ -78,7 +94,8 @@ export function createBlockIcons(atlas: Atlas) {
   };
 
   /** A nem kocka alakú blokk dobozai: alulról felfelé, hátulról előre rajzolva */
-  const boxes = (ctx: CanvasRenderingContext2D, parts: ShapePart[], tint?: readonly number[]) => {
+  const defaultP = P;
+  const boxes = (ctx: CanvasRenderingContext2D, parts: ShapePart[], tint?: readonly number[], P: Proj = defaultP) => {
     const order = [...parts].filter((p) => !p.rot).sort((a, b) => a.from[1] - b.from[1] || a.from[0] + a.from[2] - (b.from[0] + b.from[2]));
     for (const p of order) {
       const [x1, y1, z1] = p.from, [x2, y2, z2] = p.to;
@@ -94,6 +111,32 @@ export function createBlockIcons(atlas: Atlas) {
     }
   };
 
+  /** A kerítés/fal ikonja: a tartóoszlop és két kar (kelet és dél felé), hogy kerítésnek látsszon */
+  const withArms = (key: string, parts: ShapePart[]): ShapePart[] => {
+    const post = parts[0];
+    const tex = post?.faces.south?.tex ?? post?.faces.up?.tex;
+    if (!post || !tex) return parts;
+    if (/_fence$/.test(key)) {
+      return [...parts, arm([10, 6, 7], [16, 9, 9], tex), arm([10, 12, 7], [16, 15, 9], tex), arm([7, 6, 10], [9, 9, 16], tex), arm([7, 12, 10], [9, 15, 16], tex)];
+    }
+    if (/_wall$/.test(key)) return [...parts, arm([11, 0, 5], [16, 14, 11], tex), arm([5, 0, 11], [11, 14, 16], tex)];
+    return parts;
+  };
+
+  /** Az ajtó ikonja: az alsó és a felső fél egymás fölött (két blokk magas) */
+  const doorIcon = (ctx: CanvasRenderingContext2D, parts: ShapePart[]) => {
+    const lower = parts[0];
+    const tex = lower?.faces.east?.tex ?? lower?.faces.south?.tex ?? '';
+    const upTex = tex.replace(/_bottom$/, '_top');
+    const up = (p: ShapePart, y: number, t: string): ShapePart => ({
+      ...p, from: [p.from[0], p.from[1] + y, p.from[2]], to: [p.to[0], p.to[1] + y, p.to[2]],
+      faces: Object.fromEntries(Object.entries(p.faces).map(([k, f]) => [k, f ? { ...f, tex: t } : f])),
+    });
+    const pr = scaled(0.72, 25, 42);
+    boxes(ctx, [lower], undefined, pr);
+    boxes(ctx, [up(lower, 16, upTex)], undefined, pr);
+  };
+
   return (c: HTMLCanvasElement, id: number): void => {
     const def = BLOCKS[id];
     const ctx = c.getContext('2d')!;
@@ -103,6 +146,7 @@ export function createBlockIcons(atlas: Atlas) {
     const key = def.key ?? '';
     if (!def.parts) cube(ctx, def.top, def.side, def.tint);
     else if (FLAT.test(key) || def.parts.some((p) => p.rot) || def.boxes?.length === 0) flat(ctx, def.side, def.tint?.side);
-    else boxes(ctx, def.parts, def.tint?.side);
+    else if (def.door) doorIcon(ctx, def.parts);
+    else boxes(ctx, withArms(key, def.parts), def.tint?.side);
   };
 }

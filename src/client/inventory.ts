@@ -117,6 +117,7 @@ export function createItemPainter(base: string, onLoad: () => void): Painter {
     const def = ITEMS[id];
     if (!def) return;
     const ctx = c.getContext('2d')!;
+    ctx.clearRect(0, 0, c.width, c.height); // a korábbi helyettesítő betű ne maradjon az ikon alatt
     const img = load(def.tex);
     if (img && img.width > 0) {
       ctx.imageSmoothingEnabled = false;
