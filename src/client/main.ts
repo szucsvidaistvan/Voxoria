@@ -975,7 +975,7 @@ async function main(): Promise<void> {
     hurtPlayer: (dmg, fx, fz) => {
       if (mode !== 'survival' || health.dead) return;
       health.damage(dmg);
-      lastMobHit = now(); lastMobHitBy = 'slain by a Zombie';
+      lastMobHit = now(); lastMobHitBy = 'slain by a monster';
       const d = Math.hypot(player.pos.x - fx, player.pos.z - fz) || 1;
       player.knock.x += ((player.pos.x - fx) / d) * 5;
       player.knock.z += ((player.pos.z - fz) / d) * 5;

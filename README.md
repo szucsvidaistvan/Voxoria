@@ -143,6 +143,6 @@ A tárgytextúrák besorolása a `scripts/item-policy.json` fájlban van: `impor
 
 A háziállatok (malac, tehén, birka, csirke) a Good Vibes csomag lény-skinjeivel (`public/textures/entity/`) vannak textúrázva.
 A modellek adata a `src/client/mobmodels.ts` fájlban van (a dobozok pixelmérete, helye és a képen lévő részük), a dobozok
-UV-kiosztását a `src/client/boxuv.ts` végzi. A zombi saját tervű, színes dobozokból áll.
-A játékos modellje (`entity/player.png`) saját tervű skin, nem a Minecraft Steve/Alex karaktere; játék közben a **V** billentyűvel
+UV-kiosztását a `src/client/boxuv.ts` végzi. A zombi saját tervű, színes dobozokból áll; a csontváz (távolról lő, nappal ég, csontot ejt) a csomag skeleton skinjét használja.
+A játékos modellje: az `entity/player.png` a projekt tulajdonosa által megadott skin (nem a Minecraft Steve/Alex karaktere); játék közben a **V** billentyűvel
 látható (harmadik személyű nézet), és a későbbi co-op társak megjelenítésére is ez szolgál.

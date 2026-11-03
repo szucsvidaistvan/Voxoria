@@ -4,7 +4,7 @@ import { boxGeom, type BoxGeom } from './boxuv';
  * A mobok textúrázott modelljei (adat): a dobozok pixelméretei (1 blokk = 16 pixel) és a képen lévő helyük.
  * A koordináták pixelben: y felfelé a láb alatti talajtól, az előre a −z, a doboz a közepével van megadva.
  */
-export type TexName = 'pig' | 'cow' | 'sheep' | 'sheep_fur' | 'chicken' | 'player';
+export type TexName = 'pig' | 'cow' | 'sheep' | 'sheep_fur' | 'chicken' | 'player' | 'skeleton';
 
 export interface TPart {
   tex: TexName;
@@ -27,7 +27,7 @@ export interface TPart {
 
 /** A textúrák mérete pixelben */
 export const TEX_SIZE: Record<TexName, [number, number]> = {
-  pig: [64, 32], cow: [64, 32], sheep: [64, 32], sheep_fur: [64, 32], chicken: [64, 32], player: [64, 64],
+  pig: [64, 32], cow: [64, 32], sheep: [64, 32], sheep_fur: [64, 32], chicken: [64, 32], player: [64, 64], skeleton: [64, 32],
 };
 
 const legs4 = (tex: TexName, px: [number, number, number], uv: [number, number], x: number, h: number, zF: number, zB: number, extra: Partial<TPart> = {}): TPart[] => {
@@ -68,10 +68,25 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'player', px: [8, 8, 8], uv: [32, 0], p: [0, 28, 0], grow: 0.5 },
     { tex: 'player', px: [8, 12, 4], uv: [16, 16], p: [0, 18, 0] },
     { tex: 'player', px: [8, 12, 4], uv: [16, 32], p: [0, 18, 0], grow: 0.25 },
+    // jobb kar (+x) és ujja, bal kar (−x) és ujja
     { tex: 'player', px: [4, 12, 4], uv: [40, 16], p: [6, 18, 0], pivot: [6, 24, 0], swing: -1 },
+    { tex: 'player', px: [4, 12, 4], uv: [40, 32], p: [6, 18, 0], pivot: [6, 24, 0], swing: -1, grow: 0.25 },
     { tex: 'player', px: [4, 12, 4], uv: [32, 48], p: [-6, 18, 0], pivot: [-6, 24, 0], swing: 1 },
+    { tex: 'player', px: [4, 12, 4], uv: [48, 48], p: [-6, 18, 0], pivot: [-6, 24, 0], swing: 1, grow: 0.25 },
+    // jobb láb és nadrágja, bal láb és nadrágja
     { tex: 'player', px: [4, 12, 4], uv: [0, 16], p: [2, 6, 0], pivot: [2, 12, 0], swing: 1 },
+    { tex: 'player', px: [4, 12, 4], uv: [0, 32], p: [2, 6, 0], pivot: [2, 12, 0], swing: 1, grow: 0.25 },
     { tex: 'player', px: [4, 12, 4], uv: [16, 48], p: [-2, 6, 0], pivot: [-2, 12, 0], swing: -1 },
+    { tex: 'player', px: [4, 12, 4], uv: [0, 48], p: [-2, 6, 0], pivot: [-2, 12, 0], swing: -1, grow: 0.25 },
+  ],
+  // a csontváz: vékony (2 pixeles) végtagok, kissé előreemelt karok
+  skeleton: [
+    { tex: 'skeleton', px: [8, 8, 8], uv: [0, 0], p: [0, 28, 0] },
+    { tex: 'skeleton', px: [8, 12, 4], uv: [16, 16], p: [0, 18, 0] },
+    { tex: 'skeleton', px: [2, 12, 2], uv: [40, 16], p: [-5, 18, 0], pivot: [-5, 23, 0], tilt: 1.3, swing: 0.15 },
+    { tex: 'skeleton', px: [2, 12, 2], uv: [40, 16], p: [5, 18, 0], pivot: [5, 23, 0], tilt: 1.3, swing: -0.15 },
+    { tex: 'skeleton', px: [2, 12, 2], uv: [0, 16], p: [-2, 6, 0], pivot: [-2, 12, 0], swing: 1 },
+    { tex: 'skeleton', px: [2, 12, 2], uv: [0, 16], p: [2, 6, 0], pivot: [2, 12, 0], swing: -1 },
   ],
   chicken: [
     { tex: 'chicken', px: [4, 6, 3], uv: [0, 0], p: [0, 12, -4.5] },
