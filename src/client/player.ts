@@ -27,6 +27,8 @@ export class Player {
   inFire = false;
   /** az utolsó leérkezés előtti esés magassága (blokk), amit a játék elvihet és nullázhat */
   landing = 0;
+  /** lökés (blokk/mp): sebzéskor kapja, és gyorsan elhal; a mozgás mellé adódik */
+  knock = { x: 0, z: 0 };
   private peak = 0;
   private airborne = false;
 
@@ -94,6 +96,11 @@ export class Player {
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
     this.vel.x = (-sin * mz + cos * mx) * speed;
     this.vel.z = (-cos * mz - sin * mx) * speed;
+    this.vel.x += this.knock.x;
+    this.vel.z += this.knock.z;
+    const kd = Math.exp(-7 * Math.min(dt, 0.1));
+    this.knock.x *= kd;
+    this.knock.z *= kd;
 
     if (ladder) {
       this.vel.y = jump || mz > 0.1 ? 3.2 : mz < -0.1 ? -3.2 : -0.8;
