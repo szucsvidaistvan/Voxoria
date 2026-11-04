@@ -366,7 +366,7 @@ async function main(): Promise<void> {
   const drops = createDrops(scene, atlas, material, paintStack);
   const mobView = createMobView(scene);
   scene.add(camera); // a kézben tartott tárgy a kamera gyereke
-  hand = createHandItem(camera, paintStack);
+  hand = createHandItem(camera, paintStack, atlas, isItem);
   const collapse = createCollapse(scene, atlas, material, () => world);
   // harmadik személyű nézet (V): a játékos saját modellje a kamera előtt
   const playerView = createPlayerView(scene);

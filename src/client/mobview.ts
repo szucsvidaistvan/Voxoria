@@ -104,6 +104,7 @@ function buildView(kind: string, scene: THREE.Scene, base: string): View {
         const geo = new THREE.PlaneGeometry(0.8, 0.8);
         geo.rotateY(Math.PI / 2);
         geo.rotateX(-Math.PI / 2);
+        geo.scale(1, -1, 1); // az íj hasa előre néz
         bow = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: itemTex(base, 'bow'), alphaTest: 0.5, side: THREE.DoubleSide }));
         bow.frustumCulled = false;
         bow.position.set(0.02, -0.62, -0.18);
