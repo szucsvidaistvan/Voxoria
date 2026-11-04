@@ -18,6 +18,7 @@ import { buildAtlas, TILE } from './atlas';
 import { DAY_SECONDS, START_TIME, formatClock, skyAt } from './daynight';
 import { createMoonTexture, createSunTexture } from './sky';
 import { createMobView, createPlayerView } from './mobview';
+import { createHandItem } from './handitem';
 import { createCollapse } from './collapse';
 import { MobManager, mobDrops, type Mob, type MobCtx } from '../shared/mobs';
 import { findTree, isLogBlock } from '../shared/tree';
@@ -351,17 +352,21 @@ async function main(): Promise<void> {
       for (const it of invItems) if (isItem(it.id)) paintStack(it.canvas, it.id);
     });
   };
+  let hand: ReturnType<typeof createHandItem> | null = null;
   const itemPainter = createItemPainter(import.meta.env.BASE_URL, () => {
     hotViews.forEach((v) => v.invalidate());
     paintHotbar();
     bag.invalidate();
     drops.refreshIcons();
     repaintPicker();
+    hand?.invalidate();
   });
   const paintStack = (c: HTMLCanvasElement, id: number) => (isItem(id) ? itemPainter(c, id) : drawIcon(c, id));
 
   const drops = createDrops(scene, atlas, material, paintStack);
   const mobView = createMobView(scene);
+  scene.add(camera); // a kézben tartott tárgy a kamera gyereke
+  hand = createHandItem(camera, paintStack);
   const collapse = createCollapse(scene, atlas, material, () => world);
   // harmadik személyű nézet (V): a játékos saját modellje a kamera előtt
   const playerView = createPlayerView(scene);
@@ -809,7 +814,7 @@ async function main(): Promise<void> {
       giveDrop(id, x, y, z);
       // a bontás kopasztja az eszközt (a kard kétszer annyira) és kimeríti a játékost; a pillanatok alatt törő dolgok (fű) nem
       if (breakRule(id).hardness > 0) {
-        health.exhaust(0.005);
+        health.exhaust(0.04); // a bányászat fárasztó: kb. 100 blokk egy éhségpont
         wearHeld(toolOf(held()?.id)?.type === 'sword' ? 2 : 1);
       }
     }
@@ -1000,7 +1005,10 @@ async function main(): Promise<void> {
     }
   };
 
+  /** az ütés/bontás/lerakás folyamatban (a kézben tartott tárgy lendítéséhez) */
+  let handAct = false;
   const interact = (dt: number) => {
+    handAct = input.breakHeld || input.breakQueued || input.placeQueued;
     camera.getWorldDirection(dir);
     const p = camera.position;
     const blockHit: RayHit | null = raycast(world, p.x, p.y, p.z, dir.x, dir.y, dir.z, 6);
@@ -1061,7 +1069,7 @@ async function main(): Promise<void> {
       player.update(dt, mx, mz, input.jump);
       if (mode === 'survival') {
         // a mozgás (méterenként) és az ugrás kimerít
-        health.exhaust(Math.hypot(player.pos.x - px0, player.pos.z - pz0) * 0.02);
+        health.exhaust(Math.hypot(player.pos.x - px0, player.pos.z - pz0) * 0.025);
         if (wasGround && !player.onGround && player.vel.y > 0) health.exhaust(0.05);
       }
 
@@ -1158,6 +1166,8 @@ async function main(): Promise<void> {
         mobs.update(dt, makeMobCtx(sky));
       }
       mobView.sync(mobs.mobs, sky.light, now / 1000);
+      mobView.syncArrows(mobs.arrows);
+      hand?.update(dt, held()?.id ?? 0, state === 'playing' && !thirdPerson, Math.min(1, Math.hypot(player.vel.x, player.vel.z) / 4) * (player.onGround ? 1 : 0), handAct, sky.light);
       if (state === 'inventory') bag.tick();
       particles.update(dt);
       drops.update(dt, world, player.pos.x, player.pos.y, player.pos.z, (id, n) => {

@@ -48,6 +48,30 @@ export function mobDrops(kind: MobKind, rand: () => number = Math.random): { id:
   return out;
 }
 
+/** A csontváz nyílvesszeje: gravitációval repül, a blokkokban megakad, a játékost eltalálhatja (kitérni lehet előle) */
+export interface Arrow {
+  id: number;
+  x: number; y: number; z: number;
+  vx: number; vy: number; vz: number;
+  age: number;
+  /** −1: repül; különben ennyi másodperce áll a blokkban */
+  stuck: number;
+}
+const ARROW_SPEED = 15;
+const ARROW_GRAVITY = 12;
+let nextArrowId = 1;
+
+/** Nyíl kilövése az (x, y, z) pontból a (tx, ty, tz) felé: a gravitáció és egy kis pontatlanság figyelembevételével */
+function fireArrow(arrows: Arrow[], x: number, y: number, z: number, tx: number, ty: number, tz: number): void {
+  const err = 0.05;
+  const dx = tx - x + (Math.random() - 0.5) * err * 2 * Math.hypot(tx - x, tz - z);
+  const dy = ty - y + (Math.random() - 0.5) * err * 2 * 4;
+  const dz = tz - z + (Math.random() - 0.5) * err * 2 * Math.hypot(tx - x, tz - z);
+  const d = Math.hypot(dx, dy, dz) || 1;
+  const t = d / ARROW_SPEED;
+  arrows.push({ id: nextArrowId++, x, y, z, vx: dx / t, vy: dy / t + 0.5 * ARROW_GRAVITY * t, vz: dz / t, age: 0, stuck: -1 });
+}
+
 let nextId = 1;
 
 export class Mob {
@@ -77,6 +101,8 @@ export class Mob {
   atkCd = 0;
   burnT = 0;
   expT = 0;
+  /** a csontváz célzása: 0: nem céloz, különben eltelt másodperc a lövésig */
+  aim = 0;
 
   constructor(readonly kind: MobKind, x: number, y: number, z: number) {
     this.def = MOB_DEFS[kind];
@@ -200,7 +226,7 @@ function clearShot(world: World, x0: number, y0: number, z0: number, x1: number,
   return true;
 }
 
-function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx): void {
+function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]): void {
   const priv = m;
   const def = m.def;
   priv.atkCd = Math.max(0, priv.atkCd - dt);
@@ -213,11 +239,19 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx): void {
     // üldözés
     lookAt(m, ctx.px, ctx.pz);
     if (m.kind === 'skeleton') {
-      // a csontváz távolról lő: 7 blokknál közelebb megáll, 14 blokkon belül, szabad rálátással kétmásodpercenként lő
-      speed = dist > 7 ? def.speed : 0;
-      if (dist < 14 && priv.atkCd <= 0 && clearShot(world, m.x, m.y + 1.5, m.z, ctx.px, ctx.py + 1.5, ctx.pz)) {
-        priv.atkCd = 2;
-        if (Math.random() < 0.65) ctx.hurtPlayer(2, m.x, m.z);
+      // a csontváz távolról lő: 7 blokknál közelebb megáll; szabad rálátással megáll célozni, majd nyilat lő (kitérni lehet)
+      const canShoot = dist < 16 && Math.abs(dy) < 8 && clearShot(world, m.x, m.y + 1.5, m.z, ctx.px, ctx.py + 1.3, ctx.pz);
+      if (canShoot && priv.atkCd <= 0) {
+        m.aim += dt;
+        speed = 0;
+        if (m.aim >= 0.8) {
+          m.aim = 0;
+          priv.atkCd = 2;
+          fireArrow(arrows, m.x, m.y + 1.5, m.z, ctx.px, ctx.py + 1.3, ctx.pz);
+        }
+      } else {
+        m.aim = 0;
+        speed = dist > 7 || !canShoot ? def.speed : 0;
       }
     } else {
       speed = dist > 0.9 ? def.speed : 0;
@@ -286,6 +320,36 @@ export class MobManager {
     return n;
   }
 
+  /** a repülő és a blokkokba állt nyilak */
+  arrows: Arrow[] = [];
+
+  /** A nyilak repülése: gravitáció, megakadás a blokkokban, találat a játékoson */
+  private updateArrows(dt: number, ctx: MobCtx): void {
+    for (let i = this.arrows.length - 1; i >= 0; i--) {
+      const a = this.arrows[i];
+      a.age += dt;
+      if (a.stuck >= 0) {
+        a.stuck += dt;
+        if (a.stuck > 5) this.arrows.splice(i, 1);
+        continue;
+      }
+      let gone = false;
+      const n = Math.max(1, Math.ceil((Math.hypot(a.vx, a.vy, a.vz) * dt) / 0.25));
+      const h = dt / n;
+      for (let k = 0; k < n && !gone && a.stuck < 0; k++) {
+        a.x += a.vx * h; a.y += a.vy * h; a.z += a.vz * h;
+        a.vy -= ARROW_GRAVITY * h;
+        if (ctx.target && Math.abs(a.x - ctx.px) < 0.45 && Math.abs(a.z - ctx.pz) < 0.45 && a.y > ctx.py - 0.1 && a.y < ctx.py + 1.85) {
+          ctx.hurtPlayer(3, a.x - a.vx * 0.05, a.z - a.vz * 0.05);
+          gone = true;
+        } else if (isOpaque(this.world.getBlock(Math.floor(a.x), Math.floor(a.y), Math.floor(a.z)))) {
+          a.stuck = 0;
+        }
+      }
+      if (gone || a.age > 12) this.arrows.splice(i, 1);
+    }
+  }
+
   spawn(kind: MobKind, x: number, y: number, z: number): Mob {
     const m = new Mob(kind, x, y, z);
     this.mobs.push(m);
@@ -293,6 +357,7 @@ export class MobManager {
   }
 
   update(dt: number, ctx: MobCtx): void {
+    this.updateArrows(dt, ctx);
     for (let i = this.mobs.length - 1; i >= 0; i--) {
       const m = this.mobs[i];
       const far = Math.hypot(m.x - ctx.px, m.z - ctx.pz);
@@ -321,7 +386,7 @@ export class MobManager {
         if (priv.burnT >= 1) { priv.burnT -= 1; m.hp -= 2; m.hurtT = 0.3; }
       }
 
-      aiStep(this.world, m, dt, ctx);
+      aiStep(this.world, m, dt, ctx, this.arrows);
       if (m.dead) { this.mobs.splice(i, 1); continue; } // felrobbant
       physics(this.world, m, dt);
       if (m.hp <= 0 && !m.dead) { m.deadT = 0; ctx.onDie(m); }

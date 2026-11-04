@@ -1,73 +1,23 @@
 import * as THREE from 'three';
-import type { Mob, MobKind } from '../shared/mobs';
+import type { Arrow, Mob, MobKind } from '../shared/mobs';
 import { TEXTURED, partGeom, type TexName } from './mobmodels';
 
 /**
  * A mobok megjelenítése: a háziállatok a Good Vibes csomag lény-skinjeivel textúrázott dobozmodellek (mobmodels.ts),
- * a zombi színes dobozokból épített saját terv,
+ * a zombi és a csontváz is textúrázott modell,
  * járás-animációval, sebzés-villanással, és a halál utáni eldőléssel.
  * A koordináták a lábak alatti ponttól számítanak; az előre a −z irány (a mob yaw szögével forgatva).
  */
 
 type V3 = [number, number, number];
-interface Part {
-  /** méret */
-  s: V3;
-  /** a doboz közepe */
-  p: V3;
-  /** szín (sRGB hex) */
-  c: string;
-  /** ha van: a doboz ezen pont körül lendül (pl. a láb csípője); a doboz közepe továbbra is `p` */
-  pivot?: V3;
-  /** lendítés iránya és mértéke (a láb/kar a járással mozog): 1 vagy −1 */
-  swing?: number;
-  /** állandó dőlés az x tengely körül (pl. a zombi előretartott karja) */
-  tilt?: number;
-  /** szárny: a z tengely körül csapkod */
-  flap?: number;
-}
-
-const hex = (c: string): V3 => [parseInt(c.slice(1, 3), 16) / 255, parseInt(c.slice(3, 5), 16) / 255, parseInt(c.slice(5, 7), 16) / 255];
-const FACE_SHADE = [0.8, 0.8, 1, 0.5, 0.65, 0.65]; // +x, −x, +y, −y, +z, −z (a BoxGeometry lapsorrendje)
-
-const geoCache = new Map<string, THREE.BufferGeometry>();
-function boxGeo(s: V3, c: string): THREE.BufferGeometry {
-  const key = `${s.join(',')}|${c}`;
-  let g = geoCache.get(key);
-  if (g) return g;
-  g = new THREE.BoxGeometry(s[0], s[1], s[2]);
-  const [r, gr, b] = hex(c);
-  const col: number[] = [];
-  for (let f = 0; f < 6; f++) for (let v = 0; v < 4; v++) col.push(r * FACE_SHADE[f], gr * FACE_SHADE[f], b * FACE_SHADE[f]);
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  geoCache.set(key, g);
-  return g;
-}
-
-/** A színes dobozokból épített modellek (a textúrázottak a mobmodels.ts-ben vannak) */
-const MODELS: Partial<Record<MobKind, Part[]>> = {
-  // egy görnyedt, hosszú karú, rongyokba burkolt kísértet (saját terv, nem a kockajátékok megszokott zombija)
-  zombie: [
-    { s: [0.2, 0.7, 0.22], p: [-0.12, 0.35, 0], pivot: [-0.12, 0.7, 0], c: '#4a4238', swing: 1 },
-    { s: [0.2, 0.7, 0.22], p: [0.12, 0.35, 0], pivot: [0.12, 0.7, 0], c: '#4a4238', swing: -1 },
-    { s: [0.56, 0.7, 0.3], p: [0, 1.05, 0.04], c: '#5b5a3c' },
-    { s: [0.6, 0.18, 0.34], p: [0, 0.78, 0.04], c: '#3d3a2a' },
-    { s: [0.62, 0.14, 0.36], p: [0, 1.36, 0.02], c: '#6d6b4a' },
-    { s: [0.44, 0.42, 0.44], p: [0, 1.62, -0.12], c: '#9aa38a' },
-    { s: [0.5, 0.12, 0.5], p: [0, 1.86, -0.1], c: '#3a3328' },
-    { s: [0.07, 0.05, 0.02], p: [-0.1, 1.64, -0.345], c: '#ffb020' },
-    { s: [0.07, 0.05, 0.02], p: [0.1, 1.64, -0.345], c: '#ffb020' },
-    { s: [0.2, 0.04, 0.02], p: [0, 1.5, -0.345], c: '#2a2a22' },
-    { s: [0.18, 0.8, 0.18], p: [-0.38, 1.0, -0.05], pivot: [-0.38, 1.4, -0.05], c: '#8c9580', tilt: 1.2, swing: 0.15 },
-    { s: [0.18, 0.8, 0.18], p: [0.38, 1.0, -0.05], pivot: [0.38, 1.4, -0.05], c: '#8c9580', tilt: 1.2, swing: -0.15 },
-  ],
-};
 
 interface View {
   root: THREE.Group;
   /** a lény anyagai (a textúrázottak textúránként egy; a színes részeké `plain`); mind kapja a napszak-színezést */
   mats: THREE.MeshBasicMaterial[];
-  limbs: { g: THREE.Group; swing: number; tilt: number; flap: number }[];
+  limbs: { g: THREE.Group; swing: number; tilt: number; flap: number; aim: number }[];
+  /** az íj (a csontváz kezében): a mob célzás-állapotához */
+  bow?: THREE.Mesh;
 }
 
 /** A lény-skinek betöltése (közös, egyszer) */
@@ -80,6 +30,20 @@ function skin(base: string, name: TexName): THREE.Texture {
     t.magFilter = THREE.NearestFilter;
     t.minFilter = THREE.NearestFilter;
     skins.set(name, t);
+  }
+  return t;
+}
+
+/** Egy tárgy-textúra (a kézben tartott tárgyakhoz) */
+const itemTexs = new Map<string, THREE.Texture>();
+function itemTex(base: string, name: string): THREE.Texture {
+  let t = itemTexs.get(name);
+  if (!t) {
+    t = new THREE.TextureLoader().load(`${base}textures/item/${name}.png`);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    itemTexs.set(name, t);
   }
   return t;
 }
@@ -103,18 +67,18 @@ function buildView(kind: string, scene: THREE.Scene, base: string): View {
     const mats: THREE.MeshBasicMaterial[] = [];
     const limbs: View['limbs'] = [];
     const matFor = new Map<string, THREE.MeshBasicMaterial>();
-    const material = (tex?: TexName): THREE.MeshBasicMaterial => {
-      const key = tex ?? 'plain';
+    const material = (tex: TexName): THREE.MeshBasicMaterial => {
+      const key = tex;
       let m = matFor.get(key);
       if (!m) {
         // a gyapjú és a lábak áttetsző pixeleket tartalmaznak: alphaTest
-        m = new THREE.MeshBasicMaterial(tex ? { vertexColors: true, map: skin(base, tex), alphaTest: 0.5 } : { vertexColors: true });
+        m = new THREE.MeshBasicMaterial({ vertexColors: true, map: skin(base, tex), alphaTest: 0.5 });
         matFor.set(key, m); mats.push(m);
       }
       return m;
     };
     /** a rész a (pivot) csomóponton lóg, a doboz a közepénél van */
-    const attach = (mesh: THREE.Mesh, p: V3, pivot: V3 | undefined, tilt: number | undefined, swing: number | undefined, flap: number | undefined) => {
+    const attach = (mesh: THREE.Mesh, p: V3, pivot: V3 | undefined, tilt: number | undefined, swing: number | undefined, flap: number | undefined, aim?: number): THREE.Group | undefined => {
       mesh.frustumCulled = false;
       if (pivot || tilt) {
         const pv = pivot ?? p;
@@ -123,32 +87,62 @@ function buildView(kind: string, scene: THREE.Scene, base: string): View {
         mesh.position.set(p[0] - pv[0], p[1] - pv[1], p[2] - pv[2]);
         g.add(mesh);
         root.add(g);
-        if (swing !== undefined || flap !== undefined || tilt) limbs.push({ g, swing: swing ?? 0, tilt: tilt ?? 0, flap: flap ?? 0 });
-      } else {
-        mesh.position.set(...p);
-        root.add(mesh);
+        if (swing !== undefined || flap !== undefined || tilt) limbs.push({ g, swing: swing ?? 0, tilt: tilt ?? 0, flap: flap ?? 0, aim: aim ?? tilt ?? 0 });
+        return g;
       }
+      mesh.position.set(...p);
+      root.add(mesh);
+      return undefined;
     };
-    const textured = TEXTURED[kind];
-    if (textured) {
-      const k = 1 / 16;
-      for (const part of textured) {
-        const mesh = new THREE.Mesh(texturedGeo(part), material(part.tex));
-        attach(mesh, part.p.map((x) => x * k) as V3, part.pivot?.map((x) => x * k) as V3 | undefined, part.tilt, part.swing, part.flap);
-      }
-    } else {
-      for (const part of MODELS[kind as MobKind] ?? []) {
-        attach(new THREE.Mesh(boxGeo(part.s, part.c), material()), part.p, part.pivot, part.tilt, part.swing, part.flap);
+    let bow: THREE.Mesh | undefined;
+    const k = 1 / 16;
+    for (const part of TEXTURED[kind] ?? []) {
+      const mesh = new THREE.Mesh(texturedGeo(part), material(part.tex));
+      const g = attach(mesh, part.p.map((x) => x * k) as V3, part.pivot?.map((x) => x * k) as V3 | undefined, part.tilt, part.swing, part.flap, part.aim);
+      // a csontváz jobb keze (az egyetlen 1.55-ös célzó kar) tartja az íjat
+      if (kind === 'skeleton' && g && part.aim === 1.55) {
+        const geo = new THREE.PlaneGeometry(0.8, 0.8);
+        geo.rotateY(Math.PI / 2);
+        geo.rotateX(-Math.PI / 2);
+        bow = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: itemTex(base, 'bow'), alphaTest: 0.5, side: THREE.DoubleSide }));
+        bow.frustumCulled = false;
+        bow.position.set(0.02, -0.62, -0.18);
+        g.add(bow);
+        mats.push(bow.material as THREE.MeshBasicMaterial);
       }
     }
     scene.add(root);
-    return { root, mats, limbs };
+    return { root, mats, limbs, bow };
   }
+}
+
+const arrowMats = {
+  shaft: new THREE.MeshBasicMaterial({ color: 0x8a6a3c }),
+  head: new THREE.MeshBasicMaterial({ color: 0x9a9a9a }),
+  fletch: new THREE.MeshBasicMaterial({ color: 0xe8e8e0 }),
+};
+/** Egy nyíl: szár, hegy elöl (−z) és tollazat hátul; a közepe a repülő pont */
+function makeArrow(): THREE.Group {
+  const g = new THREE.Group();
+  const add = (s: V3, p: V3, m: THREE.MeshBasicMaterial) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...s), m);
+    mesh.position.set(...p);
+    mesh.frustumCulled = false;
+    g.add(mesh);
+  };
+  add([0.03, 0.03, 0.6], [0, 0, 0], arrowMats.shaft);
+  add([0.07, 0.07, 0.1], [0, 0, -0.33], arrowMats.head);
+  add([0.1, 0.02, 0.14], [0, 0, 0.26], arrowMats.fletch);
+  add([0.02, 0.1, 0.14], [0, 0, 0.26], arrowMats.fletch);
+  return g;
 }
 
 export function createMobView(scene: THREE.Scene, base: string = import.meta.env.BASE_URL) {
   const views = new Map<number, View>();
   const build = (kind: MobKind): View => buildView(kind, scene, base);
+  const arrowViews = new Map<number, THREE.Group>();
+  const FWD = new THREE.Vector3(0, 0, -1);
+  const dir = new THREE.Vector3();
 
   return {
     /**
@@ -168,7 +162,7 @@ export function createMobView(scene: THREE.Scene, base: string = import.meta.env
         const speed = Math.min(1, Math.hypot(m.vx, m.vz) / 2.5);
         const sw = Math.sin(m.walk * 3.2) * 0.85 * speed;
         for (const l of v.limbs) {
-          l.g.rotation.x = l.tilt + sw * l.swing;
+          l.g.rotation.x = (m.aim > 0 ? l.aim : l.tilt) + (m.aim > 0 ? 0 : sw * l.swing);
           if (l.flap) l.g.rotation.z = l.flap * (m.onGround ? 0.1 : 0.9 + Math.sin(time * 30) * 0.5);
         }
 
@@ -192,7 +186,22 @@ export function createMobView(scene: THREE.Scene, base: string = import.meta.env
         views.delete(id);
       }
     },
+    /** a repülő és a beleállt nyilak */
+    syncArrows(list: Arrow[]): void {
+      const alive = new Set<number>();
+      for (const a of list) {
+        alive.add(a.id);
+        let g = arrowViews.get(a.id);
+        if (!g) { g = makeArrow(); scene.add(g); arrowViews.set(a.id, g); }
+        g.position.set(a.x, a.y, a.z);
+        const len = Math.hypot(a.vx, a.vy, a.vz);
+        if (len > 0.01) g.quaternion.setFromUnitVectors(FWD, dir.set(a.vx / len, a.vy / len, a.vz / len));
+      }
+      for (const [id, g] of arrowViews) if (!alive.has(id)) { scene.remove(g); arrowViews.delete(id); }
+    },
     clear(): void {
+      for (const g of arrowViews.values()) scene.remove(g);
+      arrowViews.clear();
       for (const v of views.values()) { scene.remove(v.root); for (const mt of v.mats) mt.dispose(); }
       views.clear();
     },
