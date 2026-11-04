@@ -18,6 +18,7 @@ import { buildAtlas, TILE } from './atlas';
 import { DAY_SECONDS, START_TIME, formatClock, skyAt } from './daynight';
 import { createMoonTexture, createSunTexture } from './sky';
 import { createMobView, createPlayerView } from './mobview';
+import { createCollapse } from './collapse';
 import { MobManager, mobDrops, type Mob, type MobCtx } from '../shared/mobs';
 import { findTree, isLogBlock } from '../shared/tree';
 import { BagUI, HOTBAR_SIZE, Inventory, SlotView, createItemPainter } from './inventory';
@@ -361,6 +362,7 @@ async function main(): Promise<void> {
 
   const drops = createDrops(scene, atlas, material, paintStack);
   const mobView = createMobView(scene);
+  const collapse = createCollapse(scene, atlas, material, () => world);
   // harmadik személyű nézet (V): a játékos saját modellje a kamera előtt
   const playerView = createPlayerView(scene);
   let thirdPerson = false;
@@ -746,23 +748,35 @@ async function main(): Promise<void> {
   };
 
   /**
-   * Fadöntés: ha egy természetes fa rönkjét kiütik (kézzel is, csak lassan), az egész fa (rönkök és lomb) szétesik: a blokkok
-   * a helyükön tárgyakká válnak, és onnan esnek le a földre. Kreatívban csak a törmelék pattan szét.
+   * Egy természetes fa összeomlása a (x, y, z) rönktől felfelé: a rönkök és a lomb kikerülnek a világból, a darabok
+   * egyenként szétesnek és a földre hullanak (animáció), és földet éréskor tárgyak lesznek belőlük (túlélőben).
    */
-  const tryFell = (x: number, y: number, z: number): boolean => {
-    if (!isLogBlock(world.getBlock(x, y, z))) return false;
+  const collapseTree = (x: number, y: number, z: number): { logs: number } | null => {
+    if (!isLogBlock(world.getBlock(x, y, z))) return null;
     const tree = findTree(world, x, y, z);
-    if (!tree) return false;
-    wearHeld(tree.logs.length); // minden kidöntött rönk egy használat
-    health.exhaust(0.005 * tree.logs.length);
-    for (const c of [...tree.logs, ...tree.leaves]) setBlockAt(c.x, c.y, c.z, AIR);
+    if (!tree) return null;
+    const cells = [...tree.logs, ...tree.leaves];
+    for (const c of cells) setBlockAt(c.x, c.y, c.z, AIR);
     particles.burst(x, y, z, tree.logs[0].id);
-    for (const c of tree.logs) {
-      if (c.y > y + 1) particles.burst(c.x, c.y, c.z, c.id);
-      if (mode === 'survival') giveDrop(c.id, c.x, c.y, c.z);
-    }
-    if (mode === 'survival') for (const c of tree.leaves) giveDrop(c.id, c.x, c.y, c.z);
     flushDirty(9);
+    const tool = held()?.id;
+    let leafBursts = 0;
+    collapse.start(cells, { x, z }, (c, lx, ly, lz) => {
+      const log = isLogBlock(c.id);
+      if (log || ++leafBursts % 4 === 0) particles.burst(Math.floor(lx), Math.floor(ly), Math.floor(lz), c.id);
+      if (mode !== 'survival') return;
+      const d = dropFor(c.id, tool);
+      if (d) drops.spawn(d.id, d.n, lx, ly, lz);
+    });
+    return { logs: tree.logs.length };
+  };
+
+  /** Fadöntés: egy természetes fa rönkjét kiütik (kézzel is, csak lassan): az egész fa összeomlik */
+  const tryFell = (x: number, y: number, z: number): boolean => {
+    const r = collapseTree(x, y, z);
+    if (!r) return false;
+    wearHeld(r.logs); // minden kidöntött rönk egy használat
+    health.exhaust(0.005 * r.logs);
     return true;
   };
 
@@ -771,6 +785,8 @@ async function main(): Promise<void> {
     const id = world.getBlock(x, y, z);
     if (!setBlockAt(x, y, z, AIR)) return;
     particles.burst(x, y, z, id);
+    // a fa alól kivették a talajt: a fa magától összeomlik
+    if (isLogBlock(world.getBlock(x, y + 1, z))) collapseTree(x, y + 1, z);
     // tűzhely: a tartalma a földre esik
     if (blockKey(id) === 'furnace') {
       const f = furnaces.get(fkey(x, y, z));
@@ -1132,6 +1148,7 @@ async function main(): Promise<void> {
     if (state !== 'menu') {
       // a tűzhelyek folyamatosan dolgoznak (akkor is, ha épp nem nézed őket)
       for (const f of furnaces.values()) f.update(dt);
+      collapse.update(dt);
       // mobok: a szimuláció csak játék közben fut; békés módban nincsenek szörnyek, kikapcsolva semmi
       if (settings.mobs !== 'off') {
         if (state !== 'dead') {
