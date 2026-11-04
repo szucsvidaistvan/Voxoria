@@ -49,7 +49,7 @@ function itemTex(base: string, name: string): THREE.Texture {
 }
 
 /** Egy textúrázott rész BufferGeometry-je: a v tengely a three flipY-os textúrájához megfordítva */
-function texturedGeo(part: Parameters<typeof partGeom>[0]): THREE.BufferGeometry {
+export function texturedGeo(part: Parameters<typeof partGeom>[0]): THREE.BufferGeometry {
   const g = partGeom(part);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(g.pos, 3));

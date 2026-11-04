@@ -366,7 +366,7 @@ async function main(): Promise<void> {
   const drops = createDrops(scene, atlas, material, paintStack);
   const mobView = createMobView(scene);
   scene.add(camera); // a kézben tartott tárgy a kamera gyereke
-  hand = createHandItem(camera, paintStack, atlas, isItem);
+  hand = createHandItem(camera, paintStack, atlas, isItem, import.meta.env.BASE_URL);
   const collapse = createCollapse(scene, atlas, material, () => world);
   // harmadik személyű nézet (V): a játékos saját modellje a kamera előtt
   const playerView = createPlayerView(scene);
@@ -885,7 +885,7 @@ async function main(): Promise<void> {
     const food = ITEMS[id]?.food;
     if (food) {
       // csak éhesen lehet enni (kreatívban nincs éhség)
-      if (mode === 'survival' && health.eat(food.hunger, food.sat)) { inv.takeOne(input.hotbar); paintHotbar(); }
+      if (mode === 'survival' && health.eat(food.hunger, food.sat)) { hand?.eat(); inv.takeOne(input.hotbar); paintHotbar(); }
       return;
     }
     if (!hit) return;
