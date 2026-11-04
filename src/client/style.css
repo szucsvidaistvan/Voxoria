@@ -313,12 +313,17 @@ body.touch #touch-actions { display: grid; }
   width: 100%;
   pointer-events: none;
 }
-#hearts, #air, #food { display: flex; gap: 2px; min-height: 22px; }
-#vitals-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+#vitals { gap: 8px; }
+#hearts, #air, #food { display: flex; gap: 2px; min-height: 22px; min-width: 0; }
+#hearts { flex: 1 1 0; }
+/* a szívek és a húscombok a hotbar szélességéhez igazodnak: keskeny képernyőn zsugorodnak, nem lógnak ki */
+#vitals-right { display: flex; flex-direction: column; align-items: stretch; gap: 2px; flex: 1 1 0; min-width: 0; }
 #food { flex-direction: row-reverse; }
 .vital {
-  width: 20px;
-  height: 20px;
+  flex: 0 1 20px;
+  min-width: 0;
+  aspect-ratio: 1;
+  height: auto;
   background-size: 100% 100%;
   image-rendering: pixelated;
 }
@@ -394,7 +399,6 @@ body.creative #vitals { display: none; }
 .bag-panel header { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.6rem; }
 .bag-panel h2 { flex: 1; margin: 0; font-size: 1.3rem; font-weight: 600; }
 .bag-panel .btn { width: auto; margin: 0; padding: 0.4rem 0.9rem; font-size: 1rem; }
-#bag-split.on { background: var(--gold); color: #000; }
 #craft-area { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 0 0 0.8rem; }
 #craft-grid { display: grid; grid-template-columns: repeat(var(--n, 2), var(--slot)); gap: 4px; }
 #craft-arrow { font-size: 2rem; color: var(--gold); }

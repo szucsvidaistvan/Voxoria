@@ -143,7 +143,6 @@ export class BagUI {
   private hotEl = document.getElementById('bag-hot')!;
   private cursorEl = document.getElementById('bag-cursor')!;
   private titleEl = document.getElementById('bag-title')!;
-  private splitBtn = document.getElementById('bag-split') as HTMLButtonElement;
 
   private invViews: SlotView[] = [];
   private craftViews: SlotView[] = [];
@@ -153,8 +152,6 @@ export class BagUI {
   private size = 2;
   private cursor: Stack | null = null;
   private result: Stack | null = null;
-  /** érintésnél: a koppintás jobb gombot helyettesít (egyesével lerak, felét felveszi) */
-  private split = false;
   /** nyitva lévő tűzhely: a bemenet és az üzemanyag a `craft` rács két helye, a kimenet a tűzhelyé */
   private furnace: Furnace | null = null;
 
@@ -180,10 +177,6 @@ export class BagUI {
 
     this.outView.el.addEventListener('pointerdown', (e) => { e.preventDefault(); this.takeResult(e.shiftKey); });
     document.getElementById('bag-close')!.addEventListener('click', () => this.onClose());
-    this.splitBtn.addEventListener('click', () => {
-      this.split = !this.split;
-      this.splitBtn.classList.toggle('on', this.split);
-    });
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
     // a sötét háttérre koppintva bezárul a panel (a kézben lévő dolog visszakerül a tárolóba)
     this.root.addEventListener('pointerdown', (e) => { if (e.target === this.root) this.onClose(); });
@@ -192,9 +185,12 @@ export class BagUI {
   }
 
   /**
-   * Egérrel: kattintás azonnal (jobb gomb: fél / egy darab). Érintéssel:
-   * koppintás = felvesz / lerak, hosszan nyomva = fél stack / egy darab, ujjal húzva = a stack vonszolása
-   * a másik helyre (az ujj felengedésekor oda kerül).
+   * Kezelés (érintéssel és egérrel is):
+   *  - üres kézzel: koppintás / bal kattintás = a teljes stack felvétele; hosszan nyomva / jobb kattintás = a fele;
+   *    ujjal húzva a stack vonszolása a másik helyre
+   *  - tele kézzel: koppintás = lerak; hosszan nyomva / jobb kattintás = egy darab;
+   *    SZÉTOSZTÁS: a nyomva tartott ujjal (vagy egérrel) végighúzva több helyen a kézben lévő stack egyenlően
+   *    szétoszlik a érintett helyek között (jobb gombbal húzva helyenként egy darab)
    */
   private bindSlot(el: HTMLElement, area: 'inv' | 'craft', idx: number): void {
     el.dataset.area = area;
@@ -202,10 +198,10 @@ export class BagUI {
     el.addEventListener('contextmenu', (e) => e.preventDefault());
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      if (e.pointerType !== 'touch') {
-        this.click(area, idx, e.button === 2 || this.split ? 2 : 0, e.shiftKey);
-        return;
-      }
+      const touch = e.pointerType !== 'mouse';
+      const button: 0 | 2 = e.button === 2 ? 2 : 0;
+      if (this.cursor) { this.holdGesture(e, area, idx, button, touch); return; }
+      if (!touch) { this.click(area, idx, button, e.shiftKey); return; }
       const sx = e.clientX, sy = e.clientY;
       let mode: 'pending' | 'long' | 'drag' | 'ignore' = 'pending';
       const timer = window.setTimeout(() => {
@@ -217,9 +213,9 @@ export class BagUI {
         this.moveCursor(ev.clientX, ev.clientY);
         if (mode !== 'pending' || Math.hypot(ev.clientX - sx, ev.clientY - sy) < 10) return;
         window.clearTimeout(timer);
-        if (!this.cursor && this.list(area)[idx]) {
+        if (this.list(area)[idx]) {
           mode = 'drag';
-          this.click(area, idx, this.split ? 2 : 0, false); // felveszi a stacket (vagy a felét), és követi az ujjat
+          this.click(area, idx, 0, false); // felveszi a stacket, és követi az ujjat
           this.moveCursor(ev.clientX, ev.clientY);
         } else mode = 'ignore';
       };
@@ -229,11 +225,11 @@ export class BagUI {
         document.removeEventListener('pointerup', end);
         document.removeEventListener('pointercancel', end);
         if (ev.type === 'pointercancel') return;
-        if (mode === 'pending') this.click(area, idx, this.split ? 2 : 0, false);
+        if (mode === 'pending') this.click(area, idx, 0, false);
         else if (mode === 'drag') {
           // a vonszolt stack oda kerül, ahol az ujjat felengedték; ha nincs ott hely, visszamegy
-          const t = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest('[data-area]') as HTMLElement | null;
-          if (t && t.dataset.area) this.click(t.dataset.area as 'inv' | 'craft', Number(t.dataset.idx), 0, false);
+          const t = this.slotAt(ev.clientX, ev.clientY);
+          if (t) this.click(t.area, t.idx, 0, false);
           if (this.cursor && !this.list(area)[idx]) {
             this.list(area)[idx] = this.cursor;
             this.cursor = null;
@@ -246,6 +242,92 @@ export class BagUI {
       document.addEventListener('pointerup', end);
       document.addEventListener('pointercancel', end);
     });
+  }
+
+  /** A (x, y) képpont alatti hely (hátizsák vagy rács), ha van */
+  private slotAt(x: number, y: number): { area: 'inv' | 'craft'; idx: number } | null {
+    const t = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest('[data-area]') as HTMLElement | null;
+    return t && t.dataset.area ? { area: t.dataset.area as 'inv' | 'craft', idx: Number(t.dataset.idx) } : null;
+  }
+
+  /** Befogadja-e a hely a kézben lévő stacket (üres, vagy ugyanaz és van benne hely)? */
+  private accepts(area: 'inv' | 'craft', idx: number): boolean {
+    const c = this.cursor, r = this.list(area)[idx];
+    return !!c && (!r || (r.id === c.id && r.n < maxStack(r.id)));
+  }
+
+  /** A szétosztás terve: hány darab kerül az egyes helyekre, és mennyi marad a kézben */
+  private planSpread(slots: { area: 'inv' | 'craft'; idx: number }[], one: boolean): { counts: number[]; left: number } {
+    const c = this.cursor!;
+    let left = c.n;
+    const per = one ? 1 : Math.max(1, Math.floor(c.n / slots.length));
+    const counts = slots.map((sl) => {
+      const r = this.list(sl.area)[sl.idx];
+      const room = maxStack(c.id) - (r?.n ?? 0);
+      const m = Math.min(per, room, left);
+      left -= m;
+      return m;
+    });
+    return { counts, left };
+  }
+
+  /** Szétosztás előnézete: az érintett helyeken már a leendő darabszám látszik, a kézben a maradék */
+  private previewSpread(slots: { area: 'inv' | 'craft'; idx: number }[], one: boolean): void {
+    this.render();
+    if (slots.length < 2) return;
+    const c = this.cursor!;
+    const { counts, left } = this.planSpread(slots, one);
+    slots.forEach((sl, i) => {
+      const v = sl.area === 'inv' ? this.invViews[this.order.indexOf(sl.idx)] : this.craftViews[sl.idx];
+      const r = this.list(sl.area)[sl.idx];
+      v?.set({ id: c.id, n: (r?.n ?? 0) + counts[i], d: c.d });
+    });
+    this.cursorView.set(left > 0 ? { id: c.id, n: left, d: c.d } : null);
+  }
+
+  /** Tele kézzel indított mozdulat: koppintás (lerak), hosszan nyomva (egy darab) vagy végighúzás (szétosztás) */
+  private holdGesture(e: PointerEvent, area: 'inv' | 'craft', idx: number, button: 0 | 2, touch: boolean): void {
+    const slots: { area: 'inv' | 'craft'; idx: number }[] = [{ area, idx }];
+    let mode: 'pending' | 'long' | 'spread' = 'pending';
+    const timer = touch ? window.setTimeout(() => {
+      if (mode !== 'pending') return;
+      mode = 'long';
+      this.click(area, idx, 2, false);
+    }, 450) : 0;
+    const move = (ev: PointerEvent) => {
+      this.moveCursor(ev.clientX, ev.clientY);
+      if (mode === 'long') return;
+      const t = this.slotAt(ev.clientX, ev.clientY);
+      if (!t || slots.some((sl) => sl.area === t.area && sl.idx === t.idx) || !this.accepts(t.area, t.idx)) return;
+      slots.push(t);
+      if (slots.length >= 2) { mode = 'spread'; window.clearTimeout(timer); }
+      this.previewSpread(slots, button === 2);
+    };
+    const end = (ev: PointerEvent) => {
+      window.clearTimeout(timer);
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', end);
+      document.removeEventListener('pointercancel', end);
+      if (ev.type === 'pointercancel') { this.render(); return; }
+      if (mode === 'pending') this.click(area, idx, button, e.shiftKey);
+      else if (mode === 'spread') {
+        const c = this.cursor!;
+        const { counts, left } = this.planSpread(slots, button === 2);
+        slots.forEach((sl, i) => {
+          if (counts[i] <= 0) return;
+          const list = this.list(sl.area);
+          const r = list[sl.idx];
+          if (r) r.n += counts[i];
+          else list[sl.idx] = { id: c.id, n: counts[i], d: c.d };
+        });
+        this.cursor = left > 0 ? { id: c.id, n: left, d: c.d } : null;
+        this.render();
+        this.onChange();
+      }
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', end);
   }
 
   private moveCursor(x: number, y: number): void {
