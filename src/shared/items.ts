@@ -82,11 +82,11 @@ EXTRA.forEach(([key, name, food, stack], i) => {
 // eszközök: 5 anyag x 4 típus
 const MATERIALS = [
   // durability: ennyi használat után törik el; bonus: a támadás sebzéséhez adódik
-  { id: 'wooden', name: 'Wooden', tier: 1, speed: 2, color: '#a07a44', durability: 59, bonus: 0 },
-  { id: 'stone', name: 'Stone', tier: 2, speed: 4, color: '#8f8f8f', durability: 131, bonus: 1 },
-  { id: 'iron', name: 'Iron', tier: 3, speed: 6, color: '#d8d8d8', durability: 250, bonus: 2 },
-  { id: 'golden', name: 'Golden', tier: 1, speed: 12, color: '#f5d442', durability: 32, bonus: 0 },
-  { id: 'diamond', name: 'Diamond', tier: 4, speed: 8, color: '#4be3e0', durability: 1561, bonus: 3 },
+  { id: 'wooden', name: 'Wooden', tier: 1, speed: 1.8, color: '#a07a44', durability: 59, bonus: 0 },
+  { id: 'stone', name: 'Stone', tier: 2, speed: 2.5, color: '#8f8f8f', durability: 131, bonus: 1 },
+  { id: 'iron', name: 'Iron', tier: 3, speed: 3.2, color: '#d8d8d8', durability: 250, bonus: 2 },
+  { id: 'golden', name: 'Golden', tier: 1, speed: 4.5, color: '#f5d442', durability: 32, bonus: 0 },
+  { id: 'diamond', name: 'Diamond', tier: 4, speed: 4, color: '#4be3e0', durability: 1561, bonus: 3 },
 ];
 /** Alap támadás-sebzés típusonként (fél szív): a kard a legerősebb */
 const BASE_DAMAGE: Record<ToolType, number> = { sword: 4, axe: 3, pickaxe: 2, shovel: 2 };

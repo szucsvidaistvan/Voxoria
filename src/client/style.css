@@ -167,6 +167,8 @@ body.touch #hotwrap {
   width: min(24rem, calc(100vw - 11rem));
   flex-direction: column-reverse;
 }
+/* telefonon a hotbar fent van, alatta az életerő: a levegő-buborékok az éhségsáv ALÁ kerülnek (gépen fölé) */
+body.touch #vitals-right { flex-direction: column-reverse; }
 body.touch #held-name { top: calc(max(8px, env(safe-area-inset-top)) + 84px); bottom: auto; }
 body.touch .slot { flex: 1; width: auto; height: auto; aspect-ratio: 1; padding: 2px; border-width: 2px; }
 

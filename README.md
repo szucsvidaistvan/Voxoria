@@ -45,9 +45,11 @@ A korábbi, saját textúralapokból kivágott textúrákat a `scripts/slice-tex
 - **Tűzhely:** 8 kőből barkácsolható (gyűrű alakban), jobb klikkel nyílik. Bemenet + üzemanyag (szén, faszén, fa, deszka, bot ...), 10 másodperc tárgyanként. A vas- és aranyérc most már érc blokkot ad, amit meg kell olvasztani. A rönk faszénné olvad, a homok üveggé, a macskakő kővé.
 - **Fadöntés:** ha egy természetes fa rönkjét kiütik, az egész fa összeomlik: a rönkök és a lomb blokkonként szétesnek, pörögve-pattogva a földre hullanak (animáció), és földet érve tárgyak lesznek belőlük (fix mód, nincs beállítás). Ugyanez történik, ha a fa alól kiszedik a talajt (közvetlenül a törzs alatti blokkot). Kézzel is működik, de ~4x lassabb (kb. 12 mp), baltával fél másodperc. A fa gyökerei alatti földet (közvetlenül fölötte rönk) kézzel szintén ~4x nehezebb kiszedni, ásóval nem. Rönkházat és fa nélküli rönkoszlopot nem dönt ki.
 - **Irányítás:** játék közben a böngésző Ctrl-gyorsbillentyűi le vannak tiltva (a Ctrl+W, Ctrl+T, Ctrl+N megnyomását a weboldalak nem tilthatják le, csak teljes képernyőn). Az Esc után bármelyik billentyű vagy kattintás visszaadja az irányítást, a menüben az Enter folytatja a játékot.
-- **Éhség:** 10 húscomb; a mozgás, az ugrás, a bontás és a sebzés kimerít, a telítettség előbb fogy, mint az éhség. 18 éhség fölött az életerő magától töltődik, nulla éhségnél az életerő 1 pontig csökken. Étel jobb klikkre (csak éhesen): alma, nyers és sült hús, rothadt hús. A nyers húst a tűzhelyben lehet megsütni.
+- **Bontás:** a bontási idők szándékosan hosszabbak (szorzó: `MINING_SCALE` a `survival.ts`-ben): pl. kézzel a föld ~1,7 mp, a rönk ~16 mp, vascsákánnyal a kő ~1,6 mp.
+- **Kézben tartott tárgy:** első személyű nézetben a kezedben lévő tárgy a jobb alsó sarokban látszik (járáskor billeg, bontáskor, ütéskor és lerakáskor lendül, a napszak színezi).
+- **Éhség:** 10 húscomb; a mozgás (kb. 160 méterenként egy éhségpont a telítettség után), az ugrás, a bontás (kb. 100 blokkonként egy pont) és a sebzés fokozatosan kimerít, a telítettség előbb fogy, mint az éhség. 18 éhség fölött az életerő magától töltődik, nulla éhségnél az életerő 1 pontig csökken. Étel jobb klikkre (csak éhesen): alma, nyers és sült hús, rothadt hús. A nyers húst a tűzhelyben lehet megsütni.
 - **Szerszámok kopása:** fa 59, kő 131, vas 250, arany 32, gyémánt 1561 használat. Minden bontott blokk, kidöntött rönk és ütés kopasztja; a kard a harcban, a többi eszköz a bontásban bírja jobban. A kopás csíkként látszik az ikonon, és a mentésben megmarad.
-- **Mobok:** disznó, tehén, birka, csirke (nyers húst, gyapjút adnak), zombi (éjjel jön, napfényben ég), creeper (sistereg, majd felrobban és lyukat vág a földbe). Kard 4–7, balta 3–6, kéz 1 sebzés; esés közben kritikus. A beállításokban kikapcsolhatók, vagy békés módban csak az állatok maradnak.
+- **Mobok:** disznó, tehén, birka, csirke (nyers húst, gyapjút adnak), zombi és csontváz (éjjel jönnek, napfényben égnek). Kard 4–7, balta 3–6, kéz 1 sebzés; esés közben kritikus. A beállításokban kikapcsolhatók, vagy békés módban csak az állatok maradnak.
 
 ## Irányítás
 
@@ -143,7 +145,7 @@ A tárgytextúrák besorolása a `scripts/item-policy.json` fájlban van: `impor
 
 A háziállatok (malac, tehén, birka, csirke) a Good Vibes csomag lény-skinjeivel (`public/textures/entity/`) vannak textúrázva.
 A modellek adata a `src/client/mobmodels.ts` fájlban van (a dobozok pixelmérete, helye és a képen lévő részük), a dobozok
-UV-kiosztását a `src/client/boxuv.ts` végzi. A zombi saját tervű, színes dobozokból áll; a csontváz (távolról lő, nappal ég, csontot ejt) a csomag skeleton skinjét használja.
+UV-kiosztását a `src/client/boxuv.ts` végzi. A zombi (`zombie.png`) és a csontváz (`skeleton.png`) is a csomag skinjével van textúrázva (a bal végtagok a jobbak tükörképei a képen, ezért ugyanazt a részt használják). A csontváz távolról lő, nappal ég, csontot ejt: célzáskor megemeli az íjat tartó karját (a kezében a csomag `bow.png` tárgya), majd kilő egy valódi, ívben repülő **nyilat** (3 sebzés). A nyíl sebessége véges, ezért oldalra lépve kikerülhető; a blokkba állt nyíl pár másodpercig látszik.
 A játékos modellje: az `entity/player.png` a projekt tulajdonosa által megadott skin (nem a Minecraft Steve/Alex karaktere); játék közben a **V** billentyűvel
 látható (harmadik személyű nézet), és a későbbi co-op társak megjelenítésére is ez szolgál.
 

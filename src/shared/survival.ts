@@ -41,6 +41,9 @@ export function breakRule(id: number): BreakRule {
 
 /** Meddig tart a blokk bontása a kézben tartott dologgal (másodperc). Infinity: nem bontható.
  * @param underLog fa gyökerei alatt van-e (közvetlenül fölötte rönk): ott a föld kézzel sokkal nehezebben jön ki */
+/** Globális szorzó: a túlélő világ nem könnyű, minden blokk kiütése tovább tart */
+export const MINING_SCALE = 2.2;
+
 export function breakTime(id: number, held: number | undefined, underLog = false): number {
   const r = breakRule(id);
   if (!isFinite(r.hardness)) return Infinity;
@@ -49,12 +52,12 @@ export function breakTime(id: number, held: number | undefined, underLog = false
   const matches = !!r.tool && !!tool && tool.type === r.tool;
   const speed = matches ? tool!.speed : 1;
   const can = !r.tool || r.tier === 0 || (matches && tool!.tier >= r.tier);
-  let t = (r.hardness * (can ? 1.5 : 5)) / speed;
+  let t = (r.hardness * (can ? 1.5 : 5) * MINING_SCALE) / speed;
   const key = blockKey(id);
   // a fát kézzel (vagy nem baltával) is ki lehet ütni, de sokkal tovább tart
-  if (/(_log|_wood)$/.test(key) && !(matches && tool!.type === 'axe')) t *= 4;
+  if (/(_log|_wood)$/.test(key) && !(matches && tool!.type === 'axe')) t *= 2.5;
   // a fa gyökerei közt a talajt kézzel (ásó nélkül) nehéz kiszedni
-  if (underLog && SOFT.test(key) && !(matches && tool!.type === 'shovel')) t *= 4;
+  if (underLog && SOFT.test(key) && !(matches && tool!.type === 'shovel')) t *= 3;
   return t;
 }
 
