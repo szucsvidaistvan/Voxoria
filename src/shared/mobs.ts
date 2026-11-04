@@ -221,7 +221,7 @@ function clearShot(world: World, x0: number, y0: number, z0: number, x1: number,
   const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0, z1 - z0) * 2);
   for (let i = 1; i < n; i++) {
     const t = i / n;
-    if (isOpaque(world.getBlock(Math.floor(x0 + (x1 - x0) * t), Math.floor(y0 + (y1 - y0) * t), Math.floor(z0 + (z1 - z0) * t)))) return false;
+    if (isSolid(world.getBlock(Math.floor(x0 + (x1 - x0) * t), Math.floor(y0 + (y1 - y0) * t), Math.floor(z0 + (z1 - z0) * t)))) return false;
   }
   return true;
 }
@@ -339,11 +339,11 @@ export class MobManager {
       for (let k = 0; k < n && !gone && a.stuck < 0; k++) {
         a.x += a.vx * h; a.y += a.vy * h; a.z += a.vz * h;
         a.vy -= ARROW_GRAVITY * h;
-        if (ctx.target && Math.abs(a.x - ctx.px) < 0.45 && Math.abs(a.z - ctx.pz) < 0.45 && a.y > ctx.py - 0.1 && a.y < ctx.py + 1.85) {
+        if (isSolid(this.world.getBlock(Math.floor(a.x), Math.floor(a.y), Math.floor(a.z)))) {
+          a.stuck = 0;
+        } else if (ctx.target && Math.abs(a.x - ctx.px) < 0.45 && Math.abs(a.z - ctx.pz) < 0.45 && a.y > ctx.py - 0.1 && a.y < ctx.py + 1.85) {
           ctx.hurtPlayer(3, a.x - a.vx * 0.05, a.z - a.vz * 0.05);
           gone = true;
-        } else if (isOpaque(this.world.getBlock(Math.floor(a.x), Math.floor(a.y), Math.floor(a.z)))) {
-          a.stuck = 0;
         }
       }
       if (gone || a.age > 12) this.arrows.splice(i, 1);

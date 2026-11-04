@@ -42,7 +42,7 @@ export function breakRule(id: number): BreakRule {
 /** Meddig tart a blokk bontása a kézben tartott dologgal (másodperc). Infinity: nem bontható.
  * @param underLog fa gyökerei alatt van-e (közvetlenül fölötte rönk): ott a föld kézzel sokkal nehezebben jön ki */
 /** Globális szorzó: a túlélő világ nem könnyű, minden blokk kiütése tovább tart */
-export const MINING_SCALE = 2.2;
+export const MINING_SCALE = 1.5;
 
 export function breakTime(id: number, held: number | undefined, underLog = false): number {
   const r = breakRule(id);

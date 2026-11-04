@@ -20,7 +20,7 @@ export class Health {
   burn = 0;
   /** éhség 0..20 (10 húscomb); a telítettség és a kimerültség a Minecraftéhoz hasonló rejtett számláló */
   food = 20;
-  saturation = 5;
+  saturation = 0;
   private exhaustion = 0;
   private foodT = 0;
   private starveT = 0;
@@ -41,7 +41,7 @@ export class Health {
     this.air = MAX_AIR;
     this.burn = 0;
     this.food = 20;
-    this.saturation = 5;
+    this.saturation = 0;
     this.exhaustion = this.foodT = this.starveT = 0;
     this.dead = false;
     this.since = 99;

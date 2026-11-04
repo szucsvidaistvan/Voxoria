@@ -318,6 +318,7 @@ body.touch #touch-actions { display: grid; }
 #vitals { gap: 8px; }
 #hearts, #air, #food { display: flex; gap: 2px; min-height: 22px; min-width: 0; }
 #hearts { flex: 1 1 0; }
+#air[hidden] { display: none; }
 /* a szívek és a húscombok a hotbar szélességéhez igazodnak: keskeny képernyőn zsugorodnak, nem lógnak ki */
 #vitals-right { display: flex; flex-direction: column; align-items: stretch; gap: 2px; flex: 1 1 0; min-width: 0; }
 #food { flex-direction: row-reverse; }
