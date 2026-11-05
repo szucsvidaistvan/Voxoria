@@ -1,14 +1,26 @@
 import { BLOCKS } from '../shared/blocks';
-import { ITEMS, isItem, itemName, maxStack } from '../shared/items';
+import { ARMOR_SLOTS, ITEMS, armorOf, isItem, itemName, maxStack } from '../shared/items';
 import { matchRecipe, type Stack } from '../shared/recipes';
 import { SMELT_SECONDS, type Furnace } from '../shared/smelting';
 
 export const HOTBAR_SIZE = 9;
 export const TOTAL_SLOTS = 36;
+type Area = 'inv' | 'craft' | 'armor';
 
 /** A játékos tárolója: az első 9 hely a hotbar, a többi 27 a hátizsák */
 export class Inventory {
   slots: (Stack | null)[] = new Array(TOTAL_SLOTS).fill(null);
+  /** a viselt páncél: sisak, mellvért, nadrág, csizma */
+  armor: (Stack | null)[] = [null, null, null, null];
+
+  /** a páncél mentése: [id, kopás, ...] (0, 0: üres) */
+  armorFlat(): number[] { return this.armor.flatMap((s) => (s ? [s.id, s.d ?? 0] : [0, 0])); }
+  setArmorFlat(flat: number[] | undefined): void {
+    this.armor = [0, 1, 2, 3].map((i) => {
+      const id = flat?.[i * 2] ?? 0, d = flat?.[i * 2 + 1] ?? 0;
+      return id && armorOf(id)?.slot === i ? { id, n: 1, ...(d ? { d } : {}) } : null;
+    });
+  }
 
   /** Hozzáadás; visszaadja, hány darab nem fért el. A `d` az eszköz kopása (csak az 1-es stackeknél). */
   add(id: number, n: number, d?: number): number {
@@ -103,35 +115,39 @@ export class SlotView {
 }
 
 /** Elem textúrák betöltése és rajzolása */
-export function createItemPainter(base: string, onLoad: () => void): Painter {
+export function createItemPainter(base: string, onLoad: () => void): Painter & { preload(): Promise<void> } {
   const cache = new Map<string, HTMLImageElement | null>();
+  const pending = new Map<string, Promise<void>>();
   const load = (tex: string) => {
     if (cache.has(tex)) return cache.get(tex) ?? null;
     cache.set(tex, null);
     const img = new Image();
-    img.onload = () => { cache.set(tex, img); onLoad(); };
+    pending.set(tex, new Promise<void>((done) => {
+      img.onload = () => { cache.set(tex, img); onLoad(); done(); };
+      img.onerror = () => done();
+    }));
     img.src = `${base}textures/item/${tex}.png`;
     return null;
   };
-  return (c, id) => {
+  const paint: Painter = (c, id) => {
     const def = ITEMS[id];
     if (!def) return;
     const ctx = c.getContext('2d')!;
-    ctx.clearRect(0, 0, c.width, c.height); // a korábbi helyettesítő betű ne maradjon az ikon alatt
+    ctx.clearRect(0, 0, c.width, c.height);
+    // amíg a textúra nem töltődött be, az ikon üres marad (nincs helyettesítő betű), betöltéskor újrarajzolódik
     const img = load(def.tex);
     if (img && img.width > 0) {
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(img, 0, 0, img.width, img.width, 0, 0, c.width, c.height);
-    } else {
-      // amíg nincs textúra (vagy hiányzik a csomagból): színes négyzet és a név első betűje
-      ctx.fillStyle = def.color;
-      ctx.fillRect(10, 10, 44, 44);
-      ctx.fillStyle = '#fff';
-      ctx.font = '28px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(def.name.charAt(0), 32, 42);
     }
   };
+  return Object.assign(paint, {
+    /** az összes tárgy textúrájának betöltése (indításkor), hogy az első rajzolásnál már minden ikon kész legyen */
+    preload: async (): Promise<void> => {
+      for (const def of Object.values(ITEMS)) load(def.tex);
+      await Promise.race([Promise.all([...pending.values()]), new Promise<void>((r) => setTimeout(r, 4000))]);
+    },
+  });
 }
 
 /** Az inventory-panel: hátizsák, hotbar, barkácsrács (2x2 vagy 3x3), eredmény, egérrel és érintéssel is */
@@ -146,6 +162,8 @@ export class BagUI {
 
   private invViews: SlotView[] = [];
   private craftViews: SlotView[] = [];
+  private armorViews: SlotView[] = [];
+  private armorEl = document.getElementById('armor-slots')!;
   private outView: SlotView;
   private cursorView: SlotView;
   private craft: (Stack | null)[] = [];
@@ -165,7 +183,7 @@ export class BagUI {
     this.outEl.appendChild(this.outView.el);
     this.cursorEl.appendChild(this.cursorView.el);
 
-    const mk = (parent: HTMLElement, area: 'inv' | 'craft', i: number, list: SlotView[]) => {
+    const mk = (parent: HTMLElement, area: Area, i: number, list: SlotView[]) => {
       const v = new SlotView(paint);
       this.bindSlot(v.el, area, i);
       parent.appendChild(v.el);
@@ -174,6 +192,13 @@ export class BagUI {
     // sorrend a képernyőn: hátizsák (9..35), alatta a hotbar (0..8)
     for (let i = 9; i < TOTAL_SLOTS; i++) mk(this.mainEl, 'inv', i, this.invViews);
     for (let i = 0; i < HOTBAR_SIZE; i++) mk(this.hotEl, 'inv', i, this.invViews);
+    for (let i = 0; i < 4; i++) {
+      mk(this.armorEl, 'armor', i, this.armorViews);
+      const el = this.armorViews[i].el;
+      el.classList.add('aslot');
+      el.style.setProperty('--ph', `url(${import.meta.env.BASE_URL}textures/item/empty_slot_${ARMOR_SLOTS[i].toLowerCase()}.png)`);
+      el.title = ARMOR_SLOTS[i];
+    }
 
     this.outView.el.addEventListener('pointerdown', (e) => { e.preventDefault(); this.takeResult(e.shiftKey); });
     document.getElementById('bag-close')!.addEventListener('click', () => this.onClose());
@@ -192,7 +217,7 @@ export class BagUI {
    *    SZÉTOSZTÁS: a nyomva tartott ujjal (vagy egérrel) végighúzva több helyen a kézben lévő stack egyenlően
    *    szétoszlik a érintett helyek között (jobb gombbal húzva helyenként egy darab)
    */
-  private bindSlot(el: HTMLElement, area: 'inv' | 'craft', idx: number): void {
+  private bindSlot(el: HTMLElement, area: Area, idx: number): void {
     el.dataset.area = area;
     el.dataset.idx = String(idx);
     el.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -245,19 +270,20 @@ export class BagUI {
   }
 
   /** A (x, y) képpont alatti hely (hátizsák vagy rács), ha van */
-  private slotAt(x: number, y: number): { area: 'inv' | 'craft'; idx: number } | null {
+  private slotAt(x: number, y: number): { area: Area; idx: number } | null {
     const t = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest('[data-area]') as HTMLElement | null;
-    return t && t.dataset.area ? { area: t.dataset.area as 'inv' | 'craft', idx: Number(t.dataset.idx) } : null;
+    return t && t.dataset.area ? { area: t.dataset.area as Area, idx: Number(t.dataset.idx) } : null;
   }
 
   /** Befogadja-e a hely a kézben lévő stacket (üres, vagy ugyanaz és van benne hely)? */
-  private accepts(area: 'inv' | 'craft', idx: number): boolean {
+  private accepts(area: Area, idx: number): boolean {
+    if (area === 'armor') return false; // a páncél-helyekre nem lehet szétosztani
     const c = this.cursor, r = this.list(area)[idx];
     return !!c && (!r || (r.id === c.id && r.n < maxStack(r.id)));
   }
 
   /** A szétosztás terve: hány darab kerül az egyes helyekre, és mennyi marad a kézben */
-  private planSpread(slots: { area: 'inv' | 'craft'; idx: number }[], one: boolean): { counts: number[]; left: number } {
+  private planSpread(slots: { area: Area; idx: number }[], one: boolean): { counts: number[]; left: number } {
     const c = this.cursor!;
     let left = c.n;
     const per = one ? 1 : Math.max(1, Math.floor(c.n / slots.length));
@@ -272,7 +298,7 @@ export class BagUI {
   }
 
   /** Szétosztás előnézete: az érintett helyeken már a leendő darabszám látszik, a kézben a maradék */
-  private previewSpread(slots: { area: 'inv' | 'craft'; idx: number }[], one: boolean): void {
+  private previewSpread(slots: { area: Area; idx: number }[], one: boolean): void {
     this.render();
     if (slots.length < 2) return;
     const c = this.cursor!;
@@ -286,8 +312,8 @@ export class BagUI {
   }
 
   /** Tele kézzel indított mozdulat: koppintás (lerak), hosszan nyomva (egy darab) vagy végighúzás (szétosztás) */
-  private holdGesture(e: PointerEvent, area: 'inv' | 'craft', idx: number, button: 0 | 2, touch: boolean): void {
-    const slots: { area: 'inv' | 'craft'; idx: number }[] = [{ area, idx }];
+  private holdGesture(e: PointerEvent, area: Area, idx: number, button: 0 | 2, touch: boolean): void {
+    const slots: { area: Area; idx: number }[] = [{ area, idx }];
     let mode: 'pending' | 'long' | 'spread' = 'pending';
     const timer = touch ? window.setTimeout(() => {
       if (mode !== 'pending') return;
@@ -403,7 +429,7 @@ export class BagUI {
 
   /** Újrarajzolás (pl. elem textúra betöltése után) */
   invalidate(): void {
-    [...this.invViews, ...this.craftViews, this.outView, this.cursorView].forEach((v) => v.invalidate());
+    [...this.invViews, ...this.craftViews, ...this.armorViews, this.outView, this.cursorView].forEach((v) => v.invalidate());
     if (this.isOpen) this.render();
   }
 
@@ -413,6 +439,7 @@ export class BagUI {
   private render(): void {
     this.invViews.forEach((v, k) => v.set(this.inv.slots[this.order[k]]));
     this.craftViews.forEach((v, i) => v.set(this.craft[i]));
+    this.armorViews.forEach((v, i) => { v.set(this.inv.armor[i]); v.el.classList.toggle('empty-ph', !this.inv.armor[i]); });
     this.result = this.furnace ? this.furnace.out : matchRecipe(this.craft, this.size, this.size);
     this.outView.set(this.result);
     if (this.furnace) {
@@ -424,14 +451,26 @@ export class BagUI {
     this.cursorEl.hidden = !this.cursor;
   }
 
-  private list(area: 'inv' | 'craft'): (Stack | null)[] {
-    return area === 'inv' ? this.inv.slots : this.craft;
+  private list(area: Area): (Stack | null)[] {
+    return area === 'inv' ? this.inv.slots : area === 'armor' ? this.inv.armor : this.craft;
   }
 
   /** idx: a tároló (vagy a rács) helye */
-  private click(area: 'inv' | 'craft', idx: number, button: 0 | 2, shift: boolean): void {
+  private click(area: Area, idx: number, button: 0 | 2, shift: boolean): void {
     const list = this.list(area);
     const ref = list[idx];
+
+    // páncél-helyre csak a megfelelő darab kerülhet
+    if (area === 'armor' && this.cursor && armorOf(this.cursor.id)?.slot !== idx) return;
+    // Shift+kattintás egy páncéldarabon: felveszi a megfelelő (üres) helyre
+    const eq = ref && shift && area === 'inv' ? armorOf(ref.id) : undefined;
+    if (eq && !this.inv.armor[eq.slot]) {
+      this.inv.armor[eq.slot] = { id: ref!.id, n: 1, ...(ref!.d ? { d: ref!.d } : {}) };
+      list[idx] = null;
+      this.render();
+      this.onChange();
+      return;
+    }
 
     if (shift && ref) {
       // gyorsmozgatás: hotbar <-> hátizsák, rácsból a tárolóba
@@ -447,7 +486,7 @@ export class BagUI {
           if (!this.inv.slots[i]) { const m = Math.min(maxStack(from.id), left); this.inv.slots[i] = { id: from.id, n: m, d: from.d }; left -= m; }
         }
       };
-      if (area === 'craft') tryRange(0, TOTAL_SLOTS);
+      if (area !== 'inv') tryRange(0, TOTAL_SLOTS);
       else if (idx < HOTBAR_SIZE) tryRange(HOTBAR_SIZE, TOTAL_SLOTS);
       else tryRange(0, HOTBAR_SIZE);
       if (left > 0) list[idx] = { id: from.id, n: left, d: from.d };

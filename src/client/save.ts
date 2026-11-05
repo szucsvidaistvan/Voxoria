@@ -22,6 +22,8 @@ export interface SaveData {
   /** éhség 0..20 és telítettség (a régi mentésekben nincs: tele) */
   food?: number;
   sat?: number;
+  /** a viselt páncél: [id, kopás] x 4 (a régi mentésekben nincs) */
+  arm?: number[];
   /** a tároló: [id, darab, id, darab, ...] 36 helyre */
   inv?: number[];
 }

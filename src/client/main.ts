@@ -5,7 +5,7 @@ import {
   registerGenerated, type GeneratedPack, type RGB,
 } from '../shared/blocks';
 import { FluidSim, isReplaceable } from '../shared/fluids';
-import { I, ITEMS, isItem, itemName, toolOf } from '../shared/items';
+import { I, ITEMS, armorPoints, isItem, itemName, toolOf } from '../shared/items';
 import { CATEGORIES, categoryOf } from '../shared/categories';
 import { initRecipes } from '../shared/recipes';
 import { Furnace, initSmelting } from '../shared/smelting';
@@ -305,6 +305,7 @@ async function main(): Promise<void> {
     mode = save ? save.mode ?? 'creative' : newMode;
     document.body.classList.toggle('creative', mode === 'creative');
     inv.slots.fill(null);
+    inv.setArmorFlat(save?.arm);
     if (save?.inv) inv.fromFlat(save.inv);
     else if (save?.hotbar) save.hotbar.forEach((id, i) => { if (BLOCKS[id] && i < HOTBAR_SIZE) inv.slots[i] = { id, n: 1 }; });
     else if (mode === 'creative') HOTBAR.forEach((id, i) => { inv.slots[i] = { id, n: 1 }; });
@@ -333,7 +334,7 @@ async function main(): Promise<void> {
     const p = player.pos;
     writeSave({
       seed: world.seed, edits: world.exportEdits(), pos: [p.x, p.y, p.z], yaw: player.yaw, pitch: player.pitch,
-      time: timeOfDay, day: dayCount, furnaces: [...furnaces].map(([k, f]) => [...k.split(',').map(Number), ...f.toFlat()]), mode, hp: health.hp, food: health.food, sat: health.saturation, inv: inv.toFlat(),
+      time: timeOfDay, day: dayCount, furnaces: [...furnaces].map(([k, f]) => [...k.split(',').map(Number), ...f.toFlat()]), mode, hp: health.hp, food: health.food, sat: health.saturation, inv: inv.toFlat(), arm: inv.armorFlat(),
     });
   };
 
@@ -353,7 +354,9 @@ async function main(): Promise<void> {
     });
   };
   let hand: ReturnType<typeof createHandItem> | null = null;
+  let iconsReady = false; // az előtöltés alatt a (később létrejövő) nézeteket még nem értesítjük
   const itemPainter = createItemPainter(import.meta.env.BASE_URL, () => {
+    if (!iconsReady) return;
     hotViews.forEach((v) => v.invalidate());
     paintHotbar();
     bag.invalidate();
@@ -361,6 +364,8 @@ async function main(): Promise<void> {
     repaintPicker();
     hand?.invalidate();
   });
+  await itemPainter.preload();
+  iconsReady = true;
   const paintStack = (c: HTMLCanvasElement, id: number) => (isItem(id) ? itemPainter(c, id) : drawIcon(c, id));
 
   const drops = createDrops(scene, atlas, material, paintStack);
@@ -371,6 +376,7 @@ async function main(): Promise<void> {
   // harmadik személyű nézet (V): a játékos saját modellje a kamera előtt
   const playerView = createPlayerView(scene);
   let thirdPerson = false;
+  let shownArmor = '';
   let walkPhase = 0;
   const hotbarEl = $('hotbar');
   const hotViews: SlotView[] = [];
@@ -754,6 +760,26 @@ async function main(): Promise<void> {
     if (d) drops.spawn(d.id, d.n, x + 0.5, y + 0.5, z + 0.5);
   };
 
+  /**
+   * A páncél csökkenti a sebzést (pontonként 4%, legfeljebb 80%), és kopik. Visszaadja a csökkentett sebzést.
+   * Csak a mobok és a nyilak ütésére hívódik (az esés, a tűz, a fulladás kikerüli a páncélt).
+   */
+  const wearArmor = (dmg: number): number => {
+    const pts = armorPoints(inv.armor.map((s) => s?.id));
+    if (pts <= 0) return dmg;
+    const wear = Math.max(1, Math.floor(dmg / 2));
+    inv.armor.forEach((s, i) => {
+      const a = s && ITEMS[s.id]?.armor;
+      if (!s || !a) return;
+      s.d = (s.d ?? 0) + wear;
+      if (s.d >= a.durability) {
+        inv.armor[i] = null;
+        particles.burst(Math.floor(player.pos.x), Math.floor(player.pos.y) + 1, Math.floor(player.pos.z), B.PLANKS);
+      }
+    });
+    return Math.max(1, Math.round(dmg * (1 - Math.min(0.8, pts * 0.04))));
+  };
+
   /** A kézben tartott eszköz kopása (csak túlélőben): a törött eszköz eltűnik */
   const wearHeld = (amount: number) => {
     if (mode !== 'survival') return;
@@ -996,7 +1022,7 @@ async function main(): Promise<void> {
     day: sky.elevation > 0.15,
     hurtPlayer: (dmg, fx, fz) => {
       if (mode !== 'survival' || health.dead) return;
-      health.damage(dmg);
+      health.damage(wearArmor(dmg));
       lastMobHit = now(); lastMobHitBy = 'slain by a monster';
       const d = Math.hypot(player.pos.x - fx, player.pos.z - fz) || 1;
       player.knock.x += ((player.pos.x - fx) / d) * 5;
@@ -1183,6 +1209,9 @@ async function main(): Promise<void> {
       }
       mobView.sync(mobs.mobs, sky.light, now / 1000);
       mobView.syncArrows(mobs.arrows);
+      // a viselt páncél látszik a karakteren (harmadik személyű nézet)
+      const armorSig = inv.armor.map((s) => s?.id ?? 0).join(',');
+      if (armorSig !== shownArmor) { shownArmor = armorSig; playerView.setArmor(inv.armor.map((s) => s?.id ?? 0)); }
       hand?.update(dt, held()?.id ?? 0, state === 'playing' && !thirdPerson, Math.min(1, Math.hypot(player.vel.x, player.vel.z) / 4) * (player.onGround ? 1 : 0), handAct, sky.light);
       if (state === 'inventory') bag.tick();
       particles.update(dt);

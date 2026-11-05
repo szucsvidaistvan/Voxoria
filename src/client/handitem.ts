@@ -29,12 +29,12 @@ export function createHandItem(camera: THREE.Camera, paint: (c: HTMLCanvasElemen
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestFilter;
   const iconMat = new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.1, side: THREE.DoubleSide, depthTest: false, transparent: true });
-  const icon = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.7), iconMat);
+  const icon = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), iconMat);
 
   // ---- tömör blokk
   const cubeMat = new THREE.MeshBasicMaterial({ map: atlas.texture, vertexColors: true, alphaTest: 0.5, depthTest: false });
   const cube = new THREE.Mesh(new THREE.BufferGeometry(), cubeMat);
-  cube.scale.setScalar(0.34);
+  cube.scale.setScalar(0.25);
   const cubeGeos = new Map<number, THREE.BufferGeometry>();
 
   // ---- tárgy: a textúra pixeleiből kihúzott modell
@@ -59,7 +59,7 @@ export function createHandItem(camera: THREE.Camera, paint: (c: HTMLCanvasElemen
     cx.drawImage(img, 0, 0, W, W, 0, 0, W, W);
     const px = cx.getImageData(0, 0, W, W).data;
     const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < W && px[(y * W + x) * 4 + 3] > 40;
-    const s = 0.62 / W, d = s / 2;
+    const s = 0.46 / W, d = s / 2;
     const pos: number[] = [], col: number[] = [], idx: number[] = [];
     const col3 = new THREE.Color();
     const quad = (v: number[][], r: number, g: number, b: number, shade: number) => {
@@ -94,6 +94,7 @@ export function createHandItem(camera: THREE.Camera, paint: (c: HTMLCanvasElemen
   skinTex.minFilter = THREE.NearestFilter;
   const armMat = new THREE.MeshBasicMaterial({ map: skinTex, vertexColors: true, alphaTest: 0.5, depthTest: false });
   const arm = new THREE.Mesh(texturedGeo(TEXTURED.player![4]), armMat);
+  arm.scale.setScalar(0.72);
 
   for (const m of [icon, cube, flat, arm]) { m.renderOrder = 999; m.frustumCulled = false; m.visible = false; root.add(m); }
 
@@ -166,8 +167,8 @@ export function createHandItem(camera: THREE.Camera, paint: (c: HTMLCanvasElemen
       const sq = Math.sin(Math.sqrt(swing) * Math.PI);
       const s1 = Math.sin(swing * Math.PI);
       const s2 = Math.sin(swing * swing * Math.PI);
-      const dx = -sq * 0.5, dy = Math.sin(Math.sqrt(swing) * 2 * Math.PI) * 0.14 + sq * 0.06, dz = -s1 * 0.3;
-      const rx = -sq * 1.5, ry = -sq * 0.9, rz = -s2 * 0.6;
+      const dx = -sq * 0.22, dy = Math.sin(Math.sqrt(swing) * 2 * Math.PI) * 0.06 + sq * 0.02, dz = -s1 * 0.14;
+      const rx = -sq * 0.85, ry = -sq * 0.45, rz = -s2 * 0.3;
       const walkX = Math.cos(bob * 0.5) * 0.012 * moving;
       const walkY = Math.abs(Math.sin(bob * 0.5)) * 0.02 * moving;
 
@@ -178,14 +179,14 @@ export function createHandItem(camera: THREE.Camera, paint: (c: HTMLCanvasElemen
 
       if (kind === 'arm') {
         // a kar a jobb alsó sarokból előre-fel nyúlik; ütéskor előre lendül
-        root.position.set(0.4 + walkX + dx * 0.6, -0.37 + walkY + dy, -0.38 + dz);
+        root.position.set(0.36 + walkX + dx * 0.6, -0.33 + walkY + dy, -0.36 + dz);
         root.rotation.set(2.1 + rx * 0.5, -0.25 + ry * 0.5, 0.12 + rz * 0.5);
         arm.position.set(0, 0, 0);
       } else if (kind === 'cube') {
-        root.position.set(0.46 + walkX + dx - up * 0.42, -0.4 + walkY + dy + up * 0.2 + chew, -0.78 + dz + up * 0.18);
+        root.position.set(0.4 + walkX + dx - up * 0.34, -0.34 + walkY + dy + up * 0.16 + chew, -0.7 + dz + up * 0.14);
         root.rotation.set(0.3 + rx * 0.7 + up * 0.3, 0.55 + ry * 0.5 - up * 0.4, 0.05 + rz * 0.6);
       } else {
-        root.position.set(0.4 + walkX + dx - up * 0.4, -0.36 + walkY + dy + up * 0.26 + chew, -0.72 + dz + up * 0.15);
+        root.position.set(0.38 + walkX + dx - up * 0.32, -0.3 + walkY + dy + up * 0.2 + chew, -0.7 + dz + up * 0.12);
         root.rotation.set(rx + up * 0.5, 0.35 + ry - up * 0.5, -0.12 + rz + up * 0.3);
       }
       tint.setRGB(Math.max(light[0], 0.45), Math.max(light[1], 0.45), Math.max(light[2], 0.5));

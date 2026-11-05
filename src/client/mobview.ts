@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Arrow, Mob, MobKind } from '../shared/mobs';
-import { TEXTURED, partGeom, type TexName } from './mobmodels';
+import { ITEMS } from '../shared/items';
+import { TEXTURED, armorParts, partGeom, type TPart, type TexName } from './mobmodels';
 
 /**
  * A mobok megjelenítése: a háziállatok a Good Vibes csomag lény-skinjeivel textúrázott dobozmodellek (mobmodels.ts),
@@ -18,6 +19,8 @@ interface View {
   limbs: { g: THREE.Group; swing: number; tilt: number; flap: number; aim: number }[];
   /** az íj (a csontváz kezében): a mob célzás-állapotához */
   bow?: THREE.Mesh;
+  /** egy rész hozzáadása a modellhez; visszaadja az eltávolítóját */
+  addPart: (part: TPart) => () => void;
 }
 
 /** A lény-skinek betöltése (közös, egyszer) */
@@ -112,8 +115,20 @@ function buildView(kind: string, scene: THREE.Scene, base: string): View {
         mats.push(bow.material as THREE.MeshBasicMaterial);
       }
     }
+    const addPart = (part: TPart): (() => void) => {
+      const k2 = 1 / 16;
+      const before = limbs.length;
+      const mesh = new THREE.Mesh(texturedGeo(part), material(part.tex));
+      const g = attach(mesh, part.p.map((x) => x * k2) as V3, part.pivot?.map((x) => x * k2) as V3 | undefined, part.tilt, part.swing, part.flap, part.aim);
+      const node = g ?? mesh;
+      const limb = limbs.length > before ? limbs[limbs.length - 1] : undefined;
+      return () => {
+        root.remove(node);
+        if (limb) { const i = limbs.indexOf(limb); if (i >= 0) limbs.splice(i, 1); }
+      };
+    };
     scene.add(root);
-    return { root, mats, limbs, bow };
+    return { root, mats, limbs, bow, addPart };
   }
 }
 
@@ -216,6 +231,7 @@ export function createMobView(scene: THREE.Scene, base: string = import.meta.env
 export function createPlayerView(scene: THREE.Scene, base: string = import.meta.env.BASE_URL) {
   const v = buildView('player', scene, base);
   v.root.visible = false;
+  const armorRemovers: (() => void)[] = [];
   return {
     get visible() { return v.root.visible; },
     set visible(on: boolean) { v.root.visible = on; },
@@ -229,6 +245,15 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
       const sw = Math.sin(walk * 3.2) * 0.85 * Math.min(1, speed);
       for (const l of v.limbs) l.g.rotation.x = l.tilt + sw * l.swing;
       for (const mt of v.mats) mt.color.setRGB(Math.max(light[0], 0.35), Math.max(light[1], 0.35), Math.max(light[2], 0.4));
+    },
+    /** a viselt páncél (4 azonosító: sisak, mellvért, nadrág, csizma; 0: nincs) */
+    setArmor(ids: number[]): void {
+      for (const r of armorRemovers) r();
+      armorRemovers.length = 0;
+      ids.forEach((id, slot) => {
+        const a = id ? ITEMS[id]?.armor : undefined;
+        if (a) for (const part of armorParts(a.material, slot)) armorRemovers.push(v.addPart(part));
+      });
     },
     dispose(): void { scene.remove(v.root); for (const mt of v.mats) mt.dispose(); },
   };

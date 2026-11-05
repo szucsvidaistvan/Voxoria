@@ -4,7 +4,8 @@ import { boxGeom, type BoxGeom } from './boxuv';
  * A mobok textúrázott modelljei (adat): a dobozok pixelméretei (1 blokk = 16 pixel) és a képen lévő helyük.
  * A koordináták pixelben: y felfelé a láb alatti talajtól, az előre a −z, a doboz a közepével van megadva.
  */
-export type TexName = 'pig' | 'cow' | 'sheep' | 'sheep_fur' | 'chicken' | 'player' | 'skeleton' | 'zombie';
+export type ArmorTex = `armor_${'leather' | 'iron' | 'golden' | 'diamond'}_${1 | 2}`;
+export type TexName = 'pig' | 'cow' | 'sheep' | 'sheep_fur' | 'chicken' | 'player' | 'skeleton' | 'zombie' | ArmorTex;
 
 export interface TPart {
   tex: TexName;
@@ -28,9 +29,24 @@ export interface TPart {
 }
 
 /** A textúrák mérete pixelben */
-export const TEX_SIZE: Record<TexName, [number, number]> = {
+export const TEX_SIZE = {
   pig: [64, 32], cow: [64, 32], sheep: [64, 32], sheep_fur: [64, 32], chicken: [64, 32], player: [64, 64], skeleton: [64, 32], zombie: [64, 64],
-};
+} as Record<TexName, [number, number]>;
+for (const m of ['leather', 'iron', 'golden', 'diamond']) for (const l of [1, 2]) TEX_SIZE[`armor_${m}_${l}` as ArmorTex] = [64, 32];
+
+/**
+ * A viselt páncél részei a játékos modelljén (a 64x32-es páncélrétegekkel; réteg 1: sisak, mellvért, csizma; réteg 2: nadrág).
+ * @param material az anyag azonosítója (leather, iron, golden, diamond), @param slot 0 sisak, 1 mellvért, 2 nadrág, 3 csizma
+ */
+export function armorParts(material: string, slot: number): TPart[] {
+  const t1 = `armor_${material}_1` as ArmorTex, t2 = `armor_${material}_2` as ArmorTex;
+  const leg = (tex: ArmorTex, x: number, sw: number, grow: number): TPart => ({ tex, px: [4, 12, 4], uv: [0, 16], p: [x, 6, 0], pivot: [x, 12, 0], swing: sw, grow });
+  const arm = (x: number, sw: number): TPart => ({ tex: t1, px: [4, 12, 4], uv: [40, 16], p: [x, 18, 0], pivot: [x, 24, 0], swing: sw, grow: 0.9 });
+  if (slot === 0) return [{ tex: t1, px: [8, 8, 8], uv: [0, 0], p: [0, 28, 0], grow: 0.9 }];
+  if (slot === 1) return [{ tex: t1, px: [8, 12, 4], uv: [16, 16], p: [0, 18, 0], grow: 0.9 }, arm(6, -1), arm(-6, 1)];
+  if (slot === 2) return [{ tex: t2, px: [8, 12, 4], uv: [16, 16], p: [0, 18, 0], grow: 0.5 }, leg(t2, 2, 1, 0.5), leg(t2, -2, -1, 0.5)];
+  return [leg(t1, 2, 1, 0.9), leg(t1, -2, -1, 0.9)];
+}
 
 const legs4 = (tex: TexName, px: [number, number, number], uv: [number, number], x: number, h: number, zF: number, zB: number, extra: Partial<TPart> = {}): TPart[] => {
   return [

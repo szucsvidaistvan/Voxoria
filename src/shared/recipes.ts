@@ -1,5 +1,5 @@
 import { B, blockId, blockKey } from './blocks';
-import { EXTRA_ID as X, I, TOOL_ID, type ToolType } from './items';
+import { ARMOR_ID, EXTRA_ID as X, I, TOOL_ID, type ToolType } from './items';
 
 export interface Stack {
   id: number;
@@ -41,6 +41,12 @@ export function initRecipes(): void {
   };
   const addIf = (r: Omit<Recipe, 'out'>, out: Stack | null) => { if (out) add({ ...r, out }); };
 
+  // páncélok: a szokásos alakok (sisak, mellvért, nadrág, csizma) bőrből, vasból, aranyból, gyémántból
+  const armorMat: Record<string, number> = { leather: X.leather, iron: I.IRON_INGOT, golden: I.GOLD_INGOT, diamond: I.DIAMOND };
+  const armorShapes = [['MMM', 'M M'], ['M M', 'MMM', 'MMM'], ['MMM', 'M M', 'M M'], ['M M', 'M M']];
+  for (const [mat, ing] of Object.entries(armorMat)) {
+    armorShapes.forEach((shape, slot) => add({ shape, keys: { M: ing }, out: { id: ARMOR_ID[mat][slot], n: 1 } }));
+  }
   // fa: a rönk fajtájának megfelelő deszka
   add({
     shapeless: ['log'],

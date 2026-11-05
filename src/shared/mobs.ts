@@ -1,4 +1,4 @@
-import { BLOCKS, B, FLUID_LAVA, FLUID_WATER, blockId, dynamicBoxes, fluidKind, isOpaque, isSolid } from './blocks';
+import { BLOCKS, B, FLUID_LAVA, FLUID_WATER, LIGHT, blockId, dynamicBoxes, fluidKind, isOpaque, isSolid } from './blocks';
 import { EXTRA_ID, I } from './items';
 import { CH, type World } from './world';
 
@@ -408,6 +408,27 @@ export class MobManager {
     }
   }
 
+  /**
+   * Elég sötét van-e az (x, y, z) cellában a szörnyekhez? A lomb nem takar (a fa alatt napfény szűrődik át),
+   * ezért barlangi helynek csak az számít, ami fölött legalább 3 átlátszatlan blokk van; a fáklya/láva fénye (7 fölött) kizárja.
+   * @param needCover igaz: csak fedett (barlangi) hely jó, éjjel a szabad ég is elég sötét
+   */
+  private dark(x: number, y: number, z: number, needCover: boolean): boolean {
+    const w = this.world;
+    if (needCover) {
+      let roof = 0;
+      for (let yy = y + 2; yy < y + 40 && roof < 3; yy++) if (isOpaque(w.getBlock(x, yy, z))) roof++;
+      if (roof < 3) return false;
+    }
+    if (w.hasEmittersNear(x, z)) {
+      for (let dz = -8; dz <= 8; dz++) for (let dx = -8; dx <= 8; dx++) for (let dy = -6; dy <= 6; dy++) {
+        const l = LIGHT[w.getBlock(x + dx, y + dy, z + dz)];
+        if (l && l - Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) > 7) return false;
+      }
+    }
+    return true;
+  }
+
   /** Egy csoport (passzív: 1–3) leszállítása a játékostól minRange..maxRange távolságra */
   private trySpawn(px: number, pz: number, kind: MobKind, minR: number, maxR: number, where: 'surface' | 'cave'): void {
     const w = this.world;
@@ -425,6 +446,8 @@ export class MobManager {
     if (!(isSolid(below) && fluidKind(below) === 0 && w.getBlock(x, y, z) === 0 && w.getBlock(x, y + 1, z) === 0)) return;
     // barlangban csak fedett helyre (legalább néhány blokk kő van fölötte)
     if (where === 'cave' && w.heightAt(x, z) - y < 5) return;
+    // szörny csak sötétben: fedett barlangban (fa lombja alatt nem), vagy éjjel a szabadban, és nem fáklya mellett
+    if (MOB_DEFS[kind].hostile && !this.dark(x, y, z, where === 'cave')) return;
     // állatok csak füvön; a felszíni szörnyek bárhol, ahol szilárd a talaj
     if (!MOB_DEFS[kind].hostile && below !== B.GRASS) return;
     const n = MOB_DEFS[kind].hostile ? 1 : 1 + Math.floor(Math.random() * 3);
