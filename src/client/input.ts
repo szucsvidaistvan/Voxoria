@@ -11,6 +11,8 @@ export class Input {
   /** a bontás gombja le van nyomva (túlélő módban a bontás tartásig tart) */
   breakHeld = false;
   placeQueued = false;
+  /** a jobb gomb (vagy a Place gomb) nyomva van: az étel evéséhez kell */
+  placeHeld = false;
   hotbar = 0;
   sensitivity = 1;
   enabled = false;
@@ -66,7 +68,7 @@ export class Input {
     this.joyId = this.lookId = null;
     this.jump = false;
     this.dYaw = this.dPitch = 0;
-    this.breakQueued = this.placeQueued = this.breakHeld = false;
+    this.breakQueued = this.placeQueued = this.breakHeld = this.placeHeld = false;
     const knob = document.getElementById('joy-knob');
     if (knob) knob.style.transform = '';
   }
@@ -109,9 +111,9 @@ export class Input {
     this.canvas.addEventListener('mousedown', (e) => {
       if (!this.enabled || !this.locked) return;
       if (e.button === 0) { this.breakQueued = true; this.breakHeld = true; }
-      if (e.button === 2) this.placeQueued = true;
+      if (e.button === 2) { this.placeQueued = true; this.placeHeld = true; }
     });
-    document.addEventListener('mouseup', (e) => { if (e.button === 0) this.breakHeld = false; });
+    document.addEventListener('mouseup', (e) => { if (e.button === 0) this.breakHeld = false; if (e.button === 2) this.placeHeld = false; });
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     this.canvas.addEventListener('wheel', (e) => {
       if (!this.enabled) return;
@@ -204,7 +206,7 @@ export class Input {
     };
     press('btn-jump', () => { this.jump = true; }, () => { this.jump = false; });
     press('btn-break', () => { this.breakQueued = true; this.breakHeld = true; }, () => { this.breakHeld = false; });
-    press('btn-place', () => { this.placeQueued = true; });
+    press('btn-place', () => { this.placeQueued = true; this.placeHeld = true; }, () => { this.placeHeld = false; });
     press('btn-menu', () => this.onPause());
     press('btn-inv', () => this.onInventory());
   }

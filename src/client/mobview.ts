@@ -244,7 +244,7 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
   const cubeMat = atlas ? new THREE.MeshBasicMaterial({ map: atlas.texture, vertexColors: true, alphaTest: 0.5 }) : null;
   const heldFlat = new THREE.Mesh(new THREE.BufferGeometry(), flatMat);
   heldFlat.rotation.y = Math.PI / 2; // a kép vízszintes iránya előre (−z) mutat, a pengéje előre-fel
-  heldFlat.position.set(0, -0.41, -0.39);
+  heldFlat.position.set(0, -0.3, -0.46);
   const heldCube = new THREE.Mesh(new THREE.BufferGeometry(), cubeMat ?? flatMat);
   heldCube.scale.setScalar(0.22);
   heldCube.position.set(0, -0.72, -0.12);
@@ -262,7 +262,7 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
     if (isItem(heldId)) {
       const name = ITEMS[heldId]?.tex;
       const img = name ? itemImage(base, name) : null;
-      if (img && img.width > 0) { heldFlat.geometry = extrudeItem(img, 0.62); heldFlat.visible = true; }
+      if (img && img.width > 0) { heldFlat.geometry = extrudeItem(img, 0.85); heldFlat.visible = true; }
       else heldReady = false; // a textúra még töltődik: a következő képkockán újra
     } else if (atlas) {
       const def = BLOCKS[heldId];
@@ -287,13 +287,16 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
       v.root.rotation.y = yaw;
       const sw = Math.sin(walk * 3.2) * 0.85 * Math.min(1, speed);
       for (const l of v.limbs) l.g.rotation.x = l.tilt + sw * l.swing;
-      // a tárgyat tartó jobb kar: előre emelve tartja, ütéskor magasra lendül és lecsap, evéskor a szájhoz emelkedik
-      const sq = Math.sin(Math.sqrt(act.swing) * Math.PI);
+      // a tárgyat tartó jobb kar (a kockajátékok szerint): tartáskor kissé előre áll, ütéskor gyorsan előre-fel lendül,
+      // lassabban visszatér (a lendítés lüktetése 1−(1−p)³ szerint), a törzs felé billen; evéskor a szájhoz emelkedik és rág
+      const p = act.swing;
+      const ease = 1 - Math.pow(1 - p, 3);
+      const lift = p > 0 ? Math.sin(ease * Math.PI) * 1.2 + Math.sin(p * Math.PI) * 0.52 : 0;
       for (const l of v.limbs) {
         if (!isRightArm(l.g)) continue;
-        let rx = l.g.rotation.x + (heldId > 0 ? 0.45 : 0) + sq * 1.9; // pozitív x: a kar előre emelkedik
-        let rz = 0;
-        if (act.eat > 0) { rx = 1.75 * act.eat + Math.sin(act.chewPhase * 26) * 0.1 * act.eat; rz = 0; }
+        let rx = l.g.rotation.x * 0.5 + (heldId > 0 ? 0.314 : 0) + lift; // pozitív x: a kar előre emelkedik
+        let rz = p > 0 ? -Math.sin(p * Math.PI) * 0.4 : 0;
+        if (act.eat > 0) { rx += (1.75 - rx) * act.eat + Math.abs(Math.cos(act.chewPhase * 5 * Math.PI)) * 0.12 * act.eat; rz = 0; }
         l.g.rotation.x = rx;
         l.g.rotation.z = rz;
       }

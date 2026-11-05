@@ -18,7 +18,7 @@ import { buildAtlas, TILE } from './atlas';
 import { DAY_SECONDS, START_TIME, formatClock, skyAt } from './daynight';
 import { createMoonTexture, createSunTexture } from './sky';
 import { createMobView, createPlayerView } from './mobview';
-import { createHandItem } from './handitem';
+import { EAT_TIME, createHandItem } from './handitem';
 import { createInventoryPreview } from './invpreview';
 import { createCollapse } from './collapse';
 import { MobManager, mobDrops, type Mob, type MobCtx } from '../shared/mobs';
@@ -371,8 +371,7 @@ async function main(): Promise<void> {
 
   const drops = createDrops(scene, atlas, material, paintStack);
   const mobView = createMobView(scene);
-  scene.add(camera); // a kézben tartott tárgy a kamera gyereke
-  hand = createHandItem(camera, paintStack, atlas, isItem, import.meta.env.BASE_URL);
+  hand = createHandItem(paintStack, atlas, isItem, import.meta.env.BASE_URL);
   const collapse = createCollapse(scene, atlas, material, () => world);
   // harmadik személyű nézet (V): a játékos saját modellje a kamera előtt
   const playerView = createPlayerView(scene, import.meta.env.BASE_URL, atlas);
@@ -933,8 +932,7 @@ async function main(): Promise<void> {
     const food = ITEMS[id]?.food;
     if (food) {
       // csak éhesen lehet enni (kreatívban nincs éhség)
-      if (mode === 'survival' && health.eat(food.hunger, food.sat)) { hand?.eat(); inv.takeOne(input.hotbar); paintHotbar(); }
-      return;
+      return; // az evés a jobb gomb nyomva tartásával megy (lásd az interact-ot)
     }
     if (!hit) return;
     // ajtó: nyitás és csukás
@@ -1055,8 +1053,24 @@ async function main(): Promise<void> {
 
   /** az ütés/bontás/lerakás folyamatban (a kézben tartott tárgy lendítéséhez) */
   let handAct = false;
+  let eatT = -1; // az evés eddigi ideje (mp); negatív: nem eszik
+  let eatId = 0;
+  let eatLock = false; // megevett egy falatot: a jobb gombot el kell engedni a következőhöz
   const interact = (dt: number) => {
-    handAct = input.breakHeld || input.breakQueued || input.placeQueued;
+    // ütés-mozdulat: a bal gombra (bontás/ütés, a levegőbe is), a jobb gombra lerakáskor/használatkor; evéskor nincs
+    const heldFood = ITEMS[held()?.id ?? 0]?.food;
+    handAct = input.breakHeld || input.breakQueued || (input.placeQueued && !heldFood);
+    // evés: a jobb gombot nyomva kell tartani 1,6 mp-ig; félbehagyva nem fogy el az étel
+    if (mode === 'survival' && heldFood && input.placeHeld && health.food < 20 && !eatLock) {
+      const eid = held()!.id;
+      if (eatId !== eid) { eatId = eid; eatT = 0; }
+      eatT = Math.max(0, eatT) + dt;
+      if (eatT >= EAT_TIME) {
+        if (health.eat(heldFood.hunger, heldFood.sat)) { inv.takeOne(input.hotbar); paintHotbar(); }
+        eatT = -1; eatLock = true;
+      }
+    } else eatT = -1;
+    if (!input.placeHeld) eatLock = false;
     camera.getWorldDirection(dir);
     const p = camera.position;
     const blockHit: RayHit | null = raycast(world, p.x, p.y, p.z, dir.x, dir.y, dir.z, 6);
@@ -1224,7 +1238,7 @@ async function main(): Promise<void> {
       // a viselt páncél látszik a karakteren (harmadik személyű nézet)
       const armorSig = inv.armor.map((s) => s?.id ?? 0).join(',');
       if (armorSig !== shownArmor) { shownArmor = armorSig; playerView.setArmor(inv.armor.map((s) => s?.id ?? 0)); }
-      hand?.update(dt, held()?.id ?? 0, state === 'playing' && !thirdPerson, Math.min(1, Math.hypot(player.vel.x, player.vel.z) / 4) * (player.onGround ? 1 : 0), handAct, sky.light);
+      hand?.update(dt, held()?.id ?? 0, state === 'playing' && !thirdPerson, Math.min(1, Math.hypot(player.vel.x, player.vel.z) / 4) * (player.onGround ? 1 : 0), handAct, sky.light, eatT);
       if (state === 'inventory') {
         bag.tick();
         if (bag.isOpen) {
@@ -1242,6 +1256,7 @@ async function main(): Promise<void> {
     stream(cx, cz, settings.renderDistance, 4, 2);
     if (frame % 60 === 0) unload(cx, cz, settings.renderDistance);
     renderer.render(scene, camera);
+    hand?.render(renderer, camera); // a kéz a világ után, külön (a víz nem takarja el)
   };
   requestAnimationFrame(loop);
 }
