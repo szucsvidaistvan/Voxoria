@@ -64,7 +64,10 @@ export function createHandItem(paint: (c: HTMLCanvasElement, id: number) => void
   const flat = new THREE.Mesh(new THREE.BufferGeometry(), flatMat);
   flat.scale.setScalar(1.7);
   flat.position.set(0, 0.25, 0.125);
-  flat.rotation.y = -50 * D2R; // a 45°-os kézfordítást kiegyenlíti: a lap szinte szemből látszik (a kard széles lapja, nem a pixelsora)
+  // Minecraft 1.8 „handheld” első személyű átalakítása: eltolás (0, 4, 2)/16, forgatás Y −135°, Z 25° (Y, X, Z sorrendben), méret 1,7.
+  // A kéz 45°-os fordításával együtt a lap kb. 50°-ban áll a kamerához képest, a penge majdnem függőleges, kissé a nézőhöz dől
+  flat.rotation.order = 'YXZ';
+  flat.rotation.set(0, -135 * D2R, 25 * D2R);
   const cube = new THREE.Mesh(new THREE.BufferGeometry(), cubeMat);
   cube.scale.setScalar(1.15);
   const icon = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), iconMat);
