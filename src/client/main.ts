@@ -374,8 +374,10 @@ async function main(): Promise<void> {
   hand = createHandItem(camera, paintStack, atlas, isItem, import.meta.env.BASE_URL);
   const collapse = createCollapse(scene, atlas, material, () => world);
   // harmadik személyű nézet (V): a játékos saját modellje a kamera előtt
-  const playerView = createPlayerView(scene);
-  let thirdPerson = false;
+  const playerView = createPlayerView(scene, import.meta.env.BASE_URL, atlas);
+  /** nézet (V): 0 első személy, 1 hátulról, 2 elölről */
+  let viewMode: 0 | 1 | 2 = 0;
+  let thirdPerson = false; // viewMode > 0
   let shownArmor = '';
   let walkPhase = 0;
   const hotbarEl = $('hotbar');
@@ -607,7 +609,7 @@ async function main(): Promise<void> {
     } else input.lock();
   }
   bag.onClose = () => closeUI();
-  input.onView = () => { if (state === 'playing') thirdPerson = !thirdPerson; };
+  input.onView = () => { if (state === 'playing') { viewMode = ((viewMode + 1) % 3) as 0 | 1 | 2; thirdPerson = viewMode > 0; } };
   input.onInventory = () => (state === 'inventory' ? closeUI() : mode === 'creative' ? openPicker() : openBag(2));
   $('inv-close').addEventListener('click', () => closeUI());
   document.addEventListener('keydown', (e) => {
@@ -1138,8 +1140,14 @@ async function main(): Promise<void> {
       if (playerView.visible) {
         const sy = Math.sin(player.yaw), cy = Math.cos(player.yaw), cp = Math.cos(player.pitch), sp = Math.sin(player.pitch);
         const dist = 3.5;
-        camera.position.set(player.pos.x + sy * cp * dist, player.pos.y + EYE - sp * dist, player.pos.z + cy * cp * dist);
-        playerView.set(player.pos.x, player.pos.y, player.pos.z, player.yaw, walkPhase, Math.hypot(player.vel.x, player.vel.z) / 4, skyAt(timeOfDay, dayCount).light);
+        if (viewMode === 2) {
+          // elölnézet: a kamera a játékos előtt van, és visszanéz rá
+          camera.position.set(player.pos.x - sy * cp * dist, player.pos.y + EYE + sp * dist, player.pos.z - cy * cp * dist);
+          camera.rotation.set(-player.pitch, player.yaw + Math.PI, 0);
+        } else camera.position.set(player.pos.x + sy * cp * dist, player.pos.y + EYE - sp * dist, player.pos.z + cy * cp * dist);
+        playerView.setHeld(held()?.id ?? 0);
+        playerView.set(player.pos.x, player.pos.y, player.pos.z, player.yaw, walkPhase, Math.hypot(player.vel.x, player.vel.z) / 4, skyAt(timeOfDay, dayCount).light,
+          { swing: hand?.swingP ?? 0, eat: hand?.eatP ?? 0, chewPhase: hand?.eatPhase ?? 0 });
       }
       cx = player.pos.x;
       cz = player.pos.z;

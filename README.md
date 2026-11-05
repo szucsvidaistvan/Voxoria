@@ -48,7 +48,7 @@ A korábbi, saját textúralapokból kivágott textúrákat a `scripts/slice-tex
 - **Bontás:** a bontási idők szándékosan hosszabbak (szorzó: `MINING_SCALE` a `survival.ts`-ben): pl. kézzel a föld ~1,1 mp, a rönk ~11 mp, vascsákánnyal a kő ~1 mp.
 - **Kézben tartott tárgy:** első személyű nézetben jobb alsó sarokban látszik: üres kézzel a játékos karja (a saját skinnel), tömör blokknál 3D kocka, tárgyaknál a textúrából kihúzott, 1 pixel vastag modell. Járáskor billeg, bontáskor/ütéskor/lerakáskor lendül, evéskor a szájhoz emelkedik és rág.
 - **Éhség:** 10 húscomb; a mozgás (kb. 160 méterenként egy éhségpont), az ugrás, a bontás (kb. 100 blokkonként egy pont) és a sebzés fokozatosan kimerít, a telítettség előbb fogy, mint az éhség. 18 éhség fölött az életerő magától töltődik, nulla éhségnél az életerő 1 pontig csökken. Étel jobb klikkre (csak éhesen): alma, nyers és sült hús, rothadt hús. A nyers húst a tűzhelyben lehet megsütni.
-- **Páncél:** sisak, mellvért, nadrág, csizma bőrből, vasból, aranyból és gyémántból (a Good Vibes ikonjaival és páncélrétegeivel). Az inventoryban 4 külön hely van nekik (Shift+kattintás felveszi a megfelelő helyre), a harmadik személyű nézetben (V) látszanak a karakteren. Minden védelmi pont 4%-kal csökkenti a mobok és a nyilak sebzését (legfeljebb 80%); az esés, a tűz és a fulladás kikerüli. Ütésenként kopik, és a mentésben megmarad. Receptek: a szokásos alakok (sisak `MMM/M M`, mellvért `M M/MMM/MMM`, nadrág `MMM/M M/M M`, csizma `M M/M M`), ahol M a bőr, a vas-, arany- vagy gyémánt.
+- **Páncél:** sisak, mellvért, nadrág, csizma bőrből, vasból, aranyból és gyémántból (a Good Vibes ikonjaival és páncélrétegeivel). Az inventoryban 4 külön hely van nekik (Shift+kattintás felveszi a megfelelő helyre), a harmadik személyű nézetekben (V) látszanak a karakteren, az inventoryban egymás alatt vannak. Minden védelmi pont 4%-kal csökkenti a mobok és a nyilak sebzését (legfeljebb 80%); az esés, a tűz és a fulladás kikerüli. Ütésenként kopik, és a mentésben megmarad. Receptek: a szokásos alakok (sisak `MMM/M M`, mellvért `M M/MMM/MMM`, nadrág `MMM/M M/M M`, csizma `M M/M M`), ahol M a bőr, a vas-, arany- vagy gyémánt.
 - **Szörnyek és fény:** az ellenséges mobok csak sötétben jelennek meg: éjjel a szabadban, nappal csak fedett barlangban (a fa lombja alatt nem), és fáklya vagy láva fényében soha.
 - **Szerszámok kopása:** fa 59, kő 131, vas 250, arany 32, gyémánt 1561 használat. Minden bontott blokk, kidöntött rönk és ütés kopasztja; a kard a harcban, a többi eszköz a bontásban bírja jobban. A kopás csíkként látszik az ikonon, és a mentésben megmarad.
 - **Mobok:** disznó, tehén, birka, csirke (nyers húst, gyapjút adnak), zombi és csontváz (éjjel jönnek, napfényben égnek). Kard 4–7, balta 3–6, kéz 1 sebzés; esés közben kritikus. A beállításokban kikapcsolhatók, vagy békés módban csak az állatok maradnak.
@@ -63,7 +63,7 @@ A korábbi, saját textúralapokból kivágott textúrákat a `scripts/slice-tex
 | Bontás / építés | bal / jobb egérgomb | Bont / Épít gomb |
 | Kiválasztás a sávban | 1–9, görgő | koppintás a hotbaron |
 | Inventory (kreatívban blokklista) | E | Tárgyak gomb |
-| Nézet váltása (első / harmadik személy) | V | – |
+| Nézet váltása (első / hátulról / elölről) | V | – |
 | Menü | Esc | Menü gomb |
 
 ## Telefon
@@ -148,6 +148,8 @@ A tárgytextúrák besorolása a `scripts/item-policy.json` fájlban van: `impor
 A háziállatok (malac, tehén, birka, csirke) a Good Vibes csomag lény-skinjeivel (`public/textures/entity/`) vannak textúrázva.
 A modellek adata a `src/client/mobmodels.ts` fájlban van (a dobozok pixelmérete, helye és a képen lévő részük), a dobozok
 UV-kiosztását a `src/client/boxuv.ts` végzi. A zombi (`zombie.png`) és a csontváz (`skeleton.png`) is a csomag skinjével van textúrázva (a bal végtagok a jobbak tükörképei a képen, ezért ugyanazt a részt használják). A csontváz távolról lő, nappal ég, csontot ejt: célzáskor megemeli az íjat tartó karját (a kezében a csomag `bow.png` tárgya), majd kilő egy valódi, ívben repülő **nyilat** (3 sebzés). A nyíl sebessége véges, ezért oldalra lépve kikerülhető; a blokkba állt nyíl pár másodpercig látszik.
+A V billentyű háromféle nézetet léptet: első személy, hátulról és elölről (a karakter arcát látod). A karakter jobb kezében látszik a tartott tárgy (a textúrából kihúzott modell, blokknál kis kocka), ütéskor a kar magasra lendül és lecsap, evéskor a szájhoz emelkedik.
+
 A játékos modellje: az `entity/player.png` a projekt tulajdonosa által megadott skin (nem a Minecraft Steve/Alex karaktere); játék közben a **V** billentyűvel
 látható (harmadik személyű nézet), és a későbbi co-op társak megjelenítésére is ez szolgál.
 

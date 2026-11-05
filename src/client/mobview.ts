@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import type { Arrow, Mob, MobKind } from '../shared/mobs';
-import { ITEMS } from '../shared/items';
+import { BLOCKS } from '../shared/blocks';
+import { ITEMS, isItem } from '../shared/items';
+import type { Atlas } from './atlas';
+import { buildCubeGeo } from './blockgeo';
+import { extrudeItem, itemImage } from './itemgeo';
 import { TEXTURED, armorParts, partGeom, type TPart, type TexName } from './mobmodels';
 
 /**
@@ -228,23 +232,76 @@ export function createMobView(scene: THREE.Scene, base: string = import.meta.env
  * A játékos modellje (saját terv, public/textures/entity/player.png): a kamera mögötti nézethez és a későbbi társakhoz.
  * `set` állítja a helyét, az irányát és a járás-animációt.
  */
-export function createPlayerView(scene: THREE.Scene, base: string = import.meta.env.BASE_URL) {
+export function createPlayerView(scene: THREE.Scene, base: string = import.meta.env.BASE_URL, atlas?: Atlas) {
   const v = buildView('player', scene, base);
   v.root.visible = false;
   const armorRemovers: (() => void)[] = [];
+  const isRightArm = (g: THREE.Group) => Math.abs(g.position.x - 6 / 16) < 1e-3 && Math.abs(g.position.y - 24 / 16) < 1e-3;
+  const rightArm = v.limbs.find((l) => isRightArm(l.g))!.g;
+
+  // a kézben tartott tárgy: a jobb kar csomópontján lóg (a kéz a kar alsó vége)
+  const flatMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  const cubeMat = atlas ? new THREE.MeshBasicMaterial({ map: atlas.texture, vertexColors: true, alphaTest: 0.5 }) : null;
+  const heldFlat = new THREE.Mesh(new THREE.BufferGeometry(), flatMat);
+  heldFlat.rotation.y = Math.PI / 2; // a kép vízszintes iránya előre (−z) mutat, a pengéje előre-fel
+  heldFlat.position.set(0, -0.41, -0.39);
+  const heldCube = new THREE.Mesh(new THREE.BufferGeometry(), cubeMat ?? flatMat);
+  heldCube.scale.setScalar(0.22);
+  heldCube.position.set(0, -0.72, -0.12);
+  for (const m of [heldFlat, heldCube]) { m.visible = false; m.frustumCulled = false; rightArm.add(m); }
+  let heldId = 0;
+  let heldShown = -1;
+
+  let heldReady = false;
+  const refreshHeld = () => {
+    if (heldId === heldShown && heldReady) return;
+    heldShown = heldId;
+    heldReady = true;
+    heldFlat.visible = heldCube.visible = false;
+    if (heldId <= 0) return;
+    if (isItem(heldId)) {
+      const name = ITEMS[heldId]?.tex;
+      const img = name ? itemImage(base, name) : null;
+      if (img && img.width > 0) { heldFlat.geometry = extrudeItem(img, 0.62); heldFlat.visible = true; }
+      else heldReady = false; // a textúra még töltődik: a következő képkockán újra
+    } else if (atlas) {
+      const def = BLOCKS[heldId];
+      if (def && !def.parts && !def.conn && !def.door) {
+        heldCube.geometry = buildCubeGeo(atlas, heldId);
+        heldCube.visible = true;
+      }
+    }
+  };
+
   return {
     get visible() { return v.root.visible; },
     set visible(on: boolean) { v.root.visible = on; },
+    /** a kézben lévő tárgy (0: üres kéz) */
+    setHeld(id: number): void { heldId = id; },
     /**
      * @param walk a megtett út fázisa (nő járás közben), @param speed 0..1 a járás üteme, @param light a napszak színe (RGB)
-     * @param sneak lehajolás nincs, a paraméter a későbbi bővítésé
+     * @param act az ütés fázisa (0..1, 0: nincs), az evés előrehaladása (0..1) és a rágás fázisa
      */
-    set(x: number, y: number, z: number, yaw: number, walk: number, speed: number, light: [number, number, number]): void {
+    set(x: number, y: number, z: number, yaw: number, walk: number, speed: number, light: [number, number, number], act: { swing: number; eat: number; chewPhase: number } = { swing: 0, eat: 0, chewPhase: 0 }): void {
       v.root.position.set(x, y, z);
       v.root.rotation.y = yaw;
       const sw = Math.sin(walk * 3.2) * 0.85 * Math.min(1, speed);
       for (const l of v.limbs) l.g.rotation.x = l.tilt + sw * l.swing;
-      for (const mt of v.mats) mt.color.setRGB(Math.max(light[0], 0.35), Math.max(light[1], 0.35), Math.max(light[2], 0.4));
+      // a tárgyat tartó jobb kar: előre emelve tartja, ütéskor magasra lendül és lecsap, evéskor a szájhoz emelkedik
+      const sq = Math.sin(Math.sqrt(act.swing) * Math.PI);
+      for (const l of v.limbs) {
+        if (!isRightArm(l.g)) continue;
+        let rx = l.g.rotation.x + (heldId > 0 ? -0.45 : 0) - sq * 1.9;
+        let rz = -sq * 0.25;
+        if (act.eat > 0) { rx = -1.75 * act.eat + Math.sin(act.chewPhase * 26) * 0.1 * act.eat; rz = 0; }
+        l.g.rotation.x = rx;
+        l.g.rotation.z = rz;
+      }
+      refreshHeld();
+      const r = Math.max(light[0], 0.35), g = Math.max(light[1], 0.35), b = Math.max(light[2], 0.4);
+      for (const mt of v.mats) mt.color.setRGB(r, g, b);
+      flatMat.color.setRGB(r, g, b);
+      cubeMat?.color.setRGB(r, g, b);
     },
     /** a viselt páncél (4 azonosító: sisak, mellvért, nadrág, csizma; 0: nincs) */
     setArmor(ids: number[]): void {
