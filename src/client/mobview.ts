@@ -243,8 +243,14 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
   const flatMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
   const cubeMat = atlas ? new THREE.MeshBasicMaterial({ map: atlas.texture, vertexColors: true, alphaTest: 0.5 }) : null;
   const heldFlat = new THREE.Mesh(new THREE.BufferGeometry(), flatMat);
-  heldFlat.rotation.y = Math.PI / 2; // a kép vízszintes iránya előre (−z) mutat, a pengéje előre-fel
-  heldFlat.position.set(0, -0.3, -0.46);
+  // Minecraft 1.8 harmadik személyű tartás: a kéz a kar alján, a tárgy átalakítása „handheld”: eltolás (0, 4, 0.5)/16,
+  // forgatás Y 90°, Z −55°, méret 0,85; a modell y-tengelye lefelé néz (a teljes karakter z körül 180°-kal fordított), ezért
+  // a tárgy így áll: a penge előre mutat, kb. 28°-kal a vízszintes fölé (a kar 18°-os előredőlésével együtt), a lap függőleges.
+  heldFlat.quaternion
+    .setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI)
+    .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2))
+    .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), (-55 * Math.PI) / 180));
+  heldFlat.position.set(0.0625, -0.6875, 0.09375);
   const heldCube = new THREE.Mesh(new THREE.BufferGeometry(), cubeMat ?? flatMat);
   heldCube.scale.setScalar(0.22);
   heldCube.position.set(0, -0.72, -0.12);
