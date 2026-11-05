@@ -282,7 +282,7 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
      * @param walk a megtett út fázisa (nő járás közben), @param speed 0..1 a járás üteme, @param light a napszak színe (RGB)
      * @param act az ütés fázisa (0..1, 0: nincs), az evés előrehaladása (0..1) és a rágás fázisa
      */
-    set(x: number, y: number, z: number, yaw: number, walk: number, speed: number, light: [number, number, number], act: { swing: number; eat: number; chewPhase: number } = { swing: 0, eat: 0, chewPhase: 0 }): void {
+    set(x: number, y: number, z: number, yaw: number, walk: number, speed: number, light: [number, number, number], act: { swing: number; eat: number; chewPhase: number; block?: boolean } = { swing: 0, eat: 0, chewPhase: 0 }): void {
       v.root.position.set(x, y, z);
       v.root.rotation.y = yaw;
       const sw = Math.sin(walk * 3.2) * 0.85 * Math.min(1, speed);
@@ -297,6 +297,7 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
         let rx = l.g.rotation.x * 0.5 + (heldId > 0 ? 0.314 : 0) + lift; // pozitív x: a kar előre emelkedik
         let rz = p > 0 ? -Math.sin(p * Math.PI) * 0.4 : 0;
         if (act.eat > 0) { rx += (1.75 - rx) * act.eat + Math.abs(Math.cos(act.chewPhase * 5 * Math.PI)) * 0.12 * act.eat; rz = 0; }
+        if (act.block) { rx = 0.95; rz = 0.25; } // védekező kard: a kar a mellkas elé emelkedik
         l.g.rotation.x = rx;
         l.g.rotation.z = rz;
       }

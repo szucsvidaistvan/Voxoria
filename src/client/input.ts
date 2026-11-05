@@ -2,6 +2,8 @@
  * Bemenet: billentyűzet + egér (pointer lock) gépen, joystick + érintés telefonon.
  * A játékot a main.ts hajtja, ez csak összegyűjti az eseményeket.
  */
+const HOLD_MS = 300, TAP_SLOP = 12;
+
 export class Input {
   /** a legutóbbi lekérdezés óta felgyűlt elfordulás (radián) */
   dYaw = 0;
@@ -13,6 +15,10 @@ export class Input {
   placeQueued = false;
   /** a jobb gomb (vagy a Place gomb) nyomva van: az étel evéséhez kell */
   placeHeld = false;
+  /** érintőképernyő: gyors koppintás (lerakás / használat / ütés) várakozik */
+  tapQueued = false;
+  /** érintőképernyő: hosszan nyomva tartott ujj a vásznon (bontás, vagy evés / védekezés) */
+  holdTouch = false;
   hotbar = 0;
   sensitivity = 1;
   enabled = false;
@@ -30,6 +36,8 @@ export class Input {
   private joy = { x: 0, y: 0 };
   private joyId: number | null = null;
   private lookId: number | null = null;
+  private lookStart = { x: 0, y: 0, t: 0, moved: false };
+  private holdTimer = 0;
   private lastX = 0;
   private lastY = 0;
 
@@ -68,7 +76,7 @@ export class Input {
     this.joyId = this.lookId = null;
     this.jump = false;
     this.dYaw = this.dPitch = 0;
-    this.breakQueued = this.placeQueued = this.breakHeld = this.placeHeld = false;
+    this.breakQueued = this.placeQueued = this.breakHeld = this.placeHeld = this.tapQueued = this.holdTouch = false;
     const knob = document.getElementById('joy-knob');
     if (knob) knob.style.transform = '';
   }
@@ -176,6 +184,10 @@ export class Input {
         this.lookId = t.identifier;
         this.lastX = t.clientX;
         this.lastY = t.clientY;
+        // Pocket Edition: koppintás = lerakás / használat / ütés, hosszan nyomva = bontás (vagy evés / védekezés)
+        this.lookStart = { x: t.clientX, y: t.clientY, t: performance.now(), moved: false };
+        clearTimeout(this.holdTimer);
+        this.holdTimer = window.setTimeout(() => { if (this.lookId !== null && !this.lookStart.moved) this.holdTouch = true; }, HOLD_MS);
       }
     }, opts);
     this.canvas.addEventListener('touchmove', (e) => {
@@ -187,10 +199,17 @@ export class Input {
         this.dPitch -= (t.clientY - this.lastY) * 0.005 * this.sensitivity;
         this.lastX = t.clientX;
         this.lastY = t.clientY;
+        if (Math.hypot(t.clientX - this.lookStart.x, t.clientY - this.lookStart.y) > TAP_SLOP) this.lookStart.moved = true;
       }
     }, opts);
     const endLook = (e: TouchEvent) => {
-      for (const t of Array.from(e.changedTouches)) if (t.identifier === this.lookId) this.lookId = null;
+      for (const t of Array.from(e.changedTouches)) {
+        if (t.identifier !== this.lookId) continue;
+        this.lookId = null;
+        clearTimeout(this.holdTimer);
+        if (!this.holdTouch && !this.lookStart.moved && performance.now() - this.lookStart.t < HOLD_MS && e.type === 'touchend') this.tapQueued = true;
+        this.holdTouch = false;
+      }
     };
     this.canvas.addEventListener('touchend', endLook);
     this.canvas.addEventListener('touchcancel', endLook);
@@ -205,8 +224,7 @@ export class Input {
       }
     };
     press('btn-jump', () => { this.jump = true; }, () => { this.jump = false; });
-    press('btn-break', () => { this.breakQueued = true; this.breakHeld = true; }, () => { this.breakHeld = false; });
-    press('btn-place', () => { this.placeQueued = true; this.placeHeld = true; }, () => { this.placeHeld = false; });
+    press('btn-view', () => this.onView());
     press('btn-menu', () => this.onPause());
     press('btn-inv', () => this.onInventory());
   }

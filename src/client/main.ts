@@ -716,8 +716,8 @@ async function main(): Promise<void> {
   });
 
   $('controls').textContent = input.touch
-    ? 'Move with the joystick on the left, look around by dragging on the right. Hold Break to mine (in survival mining takes time), Place puts down a block or uses what you hold (crafting table, door, bucket, food). Items opens your inventory.'
-    : 'WASD to move, Space to jump or swim, hold left click to mine, right click to place or use (crafting table, doors, bucket, flint and steel, apple), 1–9 or scroll to choose a slot, E for the inventory, Esc for the menu.';
+    ? 'Move with the joystick on the left, look around by dragging on the right. Tap the screen to place a block, use what you hold or hit a mob; press and hold to mine (with food: eat, with a sword: block). The round button jumps, F5 changes the view, Items opens your inventory.'
+    : 'WASD to move, Space to jump or swim, hold left click to mine, right click to place or use (crafting table, doors, bucket, flint and steel, apple), hold right click with a sword to block (half damage from the front), V to change the view, 1–9 or scroll to choose a slot, E for the inventory, Esc for the menu.';
   if (input.touch) $('bag-hint').textContent = 'Tap: pick up / place. Long press: take half / place one. Drag a stack to move it. Tap outside to close.';
   $('pack-note').hidden = atlas.usingPack;
 
@@ -1026,11 +1026,13 @@ async function main(): Promise<void> {
     day: sky.elevation > 0.15,
     hurtPlayer: (dmg, fx, fz) => {
       if (mode !== 'survival' || health.dead) return;
-      health.damage(wearArmor(dmg));
+      // védekező kard (jobb gomb nyomva): az elölről érkező támadás sebzése és lökése a felére csökken
+      const guard = blocking && (fx - player.pos.x) * -Math.sin(player.yaw) + (fz - player.pos.z) * -Math.cos(player.yaw) > 0 ? 0.5 : 1;
+      health.damage(wearArmor(dmg * guard));
       lastMobHit = now(); lastMobHitBy = 'slain by a monster';
       const d = Math.hypot(player.pos.x - fx, player.pos.z - fz) || 1;
-      player.knock.x += ((player.pos.x - fx) / d) * 5;
-      player.knock.z += ((player.pos.z - fz) / d) * 5;
+      player.knock.x += ((player.pos.x - fx) / d) * 5 * guard;
+      player.knock.z += ((player.pos.z - fz) / d) * 5 * guard;
     },
     onDie: onMobDie,
   });
@@ -1053,13 +1055,22 @@ async function main(): Promise<void> {
 
   /** az ütés/bontás/lerakás folyamatban (a kézben tartott tárgy lendítéséhez) */
   let handAct = false;
+  /** a kard védekező tartásban van (jobb gomb / hosszú nyomás kardnál) */
+  let blocking = false;
   let eatT = -1; // az evés eddigi ideje (mp); negatív: nem eszik
   let eatId = 0;
   let eatLock = false; // megevett egy falatot: a jobb gombot el kell engedni a következőhöz
   const interact = (dt: number) => {
     // ütés-mozdulat: a bal gombra (bontás/ütés, a levegőbe is), a jobb gombra lerakáskor/használatkor; evéskor nincs
     const heldFood = ITEMS[held()?.id ?? 0]?.food;
-    handAct = input.breakHeld || input.breakQueued || (input.placeQueued && !heldFood);
+    const isSword = toolOf(held()?.id)?.type === 'sword';
+    // érintőn: a vásznon hosszan nyomva tartott ujj bont, ételnél eszik, kardnál védekezik
+    if (input.touch) {
+      input.breakHeld = input.holdTouch && !heldFood && !isSword;
+      input.placeHeld = input.holdTouch && (!!heldFood || isSword);
+    }
+    blocking = isSword && input.placeHeld && !health.dead;
+    handAct = input.breakHeld || input.breakQueued || input.tapQueued || (input.placeQueued && !heldFood && !isSword);
     // evés: a jobb gombot nyomva kell tartani 1,6 mp-ig; félbehagyva nem fogy el az étel
     if (mode === 'survival' && heldFood && input.placeHeld && health.food < 20 && !eatLock) {
       const eid = held()!.id;
@@ -1079,7 +1090,8 @@ async function main(): Promise<void> {
     const blockDist = blockHit ? Math.hypot(blockHit.hx - p.x, blockHit.hy - p.y, blockHit.hz - p.z) : Infinity;
     const mobFirst = !!mobHit && mobHit.t < blockDist;
     const hit: RayHit | null = mobFirst ? null : blockHit;
-    if (mobFirst && (input.breakQueued || input.breakHeld)) attackMob(mobHit!.mob);
+    if (mobFirst && (input.breakQueued || input.breakHeld || input.tapQueued)) attackMob(mobHit!.mob);
+    else if (input.tapQueued) input.placeQueued = true; // koppintás: lerakás / használat (Pocket Edition)
     highlight.visible = !!hit;
     if (hit) {
       const [x0, y0, z0, x1, y1, z1] = hit.box;
@@ -1110,7 +1122,7 @@ async function main(): Promise<void> {
     else cracks.hide();
 
     if (input.placeQueued) useItem(hit);
-    input.breakQueued = input.placeQueued = false;
+    input.breakQueued = input.placeQueued = input.tapQueued = false;
   };
 
   const loop = (now: number) => {
@@ -1128,6 +1140,7 @@ async function main(): Promise<void> {
       input.dYaw = input.dPitch = 0;
       const { mx, mz } = input.getMove();
       const wasGround = player.onGround, px0 = player.pos.x, pz0 = player.pos.z;
+      player.speedMul = blocking ? 0.8 : 1;
       player.update(dt, mx, mz, input.jump);
       if (mode === 'survival') {
         // a mozgás (méterenként) és az ugrás kimerít
@@ -1165,7 +1178,7 @@ async function main(): Promise<void> {
         } else camera.position.set(player.pos.x + sy * cp * dist, player.pos.y + EYE - sp * dist, player.pos.z + cy * cp * dist);
         playerView.setHeld(held()?.id ?? 0);
         playerView.set(player.pos.x, player.pos.y, player.pos.z, player.yaw, walkPhase, Math.hypot(player.vel.x, player.vel.z) / 4, skyAt(timeOfDay, dayCount).light,
-          { swing: hand?.swingP ?? 0, eat: hand?.eatP ?? 0, chewPhase: hand?.eatPhase ?? 0 });
+          { swing: hand?.swingP ?? 0, eat: hand?.eatP ?? 0, chewPhase: hand?.eatPhase ?? 0, block: blocking });
       }
       cx = player.pos.x;
       cz = player.pos.z;
@@ -1238,7 +1251,7 @@ async function main(): Promise<void> {
       // a viselt páncél látszik a karakteren (harmadik személyű nézet)
       const armorSig = inv.armor.map((s) => s?.id ?? 0).join(',');
       if (armorSig !== shownArmor) { shownArmor = armorSig; playerView.setArmor(inv.armor.map((s) => s?.id ?? 0)); }
-      hand?.update(dt, held()?.id ?? 0, state === 'playing' && !thirdPerson, Math.min(1, Math.hypot(player.vel.x, player.vel.z) / 4) * (player.onGround ? 1 : 0), handAct, sky.light, eatT);
+      hand?.update(dt, held()?.id ?? 0, state === 'playing' && !thirdPerson, Math.min(1, Math.hypot(player.vel.x, player.vel.z) / 4) * (player.onGround ? 1 : 0), handAct, sky.light, eatT, blocking);
       if (state === 'inventory') {
         bag.tick();
         if (bag.isOpen) {

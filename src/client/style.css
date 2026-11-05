@@ -283,23 +283,34 @@ body.touch .slot { flex: 1; width: auto; height: auto; aspect-ratio: 1; padding:
 
 #touch-actions {
   position: fixed;
-  right: max(16px, env(safe-area-inset-right));
-  bottom: max(16px, env(safe-area-inset-bottom));
-  grid-template-columns: repeat(2, 76px);
-  gap: 10px;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
 }
-body.touch #touch-actions { display: grid; }
+body.touch #touch-actions { display: block; }
+/* Pocket Edition: egyetlen nagy, kerek ugrógomb a jobb alsó sarokban */
 #touch-actions button {
-  height: 76px;
+  width: 88px; height: 88px;
+  border-radius: 50%;
   font: inherit;
-  font-size: 1.1rem;
+  font-size: 1.6rem;
   color: var(--chalk);
-  background: rgba(14, 26, 51, 0.6);
+  background: rgba(14, 26, 51, 0.45);
   border: 0;
-  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.5);
 }
 #touch-actions button:active { background: var(--sky); }
-#btn-jump { grid-column: 1 / -1; }
+/* nézetváltó (F5): kicsi gomb a jobb felső sarokban, a Items gomb mellett */
+#btn-view {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top));
+  right: calc(max(8px, env(safe-area-inset-right)) + 84px);
+  padding: 0.5rem 0.7rem;
+  font: inherit;
+  color: var(--chalk);
+  background: rgba(14, 26, 51, 0.72);
+  border: 0;
+}
+#btn-view:active { background: var(--sky); }
 
 @media (prefers-reduced-motion: reduce) {
   .btn:active { transform: none; }

@@ -73,6 +73,9 @@ export class Player {
   }
 
   /** mx: jobbra (+) / balra (−), mz: előre (+) / hátra (−), mindkettő −1..1 */
+  /** a mozgás szorzója (pl. kardos védekezés közben lassabb) */
+  speedMul = 1;
+
   update(dt: number, mx: number, mz: number, jump: boolean): void {
     const p = this.pos;
     if (!this.world.isLoaded(p.x, p.z)) return; // várjuk meg a terepet
@@ -92,7 +95,7 @@ export class Player {
 
     const len = Math.hypot(mx, mz);
     if (len > 1) { mx /= len; mz /= len; }
-    const speed = this.inLava ? WALK_SPEED * LAVA_SPEED : this.inWater ? WALK_SPEED * WATER_SPEED : WALK_SPEED;
+    const speed = (this.inLava ? WALK_SPEED * LAVA_SPEED : this.inWater ? WALK_SPEED * WATER_SPEED : WALK_SPEED) * this.speedMul;
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
     this.vel.x = (-sin * mz + cos * mx) * speed;
     this.vel.z = (-cos * mz - sin * mx) * speed;
