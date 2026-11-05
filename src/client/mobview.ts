@@ -291,9 +291,9 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
       const sq = Math.sin(Math.sqrt(act.swing) * Math.PI);
       for (const l of v.limbs) {
         if (!isRightArm(l.g)) continue;
-        let rx = l.g.rotation.x + (heldId > 0 ? -0.45 : 0) - sq * 1.9;
-        let rz = -sq * 0.25;
-        if (act.eat > 0) { rx = -1.75 * act.eat + Math.sin(act.chewPhase * 26) * 0.1 * act.eat; rz = 0; }
+        let rx = l.g.rotation.x + (heldId > 0 ? 0.45 : 0) + sq * 1.9; // pozitív x: a kar előre emelkedik
+        let rz = 0;
+        if (act.eat > 0) { rx = 1.75 * act.eat + Math.sin(act.chewPhase * 26) * 0.1 * act.eat; rz = 0; }
         l.g.rotation.x = rx;
         l.g.rotation.z = rz;
       }

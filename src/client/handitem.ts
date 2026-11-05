@@ -107,7 +107,7 @@ export function createHandItem(camera: THREE.Camera, paint: (c: HTMLCanvasElemen
             const name = ITEMS[show]?.tex;
             const img = name ? itemImage(base, name, () => { dirty = true; }) : null;
             if (img && img.width > 0) {
-              flat.geometry = extrudeItem(img, 0.7);
+              flat.geometry = extrudeItem(img, 1.0);
               k = 'flat';
             }
           } else if (def && !def.parts && !def.conn && !def.door) {
@@ -150,8 +150,8 @@ export function createHandItem(camera: THREE.Camera, paint: (c: HTMLCanvasElemen
         root.position.set(0.4 + walkX + dx - up * 0.34, -0.34 + walkY + dy + up * 0.16 + chew, -0.7 + dz + up * 0.14);
         root.rotation.set(0.3 + rx * 0.7 + up * 0.3, 0.55 + ry * 0.5 - up * 0.4, 0.05 + rz * 0.6);
       } else {
-        root.position.set(0.44 + walkX + dx - up * 0.38, -0.33 + walkY + dy + up * 0.22 + chew, -0.68 + dz + up * 0.12);
-        root.rotation.set(rx + up * 0.5, 0.35 + ry - up * 0.5, -0.12 + rz + up * 0.3);
+        root.position.set(0.5 + walkX + dx - up * 0.45, -0.38 + walkY + dy + up * 0.25 + chew, -0.82 + dz + up * 0.14);
+        root.rotation.set(rx + up * 0.5, 0.5 + ry - up * 0.5, 0.3 + rz + up * 0.3);
       }
       tint.setRGB(Math.max(light[0], 0.45), Math.max(light[1], 0.45), Math.max(light[2], 0.5));
       for (const m of [iconMat, cubeMat, flatMat, armMat]) m.color.copy(tint);

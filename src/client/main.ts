@@ -19,6 +19,7 @@ import { DAY_SECONDS, START_TIME, formatClock, skyAt } from './daynight';
 import { createMoonTexture, createSunTexture } from './sky';
 import { createMobView, createPlayerView } from './mobview';
 import { createHandItem } from './handitem';
+import { createInventoryPreview } from './invpreview';
 import { createCollapse } from './collapse';
 import { MobManager, mobDrops, type Mob, type MobCtx } from '../shared/mobs';
 import { findTree, isLogBlock } from '../shared/tree';
@@ -379,6 +380,9 @@ async function main(): Promise<void> {
   let viewMode: 0 | 1 | 2 = 0;
   let thirdPerson = false; // viewMode > 0
   let shownArmor = '';
+  let invPreview: ReturnType<typeof createInventoryPreview> | null = null;
+  let mouseX = 0, mouseY = 0;
+  document.addEventListener('pointermove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
   let walkPhase = 0;
   const hotbarEl = $('hotbar');
   const hotViews: SlotView[] = [];
@@ -1221,7 +1225,13 @@ async function main(): Promise<void> {
       const armorSig = inv.armor.map((s) => s?.id ?? 0).join(',');
       if (armorSig !== shownArmor) { shownArmor = armorSig; playerView.setArmor(inv.armor.map((s) => s?.id ?? 0)); }
       hand?.update(dt, held()?.id ?? 0, state === 'playing' && !thirdPerson, Math.min(1, Math.hypot(player.vel.x, player.vel.z) / 4) * (player.onGround ? 1 : 0), handAct, sky.light);
-      if (state === 'inventory') bag.tick();
+      if (state === 'inventory') {
+        bag.tick();
+        if (bag.isOpen) {
+          invPreview ??= createInventoryPreview($<HTMLCanvasElement>('inv-preview'), atlas);
+          invPreview.render(inv.armor.map((s) => s?.id ?? 0), held()?.id ?? 0, mouseX, mouseY);
+        }
+      }
       particles.update(dt);
       drops.update(dt, world, player.pos.x, player.pos.y, player.pos.z, (id, n) => {
         const left = inv.add(id, n);
