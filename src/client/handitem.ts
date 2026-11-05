@@ -61,13 +61,13 @@ export function createHandItem(paint: (c: HTMLCanvasElement, id: number) => void
   const flat = new THREE.Mesh(new THREE.BufferGeometry(), flatMat);
   flat.scale.setScalar(1.7);
   flat.position.set(0, 0.25, 0.125);
-  flat.rotation.y = -20 * D2R; // a 45°-os kézfordítással együtt kb. 25°: a lap a kamera felé néz, kicsit befelé fordulva
+  flat.rotation.y = -50 * D2R; // a 45°-os kézfordítást kiegyenlíti: a lap szinte szemből látszik (a kard széles lapja, nem a pixelsora)
   const cube = new THREE.Mesh(new THREE.BufferGeometry(), cubeMat);
   cube.scale.setScalar(1.15);
   const icon = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), iconMat);
   icon.scale.setScalar(1.5);
   icon.position.set(0, 0.1, 0);
-  icon.rotation.y = -20 * D2R;
+  icon.rotation.y = -50 * D2R;
   baseG.add(flat, cube, icon);
 
   // ---- üres kéz: a játékos jobb karja
