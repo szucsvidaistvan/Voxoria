@@ -403,7 +403,7 @@ body.creative #vitals { display: none; }
 .bag-panel h2 { flex: 1; margin: 0; font-size: 1.3rem; font-weight: 600; }
 .bag-panel .btn { width: auto; margin: 0; padding: 0.4rem 0.9rem; font-size: 1rem; }
 #craft-area { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 0 0 0.8rem; }
-#armor-slots { display: grid; grid-template-columns: repeat(2, var(--slot)); gap: 4px; }
+#armor-slots { display: grid; grid-template-columns: var(--slot); gap: 4px; }
 #bag.furnace #armor-slots { display: none; }
 .islot.aslot.empty-ph { background-image: var(--ph); background-repeat: no-repeat; background-position: center; background-size: 70%; image-rendering: pixelated; }
 #craft-grid { display: grid; grid-template-columns: repeat(var(--n, 2), var(--slot)); gap: 4px; }
