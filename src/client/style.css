@@ -404,7 +404,8 @@ body.creative #vitals { display: none; }
 .bag-panel .btn { width: auto; margin: 0; padding: 0.4rem 0.9rem; font-size: 1rem; }
 #craft-area { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 0 0 0.8rem; }
 #armor-slots { display: grid; grid-template-columns: var(--slot); gap: 4px; }
-#bag.furnace #armor-slots { display: none; }
+#bag.furnace #armor-slots, #bag.furnace #inv-preview { display: none; }
+#inv-preview { width: calc(var(--slot) * 2); height: calc(var(--slot) * 4 + 12px); background: #000; border: 2px solid #8b8b8b; border-radius: 3px; }
 .islot.aslot.empty-ph { background-image: var(--ph); background-repeat: no-repeat; background-position: center; background-size: 70%; image-rendering: pixelated; }
 #craft-grid { display: grid; grid-template-columns: repeat(var(--n, 2), var(--slot)); gap: 4px; }
 #craft-arrow { font-size: 2rem; color: var(--gold); }
