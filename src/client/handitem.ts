@@ -58,6 +58,9 @@ export function createHandItem(paint: (c: HTMLCanvasElement, id: number) => void
   scene.add(swingG);
   swingG.add(eatG);
   eatG.add(baseG);
+  // védekezés (kard): MC-szerű póz a méretezett térben: eltolás (-0.5, 0.2, 0), majd Y30 · X-80 · Y60
+  const blockG = new THREE.Group();
+  baseG.add(blockG);
   const flat = new THREE.Mesh(new THREE.BufferGeometry(), flatMat);
   flat.scale.setScalar(1.7);
   flat.position.set(0, 0.25, 0.125);
@@ -68,7 +71,7 @@ export function createHandItem(paint: (c: HTMLCanvasElement, id: number) => void
   icon.scale.setScalar(1.5);
   icon.position.set(0, 0.1, 0);
   icon.rotation.y = -50 * D2R;
-  baseG.add(flat, cube, icon);
+  blockG.add(flat, cube, icon);
 
   // ---- üres kéz: a játékos jobb karja
   const armSwingG = new THREE.Group();
@@ -92,6 +95,7 @@ export function createHandItem(paint: (c: HTMLCanvasElement, id: number) => void
   let bob = 0;
   let f3 = 0;
   let eatElapsed = 0;
+  let blockP = 0;
   let visible = false;
 
   /** a megjelenítendő tárgy modelljének összeállítása */
@@ -135,8 +139,9 @@ export function createHandItem(paint: (c: HTMLCanvasElement, id: number) => void
      * @param moving 0..1 a járás üteme
      * @param act ütés indul / tart (bal gomb nyomva, vagy sikeres lerakás/használat)
      * @param eating az evés eddigi ideje másodpercben (negatív: nem eszik)
+     * @param blocking a kard védekező tartásban van
      */
-    update(dt: number, id: number, show: boolean, moving: number, act: boolean, light: [number, number, number], eating = -1): void {
+    update(dt: number, id: number, show: boolean, moving: number, act: boolean, light: [number, number, number], eating = -1, blocking = false): void {
       // időzítők (nézettől függetlenül: a harmadik személyű modell is használja)
       if (act && !swinging) { swinging = true; swing = 0; }
       if (swinging) {
@@ -150,6 +155,7 @@ export function createHandItem(paint: (c: HTMLCanvasElement, id: number) => void
         f3 = 1 - Math.pow(Math.max(0, Math.min(1, f1)), 27);
       } else { f3 = 0; eatElapsed = 0; }
 
+      blockP = Math.max(0, Math.min(1, blockP + (blocking ? 1 : -1) * dt * 8));
       visible = show;
       if (!show) return;
 
@@ -163,7 +169,7 @@ export function createHandItem(paint: (c: HTMLCanvasElement, id: number) => void
       bob += dt * (3 + 6 * moving);
       const walkX = Math.cos(bob * 0.5) * 0.012 * moving;
       const walkY = Math.abs(Math.sin(bob * 0.5)) * 0.02 * moving;
-      const p = swinging ? swing : 0;
+      const p = swinging && blockP < 0.01 ? swing : 0; // védekezés közben nincs lendítés
       const sp = Math.sin(p * p * Math.PI);        // f
       const s1 = Math.sin(Math.sqrt(p) * Math.PI); // f1
 
@@ -189,6 +195,8 @@ export function createHandItem(paint: (c: HTMLCanvasElement, id: number) => void
         eatG.position.set(f3 * 0.6, bobY - f3 * 0.5, 0);
         eatG.quaternion.copy(rot('y', f3 * 90 * D2R).multiply(rot('x', f3 * 10 * D2R)).multiply(rot('z', f3 * 30 * D2R)));
         // a kéz helye és az ütés-forgatás
+        blockG.position.set(-0.5 * blockP, 0.2 * blockP, 0);
+        blockG.quaternion.copy(rot('y', 30 * D2R * blockP).multiply(rot('x', -80 * D2R * blockP)).multiply(rot('y', 60 * D2R * blockP)));
         baseG.position.set(0.56, -0.52 + (1 - equip) * -0.6, -0.72);
         baseG.quaternion.copy(rot('y', 45 * D2R).multiply(rot('y', sp * -20 * D2R)).multiply(rot('z', s1 * -20 * D2R)).multiply(rot('x', s1 * -80 * D2R)));
       }
