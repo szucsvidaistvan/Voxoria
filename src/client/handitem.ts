@@ -159,10 +159,15 @@ export function createHandItem(camera: THREE.Camera, paint: (c: HTMLCanvasElemen
       bob += dt * (3 + 6 * moving);
       if (act) swinging = true;
       if (swinging) {
-        swing += dt * 3.2;
+        swing += dt * 2.8;
         if (swing >= 1) { swing = 0; swinging = act; }
       }
-      const s = Math.sin(swing * Math.PI);
+      // ütés: a kéz hátrahúzódik, majd lecsap előre-lefelé és visszatér (ív, mint a kockajátékok csapása)
+      const sq = Math.sin(Math.sqrt(swing) * Math.PI);
+      const s1 = Math.sin(swing * Math.PI);
+      const s2 = Math.sin(swing * swing * Math.PI);
+      const dx = -sq * 0.28, dy = Math.sin(Math.sqrt(swing) * 2 * Math.PI) * 0.1, dz = -s1 * 0.22;
+      const rx = -sq * 1.25, ry = -sq * 0.7, rz = -s2 * 0.45;
       const walkX = Math.cos(bob * 0.5) * 0.012 * moving;
       const walkY = Math.abs(Math.sin(bob * 0.5)) * 0.02 * moving;
 
@@ -173,15 +178,15 @@ export function createHandItem(camera: THREE.Camera, paint: (c: HTMLCanvasElemen
 
       if (kind === 'arm') {
         // a kar a jobb alsó sarokból előre-fel nyúlik; ütéskor előre lendül
-        root.position.set(0.4 + walkX - s * 0.06, -0.37 + walkY - s * 0.06, -0.38 - s * 0.1);
-        root.rotation.set(2.1 - s * 0.6, -0.25, 0.12);
+        root.position.set(0.4 + walkX + dx * 0.6, -0.37 + walkY + dy, -0.38 + dz);
+        root.rotation.set(2.1 + rx * 0.5, -0.25 + ry * 0.5, 0.12 + rz * 0.5);
         arm.position.set(0, 0, 0);
       } else if (kind === 'cube') {
-        root.position.set(0.46 + walkX - s * 0.12 - up * 0.42, -0.4 + walkY - s * 0.1 + up * 0.2 + chew, -0.78 - s * 0.12 + up * 0.18);
-        root.rotation.set(0.3 - s * 0.9 + up * 0.3, 0.55 - s * 0.3 - up * 0.4, 0.05 + s * 0.2);
+        root.position.set(0.46 + walkX + dx - up * 0.42, -0.4 + walkY + dy + up * 0.2 + chew, -0.78 + dz + up * 0.18);
+        root.rotation.set(0.3 + rx * 0.7 + up * 0.3, 0.55 + ry * 0.5 - up * 0.4, 0.05 + rz * 0.6);
       } else {
-        root.position.set(0.4 + walkX - s * 0.12 - up * 0.4, -0.36 + walkY - s * 0.1 + up * 0.26 + chew, -0.72 - s * 0.12 + up * 0.15);
-        root.rotation.set(-s * 0.9 + up * 0.5, 0.35 - s * 0.3 - up * 0.5, -0.12 + s * 0.35 + up * 0.3);
+        root.position.set(0.4 + walkX + dx - up * 0.4, -0.36 + walkY + dy + up * 0.26 + chew, -0.72 + dz + up * 0.15);
+        root.rotation.set(rx + up * 0.5, 0.35 + ry - up * 0.5, -0.12 + rz + up * 0.3);
       }
       tint.setRGB(Math.max(light[0], 0.45), Math.max(light[1], 0.45), Math.max(light[2], 0.5));
       for (const m of [iconMat, cubeMat, flatMat, armMat]) m.color.copy(tint);
