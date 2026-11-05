@@ -12,6 +12,8 @@ export interface ItemDef {
   stack: number;
   /** eszköz: típus, szint (1 fa, 2 kő, 3 vas, 4 gyémánt), és a bontás sebessége */
   tool?: { type: ToolType; tier: number; speed: number; /** ennyi használat után törik el */ durability: number; /** sebzés támadáskor (fél szívben) */ damage: number };
+  /** páncél: melyik helyre vehető fel (0 sisak, 1 mellvért, 2 nadrág, 3 csizma), mennyi védelmet ad, és ennyi sebzés után törik el */
+  armor?: { slot: number; defense: number; material: string; durability: number };
   /** étel: ennyi éhséget tölt vissza (fél húscomb) és ennyi telítettséget ad */
   food?: { hunger: number; sat: number };
   /** a kijelzés színe, ha a textúra hiányzik */
@@ -101,6 +103,29 @@ MATERIALS.forEach((m, mi) => {
     ITEMS[id] = { name: `${m.name} ${hu}`, tex: `${m.id}_${type}`, stack: 1, tool: { type, tier: m.tier, speed: m.speed, durability: m.durability, damage: BASE_DAMAGE[type] + m.bonus }, color: m.color };
   });
 });
+
+// páncélok: 4 anyag x 4 darab (sisak, mellvért, nadrág, csizma)
+export const ARMOR_SLOTS = ['Helmet', 'Chestplate', 'Leggings', 'Boots'] as const;
+const ARMOR_MATS = [
+  // defense: darabonként (sisak, mellvért, nadrág, csizma); durability: a darabokra
+  { id: 'leather', name: 'Leather', defense: [1, 3, 2, 1], durability: [55, 80, 75, 65], color: '#a06540' },
+  { id: 'iron', name: 'Iron', defense: [2, 6, 5, 2], durability: [165, 240, 225, 195], color: '#d8d8d8' },
+  { id: 'golden', name: 'Golden', defense: [2, 5, 3, 1], durability: [77, 112, 105, 91], color: '#f5d442' },
+  { id: 'diamond', name: 'Diamond', defense: [3, 8, 6, 3], durability: [363, 528, 495, 429], color: '#4be3e0' },
+];
+/** ARMOR_ID[anyag][hely] */
+export const ARMOR_ID: Record<string, number[]> = {};
+ARMOR_MATS.forEach((m, mi) => {
+  ARMOR_ID[m.id] = [];
+  ARMOR_SLOTS.forEach((nm, si) => {
+    const id = ITEM_BASE + 300 + mi * 4 + si;
+    ARMOR_ID[m.id][si] = id;
+    ITEMS[id] = { name: `${m.name} ${nm}`, tex: `${m.id}_${nm.toLowerCase()}`, stack: 1, armor: { slot: si, defense: m.defense[si], material: m.id, durability: m.durability[si] }, color: m.color };
+  });
+});
+/** A viselt páncél összes védelme (a sebzés 4%-kal csökken pontonként, legfeljebb 80%-kal) */
+export const armorPoints = (ids: (number | undefined)[]): number => ids.reduce((t: number, id) => t + (id ? ITEMS[id]?.armor?.defense ?? 0 : 0), 0);
+export const armorOf = (id: number | undefined): ItemDef['armor'] => (id === undefined ? undefined : ITEMS[id]?.armor);
 
 export const isItem = (id: number): boolean => id >= ITEM_BASE;
 export const itemName = (id: number): string => ITEMS[id]?.name ?? BLOCKS[id]?.name ?? '?';
