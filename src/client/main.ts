@@ -1057,6 +1057,7 @@ async function main(): Promise<void> {
   let handAct = false;
   /** a kard védekező tartásban van (jobb gomb / hosszú nyomás kardnál) */
   let blocking = false;
+  let holdRepeat = 0.25; // érintő, kreatív: a következő bontásig hátralévő idő
   let eatT = -1; // az evés eddigi ideje (mp); negatív: nem eszik
   let eatId = 0;
   let eatLock = false; // megevett egy falatot: a jobb gombot el kell engedni a következőhöz
@@ -1066,8 +1067,12 @@ async function main(): Promise<void> {
     const isSword = toolOf(held()?.id)?.type === 'sword';
     // érintőn: a vásznon hosszan nyomva tartott ujj bont, ételnél eszik, kardnál védekezik
     if (input.touch) {
-      input.breakHeld = input.holdTouch && !heldFood && !isSword;
+      const mineHold = input.holdTouch && !heldFood && !isSword;
+      input.breakHeld = mineHold;
       input.placeHeld = input.holdTouch && (!!heldFood || isSword);
+      // kreatívban a bontás kattintásra történik: a hosszú nyomás indulásakor egyet bont, tartva ismétel (mint a Pocket Editionben)
+      holdRepeat = mineHold ? holdRepeat - dt : 0;
+      if (mineHold && holdRepeat <= 0) { input.breakQueued = true; holdRepeat = 0.25; }
     }
     blocking = isSword && input.placeHeld && !health.dead;
     handAct = input.breakHeld || input.breakQueued || input.tapQueued || (input.placeQueued && !heldFood && !isSword);
