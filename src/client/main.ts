@@ -644,6 +644,22 @@ async function main(): Promise<void> {
   document.addEventListener('keydown', (e) => {
     if (state === 'menu' && e.code === 'Enter' && !btnContinue.hidden && document.activeElement?.tagName !== 'BUTTON') btnContinue.click();
   });
+  // Esc a menüben: folytatás, mint az inventory bezárásánál. Az Esc nem felhasználói gesztus, ezért az egeret
+  // az Esc felengedésekor zárjuk vissza (addig a kurzorzár felszabadulását nem vesszük figyelembe).
+  document.addEventListener('keydown', (e) => {
+    if (e.code !== 'Escape' || e.repeat || state !== 'menu' || !started || btnContinue.hidden) return;
+    if (!settingsEl.hidden) { settingsEl.hidden = true; btnSettings.setAttribute('aria-expanded', 'false'); e.preventDefault(); return; }
+    e.preventDefault();
+    btnContinue.click();
+    if (input.touch) return;
+    input.ignoreUnlockUntil = performance.now() + 800;
+    const relock = (k: KeyboardEvent) => {
+      if (k.code !== 'Escape') return;
+      document.removeEventListener('keyup', relock);
+      if (state === 'playing') input.lock();
+    };
+    document.addEventListener('keyup', relock);
+  });
   btnContinue.addEventListener('click', () => {
     if (!started) {
       const save = loadSave();

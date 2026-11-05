@@ -166,8 +166,8 @@ export function createHandItem(camera: THREE.Camera, paint: (c: HTMLCanvasElemen
       const sq = Math.sin(Math.sqrt(swing) * Math.PI);
       const s1 = Math.sin(swing * Math.PI);
       const s2 = Math.sin(swing * swing * Math.PI);
-      const dx = -sq * 0.28, dy = Math.sin(Math.sqrt(swing) * 2 * Math.PI) * 0.1, dz = -s1 * 0.22;
-      const rx = -sq * 1.25, ry = -sq * 0.7, rz = -s2 * 0.45;
+      const dx = -sq * 0.5, dy = Math.sin(Math.sqrt(swing) * 2 * Math.PI) * 0.14 + sq * 0.06, dz = -s1 * 0.3;
+      const rx = -sq * 1.5, ry = -sq * 0.9, rz = -s2 * 0.6;
       const walkX = Math.cos(bob * 0.5) * 0.012 * moving;
       const walkY = Math.abs(Math.sin(bob * 0.5)) * 0.02 * moving;
 
