@@ -251,6 +251,10 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
     .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2))
     .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), (-55 * Math.PI) / 180));
   heldFlat.position.set(0.0625, -0.6875, 0.09375);
+  const heldQuat = heldFlat.quaternion.clone();
+  const heldPos = heldFlat.position.clone();
+  const blockWorldQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), (80 * Math.PI) / 180);
+  const armInv = new THREE.Quaternion();
   const heldCube = new THREE.Mesh(new THREE.BufferGeometry(), cubeMat ?? flatMat);
   heldCube.scale.setScalar(0.22);
   heldCube.position.set(0, -0.72, -0.12);
@@ -310,6 +314,18 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
         if (act.block) { rx = 0.94; rz = 0; }
         l.g.rotation.x = rx;
         l.g.rotation.z = rz;
+        l.g.updateMatrix();
+        if (act.block) {
+          // védekezéskor a kard a test előtt átlósan áll (a lapja elölről látszik): a világban Z körül 90°-kal forgatott lap,
+          // a kar dőlését visszafordítva; a penge fölfelé, a test közepe felé mutat
+          armInv.copy(l.g.quaternion).invert();
+          heldFlat.quaternion.copy(armInv).multiply(blockWorldQ);
+          // a kéz a markolatot fogja: a lap a penge irányába (fölfelé, befelé) tolva
+          heldFlat.position.set(-0.07, 0.03, 0).applyQuaternion(armInv).add(heldPos);
+        } else {
+          heldFlat.quaternion.copy(heldQuat);
+          heldFlat.position.copy(heldPos);
+        }
       }
       refreshHeld();
       const r = Math.max(light[0], 0.35), g = Math.max(light[1], 0.35), b = Math.max(light[2], 0.4);
