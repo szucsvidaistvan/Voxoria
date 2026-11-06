@@ -25,6 +25,7 @@ import { MobManager, mobDrops, type Mob, type MobCtx } from '../shared/mobs';
 import { findTree, isLogBlock } from '../shared/tree';
 import { BagUI, HOTBAR_SIZE, Inventory, SlotView, createItemPainter } from './inventory';
 import { Health, createVitals } from './health';
+import { createTargetFrame } from './targetframe';
 import { createCracks, createDrops, createParticles } from './effects';
 import { createBlockIcons } from './icons';
 import { Input } from './input';
@@ -417,6 +418,7 @@ async function main(): Promise<void> {
 
   // ---------- életerő ----------
   const updateVitals = createVitals($('hearts'), $('air'), $('food'));
+  const targetFrame = createTargetFrame(import.meta.env.BASE_URL);
   const hurtEl = $('hurt'), fireEl = $('fire-overlay');
   health.onHurt = () => {
     hurtEl.classList.remove('flash');
@@ -1094,6 +1096,11 @@ async function main(): Promise<void> {
     const mobHit = settings.mobs === 'off' ? null : mobs.pick(p.x, p.y, p.z, dir.x, dir.y, dir.z, 3.6);
     const blockDist = blockHit ? Math.hypot(blockHit.hx - p.x, blockHit.hy - p.y, blockHit.hz - p.z) : Infinity;
     const mobFirst = !!mobHit && mobHit.t < blockDist;
+    // célpont-keret: a keresztszálnál látható mob (nagyobb távolságból is), ha nem takarja blokk
+    const lookHit = settings.mobs === 'off' ? null : mobs.pick(p.x, p.y, p.z, dir.x, dir.y, dir.z, 24);
+    const farBlock = lookHit ? raycast(world, p.x, p.y, p.z, dir.x, dir.y, dir.z, 24) : null;
+    const farDist = farBlock ? Math.hypot(farBlock.hx - p.x, farBlock.hy - p.y, farBlock.hz - p.z) : Infinity;
+    targetFrame.update(lookHit && lookHit.t < farDist ? lookHit.mob : null, dt);
     const hit: RayHit | null = mobFirst ? null : blockHit;
     if (mobFirst && (input.breakQueued || input.breakHeld || input.tapQueued)) attackMob(mobHit!.mob);
     else if (input.tapQueued) input.placeQueued = true; // koppintás: lerakás / használat (Pocket Edition)
