@@ -253,8 +253,11 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
   heldFlat.position.set(0.0625, -0.6875, 0.09375);
   const heldQuat = heldFlat.quaternion.clone();
   const heldPos = heldFlat.position.clone();
-  const blockWorldQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), (80 * Math.PI) / 180);
+  const blockWorldQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), (105 * Math.PI) / 180);
   const armInv = new THREE.Quaternion();
+  // a kéz a markolatot fogja: a kép bal alsó sarkától kb. 2,5 képpontra, vagyis a kép közepétől (−5,5; −5,5)/16-ra
+  // (×0,85 méret): a lapot a markolat irányából a kézhez toljuk
+  const grip = new THREE.Vector3(0.29, 0.29, 0);
   const heldCube = new THREE.Mesh(new THREE.BufferGeometry(), cubeMat ?? flatMat);
   heldCube.scale.setScalar(0.22);
   heldCube.position.set(0, -0.72, -0.12);
@@ -321,10 +324,10 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
           armInv.copy(l.g.quaternion).invert();
           heldFlat.quaternion.copy(armInv).multiply(blockWorldQ);
           // a kéz a markolatot fogja: a lap a penge irányába (fölfelé, befelé) tolva
-          heldFlat.position.set(-0.07, 0.03, 0).applyQuaternion(armInv).add(heldPos);
+          heldFlat.position.copy(grip).applyQuaternion(blockWorldQ).applyQuaternion(armInv).add(heldPos);
         } else {
           heldFlat.quaternion.copy(heldQuat);
-          heldFlat.position.copy(heldPos);
+          heldFlat.position.copy(grip).applyQuaternion(heldQuat).add(heldPos);
         }
       }
       refreshHeld();
