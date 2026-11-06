@@ -330,6 +330,8 @@ body.touch #touch-actions { display: block; }
 #hearts, #air, #food { display: flex; gap: 2px; min-height: 22px; min-width: 0; }
 #hearts { flex: 1 1 0; }
 #air[hidden] { display: none; }
+/* a buborékok a húscombokhoz igazodnak (jobbra), a hotbar szélén: a lemerülés a bal szélről indul */
+#air { flex-direction: row-reverse; }
 /* a szívek és a húscombok a hotbar szélességéhez igazodnak: keskeny képernyőn zsugorodnak, nem lógnak ki */
 #vitals-right { display: flex; flex-direction: column; align-items: stretch; gap: 2px; flex: 1 1 0; min-width: 0; }
 #food { flex-direction: row-reverse; }
@@ -344,6 +346,58 @@ body.touch #touch-actions { display: block; }
 .vital.shake { animation: shake 0.3s infinite; }
 @keyframes shake { 50% { transform: translateY(-2px); } }
 body.creative #vitals { display: none; }
+
+/* célpont-keret (WoW-stílus): portré, név, életerő-sáv a képernyő tetején */
+#target {
+  position: fixed;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: min(300px, 86vw);
+  padding: 6px;
+  background: rgba(14, 26, 51, 0.78);
+  box-shadow: inset 0 0 0 2px var(--edge);
+  pointer-events: none;
+}
+#target[hidden] { display: none; }
+#target.dead { opacity: 0.6; }
+#target-face {
+  width: 44px; height: 44px; flex: none;
+  image-rendering: pixelated;
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 2px var(--edge);
+}
+#target-body { flex: 1; min-width: 0; }
+#target-name {
+  color: #ffd75e;
+  line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 1px 1px 0 #000;
+}
+#target.hostile #target-name { color: #ff6b5e; }
+#target-bar {
+  position: relative;
+  height: 18px;
+  margin-top: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.6);
+}
+#target-fill, #target-trail { position: absolute; left: 0; top: 0; bottom: 0; }
+#target-fill { background: linear-gradient(#5fd35f, #2f9a2f); transition: width 0.12s; }
+#target.hostile #target-fill { background: linear-gradient(#e0483f, #a52a24); }
+#target-trail { background: rgba(255, 255, 255, 0.45); }
+#target-hp {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+}
+body.touch #target { top: calc(max(8px, env(safe-area-inset-top)) + 96px); width: min(260px, 60vw); }
+body.creative #target-hp { display: flex; }
 
 #mine {
   position: fixed;
