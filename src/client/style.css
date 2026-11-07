@@ -167,8 +167,6 @@ body.touch #hotwrap {
   width: min(24rem, calc(100vw - 11rem));
   flex-direction: column-reverse;
 }
-/* telefonon a hotbar fent van, alatta az életerő: a levegő-buborékok az éhségsáv ALÁ kerülnek (gépen fölé) */
-body.touch #vitals-right { flex-direction: column-reverse; }
 body.touch #held-name { top: calc(max(8px, env(safe-area-inset-top)) + 84px); bottom: auto; }
 body.touch .slot { flex: 1; width: auto; height: auto; aspect-ratio: 1; padding: 2px; border-width: 2px; }
 
@@ -319,33 +317,51 @@ body.touch #touch-actions { display: block; }
 #credits a { color: inherit; }
 
 /* ---------- életerő, levegő, bontás ---------- */
-#vitals {
+/* RPG-HUD: portré + életerő- és éhségsáv bal felül, oxigénsáv és páncélpont a hotbar fölött */
+#hud-stats {
+  position: fixed;
+  left: max(10px, env(safe-area-inset-left));
+  top: max(10px, env(safe-area-inset-top));
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  width: 100%;
+  gap: 6px;
+  align-items: stretch;
+  padding: 5px;
+  background: rgba(14, 26, 51, 0.78);
+  box-shadow: inset 0 0 0 2px var(--edge);
   pointer-events: none;
 }
-#vitals { gap: 8px; }
-#hearts, #air, #food { display: flex; gap: 2px; min-height: 22px; min-width: 0; }
-#hearts { flex: 1 1 0; }
-#air[hidden] { display: none; }
-/* a buborékok a húscombokhoz igazodnak (jobbra), a hotbar szélén: a lemerülés a bal szélről indul */
-#air { flex-direction: row-reverse; }
-/* a szívek és a húscombok a hotbar szélességéhez igazodnak: keskeny képernyőn zsugorodnak, nem lógnak ki */
-#vitals-right { display: flex; flex-direction: column; align-items: stretch; gap: 2px; flex: 1 1 0; min-width: 0; }
-#food { flex-direction: row-reverse; }
-.vital {
-  flex: 0 1 20px;
-  min-width: 0;
-  aspect-ratio: 1;
-  height: auto;
-  background-size: 100% 100%;
-  image-rendering: pixelated;
+#hud-face { width: 46px; height: 46px; flex: none; image-rendering: pixelated; box-shadow: 0 0 0 2px var(--edge); }
+#hud-bars { display: flex; flex-direction: column; justify-content: space-between; gap: 4px; width: clamp(120px, 18vw, 210px); }
+.bar {
+  position: relative;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.6);
 }
-.vital.shake { animation: shake 0.3s infinite; }
-@keyframes shake { 50% { transform: translateY(-2px); } }
-body.creative #vitals { display: none; }
+.bar .fill, .bar .trail { position: absolute; left: 0; top: 0; bottom: 0; }
+.bar .trail { background: rgba(255, 255, 255, 0.45); }
+.bar .fill { transition: width 0.12s; }
+.bar span {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; color: #fff; text-shadow: 1px 1px 0 #000;
+}
+.bar.hp .fill { background: linear-gradient(#e0483f, #a52a24); }
+.bar.hp.burn .fill { background: linear-gradient(#ffb347, #e0701a); }
+.bar.food .fill { background: linear-gradient(#5fd35f, #2f9a2f); }
+.bar.low { animation: lowpulse 0.6s infinite; }
+@keyframes lowpulse { 50% { filter: brightness(1.6); } }
+#airbar { align-self: center; width: min(340px, 90%); }
+#airbar[hidden] { display: none; }
+#bar-air { height: 12px; }
+#bar-air .fill { background: linear-gradient(#4aa3ff, #1d5fc0); }
+#armor-pts { display: flex; align-items: center; gap: 4px; align-self: flex-start; padding: 2px 6px; color: #fff; text-shadow: 1px 1px 0 #000; background: rgba(14, 26, 51, 0.6); }
+#armor-pts[hidden] { display: none; }
+#armor-icon { width: 18px; height: 16px; background-size: 100% 100%; image-rendering: pixelated; }
+body.creative #hud-stats, body.creative #armor-pts, body.creative #airbar { display: none; }
+body.touch #hud-stats { left: max(8px, env(safe-area-inset-left)); top: calc(max(8px, env(safe-area-inset-top)) + 40px); transform-origin: top left; }
+body.touch #hud-bars { width: 110px; }
+body.touch #hud-face { width: 34px; height: 34px; }
 
 /* célpont-keret (WoW-stílus): portré, név, életerő-sáv a képernyő tetején */
 #target {
