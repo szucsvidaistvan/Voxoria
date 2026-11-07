@@ -26,6 +26,7 @@ import { findTree, isLogBlock } from '../shared/tree';
 import { BagUI, HOTBAR_SIZE, Inventory, SlotView, createItemPainter } from './inventory';
 import { Health, createStatBars } from './health';
 import { createTargetFrame } from './targetframe';
+import { createNameplates } from './nameplates';
 import { createCracks, createDrops, createParticles } from './effects';
 import { createBlockIcons } from './icons';
 import { Input } from './input';
@@ -420,6 +421,13 @@ async function main(): Promise<void> {
   const updateStats = createStatBars(import.meta.env.BASE_URL);
   const updateVitals = (hp: Health, shake: boolean) => updateStats(hp, shake, armorPoints(inv.armor.map((s) => s?.id)));
   const targetFrame = createTargetFrame(import.meta.env.BASE_URL);
+  const nameplates = createNameplates($('nameplates'), (m) => {
+    // takarja-e blokk a mob fejét a kamerától
+    const c = camera.position, dx = m.x - c.x, dy = m.y + m.def.h * 0.8 - c.y, dz = m.z - c.z;
+    const len = Math.hypot(dx, dy, dz) || 1;
+    const r = raycast(world, c.x, c.y, c.z, dx / len, dy / len, dz / len, len);
+    return !!r && Math.hypot(r.hx - c.x, r.hy - c.y, r.hz - c.z) < len - 0.5;
+  });
   const hurtEl = $('hurt'), fireEl = $('fire-overlay');
   health.onHurt = () => {
     hurtEl.classList.remove('flash');
@@ -1101,7 +1109,10 @@ async function main(): Promise<void> {
     const lookHit = settings.mobs === 'off' ? null : mobs.pick(p.x, p.y, p.z, dir.x, dir.y, dir.z, 24);
     const farBlock = lookHit ? raycast(world, p.x, p.y, p.z, dir.x, dir.y, dir.z, 24) : null;
     const farDist = farBlock ? Math.hypot(farBlock.hx - p.x, farBlock.hy - p.y, farBlock.hz - p.z) : Infinity;
-    targetFrame.update(lookHit && lookHit.t < farDist ? lookHit.mob : null, dt);
+    const targeted = lookHit && lookHit.t < farDist ? lookHit.mob : null;
+    targetFrame.update(targeted, dt);
+    if (settings.mobs === 'off') nameplates.update([], null, camera, innerWidth, innerHeight);
+    else nameplates.update(mobs.mobs, targeted, camera, innerWidth, innerHeight);
     const hit: RayHit | null = mobFirst ? null : blockHit;
     if (mobFirst && (input.breakQueued || input.breakHeld || input.tapQueued)) attackMob(mobHit!.mob);
     else if (input.tapQueued) input.placeQueued = true; // koppintás: lerakás / használat (Pocket Edition)
