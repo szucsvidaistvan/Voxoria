@@ -254,7 +254,7 @@ export function createStatBars(base: string) {
   let last = '';
   let anim = 0;
   return (hp: Health, shake: boolean, armor = 0) => {
-    const sig = `${hp.hp}|${hp.burn > 0}|${Math.ceil(hp.air * 4)}|${shake}|${hp.food}|${armor}`;
+    const sig = `${hp.hp}|${hp.burn > 0}|${Math.ceil(hp.air * 4)}|${hp.air < hp.maxAir}|${shake}|${hp.food}|${armor}`;
     if (sig === last) return;
     last = sig;
     set(hpBar, hp.hp, hp.max, `${Math.ceil(hp.hp)} / ${hp.max}`);
