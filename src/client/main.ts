@@ -24,7 +24,7 @@ import { createCollapse } from './collapse';
 import { MobManager, mobDrops, type Mob, type MobCtx } from '../shared/mobs';
 import { findTree, isLogBlock } from '../shared/tree';
 import { BagUI, HOTBAR_SIZE, Inventory, SlotView, createItemPainter } from './inventory';
-import { Health, createVitals } from './health';
+import { Health, createStatBars } from './health';
 import { createTargetFrame } from './targetframe';
 import { createCracks, createDrops, createParticles } from './effects';
 import { createBlockIcons } from './icons';
@@ -417,7 +417,8 @@ async function main(): Promise<void> {
   paintHotbar();
 
   // ---------- életerő ----------
-  const updateVitals = createVitals($('hearts'), $('air'), $('food'));
+  const updateStats = createStatBars(import.meta.env.BASE_URL);
+  const updateVitals = (hp: Health, shake: boolean) => updateStats(hp, shake, armorPoints(inv.armor.map((s) => s?.id)));
   const targetFrame = createTargetFrame(import.meta.env.BASE_URL);
   const hurtEl = $('hurt'), fireEl = $('fire-overlay');
   health.onHurt = () => {
