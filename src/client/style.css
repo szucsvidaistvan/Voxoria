@@ -317,6 +317,17 @@ body.touch #touch-actions { display: block; }
 #credits a { color: inherit; }
 
 /* ---------- életerő, levegő, bontás ---------- */
+/* névtáblák a mobok feje fölött */
+#nameplates { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.nameplate { position: absolute; left: 0; top: 0; transform-origin: 50% 100%; text-align: center; white-space: nowrap; }
+.nameplate[hidden] { display: none; }
+.np-name { color: #ffd75e; font-size: 0.85rem; line-height: 1.1; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.nameplate.hostile .np-name { color: #ff6b5e; }
+.np-bar { width: 64px; height: 7px; margin: 2px auto 0; background: rgba(0, 0, 0, 0.6); box-shadow: 0 0 0 1px #000; }
+.np-fill { height: 100%; background: #3cc23c; }
+.nameplate.hostile .np-fill { background: #d8372e; }
+body.creative .nameplate { display: none; }
+
 /* RPG-HUD: portré + életerő- és éhségsáv bal felül, oxigénsáv és páncélpont a hotbar fölött */
 #hud-stats {
   position: fixed;
