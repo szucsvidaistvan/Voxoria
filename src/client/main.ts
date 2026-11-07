@@ -155,6 +155,7 @@ async function main(): Promise<void> {
 
   // ---------- világ ----------
   let world: World;
+  let gravity: GravitySim;
   let player: Player;
   let sim: FluidSim;
   let mobs: MobManager;
@@ -294,6 +295,7 @@ async function main(): Promise<void> {
     clearWorld();
     world = new World(seed);
     sim = new FluidSim(world, (x, _y, z) => markDirty(x, z));
+    gravity = new GravitySim(world, (x, y, z) => { markDirty(x, z); sim.notify(x, y, z); });
     mobs = new MobManager(world);
     mobView.clear();
     dirty.clear();
@@ -755,10 +757,6 @@ async function main(): Promise<void> {
   const mine = { x: 0, y: 0, z: 0, t: 0, need: 0, active: false };
 
   /** Blokk átírása: újrameshelés és a folyadék/tűz szimuláció értesítése */
-  const gravity = new GravitySim(world, (x, y, z) => {
-    markDirty(x, z);
-    sim.notify(x, y, z);
-  });
   const setBlockAt = (x: number, y: number, z: number, id: number): boolean => {
     const old = world.getBlock(x, y, z);
     if (!world.setBlock(x, y, z, id)) return false;
