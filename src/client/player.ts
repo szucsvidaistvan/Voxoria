@@ -9,6 +9,9 @@ const WATER_GRAVITY = 7, WATER_SPEED = 0.6, MAX_SINK = 3.5, SWIM_UP = 3.5, SWIM_
 // lávában: nagyon lassú mozgás, még a vízinél is lassabb úszás
 const LAVA_GRAVITY = 4, LAVA_SPEED = 0.3, LAVA_SINK = 1.6, LAVA_UP = 2.2;
 
+/** Ilyen magas lépcsőfokra (lap, lépcső, hóréteg) ugrás nélkül fellép (a teljes blokk nem) */
+const STEP_HEIGHT = 0.6;
+
 export class Player {
   pos = { x: 8.5, y: 40, z: 8.5 };
   vel = { x: 0, y: 0, z: 0 };
@@ -33,6 +36,22 @@ export class Player {
   private airborne = false;
 
   constructor(private world: World) {}
+
+  /**
+   * Automatikus fellépés: ha földön járva egy alacsony akadálynak (hórétegnek, lapnak, lépcsőfoknak,
+   * legfeljebb STEP_HEIGHT magas) megyünk neki, a játékos a legkisebb szükséges magassággal felemelkedik.
+   * @returns igaz, ha sikerült (a p.y már az új magasságon van)
+   */
+  private stepUp(p: { x: number; y: number; z: number }, noStep: boolean): boolean {
+    if (!this.onGround || noStep || this.vel.y > 0.01) return false;
+    for (let lift = 0.0625; lift <= STEP_HEIGHT + 1e-6; lift += 0.0625) {
+      if (!this.collides(p.x, p.y + lift + 0.002, p.z)) {
+        p.y += lift + 0.002;
+        return true;
+      }
+    }
+    return false;
+  }
 
   private collides(x: number, y: number, z: number): boolean {
     for (let ix = Math.floor(x - HALF_W + EPS); ix <= Math.floor(x + HALF_W - EPS); ix++) {
@@ -131,9 +150,9 @@ export class Player {
           : Math.max(this.vel.y - GRAVITY * h, -MAX_FALL);
 
       p.x += this.vel.x * h;
-      if (this.collides(p.x, p.y, p.z)) p.x -= this.vel.x * h;
+      if (this.collides(p.x, p.y, p.z) && !this.stepUp(p, swim || ladder)) p.x -= this.vel.x * h;
       p.z += this.vel.z * h;
-      if (this.collides(p.x, p.y, p.z)) p.z -= this.vel.z * h;
+      if (this.collides(p.x, p.y, p.z) && !this.stepUp(p, swim || ladder)) p.z -= this.vel.z * h;
 
       const dy = this.vel.y * h;
       p.y += dy;
