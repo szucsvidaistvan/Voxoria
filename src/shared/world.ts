@@ -1,36 +1,8 @@
 import { AIR, B, LIGHT, fluidKind } from './blocks';
+import { CH, CS, SEA_LEVEL, fbm, hash2, valueNoise } from './noise';
+import { G, biomeAt, decorate, freezes, mountainBump, soilDepth, stoneVariant, sugarCane, surfaceOf, temperature } from './worldgen';
 
-export const CS = 16; // chunk szélesség (X és Z)
-export const CH = 64; // világ magassága
-export const SEA_LEVEL = 28; // a terep kb. 17%-át önti el a víz
-
-function hash2(x: number, z: number, s: number): number {
-  let h = Math.imul(x, 374761393) ^ Math.imul(z, 668265263) ^ Math.imul(s, 1442695041);
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  h ^= h >>> 16;
-  return (h >>> 0) / 4294967296;
-}
-
-const smooth = (t: number) => t * t * (3 - 2 * t);
-
-function valueNoise(x: number, z: number, s: number): number {
-  const x0 = Math.floor(x), z0 = Math.floor(z);
-  const fx = smooth(x - x0), fz = smooth(z - z0);
-  const a = hash2(x0, z0, s), b = hash2(x0 + 1, z0, s);
-  const c = hash2(x0, z0 + 1, s), d = hash2(x0 + 1, z0 + 1, s);
-  return a + (b - a) * fx + (c - a) * fz + (a - b - c + d) * fx * fz;
-}
-
-function fbm(x: number, z: number, s: number): number {
-  let v = 0, amp = 1, freq = 1, sum = 0;
-  for (let i = 0; i < 4; i++) {
-    v += valueNoise(x * freq, z * freq, s + i) * amp;
-    sum += amp;
-    amp *= 0.5;
-    freq *= 2;
-  }
-  return v / sum;
-}
+export { CS, CH, SEA_LEVEL };
 
 export class Chunk {
   /** két bájtos blokkazonosítók (65535 különböző blokk) */
@@ -96,7 +68,7 @@ export class World {
   }
 
   heightAt(wx: number, wz: number): number {
-    return Math.floor(18 + fbm(wx / 48, wz / 48, this.seed) * 28);
+    return Math.floor(18 + fbm(wx / 48, wz / 48, this.seed) * 28 + mountainBump(this.seed, wx, wz));
   }
 
   getBlock(x: number, y: number, z: number): number {
@@ -149,26 +121,41 @@ export class World {
 
   private generate(c: Chunk): void {
     const ox = c.cx * CS, oz = c.cz * CS;
+    const seed = this.seed;
     for (let z = 0; z < CS; z++) {
       for (let x = 0; x < CS; x++) {
         const wx = ox + x, wz = oz + z;
         const h = Math.min(this.heightAt(wx, wz), CH - 12);
-        const beach = h <= SEA_LEVEL;
-        // a tengerfenéken kavicsfoltok vannak (alacsony frekvenciájú zaj dönti el, hol)
-        const gravelBed = beach && h < SEA_LEVEL - 1 && valueNoise(wx / 6, wz / 6, this.seed + 31) > 0.6;
+        const biome = biomeAt(seed, wx, wz, h);
+        const depth = soilDepth(biome);
+        const mountain = biome === 'mountains';
         for (let y = 0; y <= h; y++) {
           let id: number;
           if (y === 0) id = B.BEDROCK;
-          else if (y < h - 3) id = this.stoneOrOre(wx, y, wz);
-          else if (y < h) id = gravelBed ? B.GRAVEL : beach ? (y < h - 1 ? B.SANDSTONE : B.SAND) : B.DIRT;
-          else id = gravelBed ? B.GRAVEL : beach ? B.SAND : B.GRASS;
+          else if (y < h - depth) {
+            id = this.stoneOrOre(wx, y, wz);
+            if (id === B.STONE) id = stoneVariant(seed, wx, y, wz, mountain);
+          } else id = surfaceOf(biome, seed, wx, wz, y, h);
           c.set(x, y, z, id);
         }
-        // tenger és tavak: a tengerszint alatti oszlopokat víz tölti fel
+        // tenger és tavak: a tengerszint alatti oszlopokat víz tölti fel (hidegben befagy a teteje)
         for (let y = h + 1; y <= SEA_LEVEL; y++) c.set(x, y, z, B.WATER);
-        // fák: csak a chunk belsejében, hogy ne lógjanak át a szomszédba
-        if (!beach && x >= 2 && x <= 13 && z >= 2 && z <= 13 && hash2(wx, wz, this.seed + 99) < 0.012) {
-          this.placeTree(c, x, h + 1, z, 4 + Math.floor(hash2(wx, wz, this.seed + 7) * 2));
+        if (h < SEA_LEVEL) {
+          if (freezes(seed, wx, wz)) c.set(x, SEA_LEVEL, z, G('ice', B.WATER));
+          else if (biome === 'ocean' && h >= SEA_LEVEL - 2 && hash2(wx, wz, seed + 141) < 0.06 && temperature(seed, wx, wz) > 0.4) {
+            c.set(x, SEA_LEVEL + 1, z, G('lily_pad', AIR));
+          }
+        } else if (biome !== 'ocean') {
+          const top = c.get(x, h, z);
+          decorate(c, seed, biome, x, z, wx, wz, h + 1, top);
+          if (h === SEA_LEVEL + 1 && (biome === 'plains' || biome === 'forest' || biome === 'swamp' || biome === 'jungle')) {
+            const near = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => this.heightAt(wx + dx, wz + dz) <= SEA_LEVEL);
+            sugarCane(c, seed, x, z, wx, wz, h + 1, near);
+          }
+        } else if (h === SEA_LEVEL) {
+          // a part menti homokon nád
+          const near = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => this.heightAt(wx + dx, wz + dz) < SEA_LEVEL);
+          sugarCane(c, seed, x, z, wx, wz, h + 1, near);
         }
       }
     }
@@ -191,20 +178,5 @@ export class World {
     if (y < 30 && r < 0.010) return B.IRON_ORE;
     if (r < 0.020) return B.COAL_ORE;
     return B.STONE;
-  }
-
-  private placeTree(c: Chunk, x: number, y: number, z: number, trunk: number): void {
-    for (let i = 0; i < trunk; i++) c.set(x, y + i, z, B.LOG);
-    const top = y + trunk;
-    for (let dy = -2; dy <= 1; dy++) {
-      const r = dy >= 0 ? 1 : 2;
-      for (let dz = -r; dz <= r; dz++) {
-        for (let dx = -r; dx <= r; dx++) {
-          if (Math.abs(dx) === r && Math.abs(dz) === r && dy !== 0) continue;
-          const yy = top + dy;
-          if (yy < CH && c.get(x + dx, yy, z + dz) === AIR) c.set(x + dx, yy, z + dz, B.LEAVES);
-        }
-      }
-    }
   }
 }
