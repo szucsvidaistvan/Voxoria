@@ -5,6 +5,7 @@ import {
   registerGenerated, type GeneratedPack, type RGB,
 } from '../shared/blocks';
 import { FluidSim, isReplaceable } from '../shared/fluids';
+import { GravitySim } from '../shared/gravity';
 import { I, ITEMS, armorPoints, isItem, itemName, toolOf } from '../shared/items';
 import { CATEGORIES, categoryOf } from '../shared/categories';
 import { initRecipes } from '../shared/recipes';
@@ -154,6 +155,7 @@ async function main(): Promise<void> {
 
   // ---------- világ ----------
   let world: World;
+  let gravity: GravitySim;
   let player: Player;
   let sim: FluidSim;
   let mobs: MobManager;
@@ -293,6 +295,7 @@ async function main(): Promise<void> {
     clearWorld();
     world = new World(seed);
     sim = new FluidSim(world, (x, _y, z) => markDirty(x, z));
+    gravity = new GravitySim(world, (x, y, z) => { markDirty(x, z); sim.notify(x, y, z); });
     mobs = new MobManager(world);
     mobView.clear();
     dirty.clear();
@@ -765,6 +768,7 @@ async function main(): Promise<void> {
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) dirty.add(World.key(cx + dx, cz + dz));
     }
     sim.notify(x, y, z);
+    gravity.notify(x, y, z);
     return true;
   };
 
@@ -1251,7 +1255,7 @@ async function main(): Promise<void> {
       for (let i = 0; i < world.dynamic.length; i += 3) sim.sched(world.dynamic[i], world.dynamic[i + 1], world.dynamic[i + 2], Math.floor(Math.random() * 10));
       world.dynamic.length = 0;
       simAcc = Math.min(simAcc + dt, 0.25);
-      while (simAcc >= 0.05) { simAcc -= 0.05; sim.update(); }
+      while (simAcc >= 0.05) { simAcc -= 0.05; sim.update(); gravity.update(); }
     }
     flushDirty(3);
     resumeEl.hidden = !(state === 'playing' && !input.touch && !input.locked);
