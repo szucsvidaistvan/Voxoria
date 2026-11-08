@@ -13,6 +13,8 @@ export interface SaveData {
   day?: number;
   /** a tűzhelyek: [x, y, z, ...Furnace.toFlat()] (a régi mentésekben nincs) */
   furnaces?: number[][];
+  /** a ládák: [x, y, z, ...Chest.toFlat()] (a régi mentésekben nincs) */
+  chests?: number[][];
   /** a hotbar blokkjai (a régi mentésekben nincs) */
   hotbar?: number[];
   /** játékmód (a régi mentésekben nincs: kreatív) */

@@ -12,6 +12,7 @@ export const BASE_TEXTURES: TexName[] = [
   'bedrock', 'gravel', 'sandstone', 'sandstone_top', 'sandstone_bottom',
   'coal_ore', 'iron_ore', 'gold_ore', 'diamond_ore',
   'obsidian', 'lava', 'fire', 'crafting_table_top', 'crafting_table_side',
+  'chest_top', 'chest_side',
 ];
 
 export const AIR = 0;
@@ -21,6 +22,7 @@ export const B = {
   BEDROCK: 10, GRAVEL: 11, SANDSTONE: 12,
   COAL_ORE: 13, IRON_ORE: 14, GOLD_ORE: 15, DIAMOND_ORE: 16,
   OBSIDIAN: 17, LAVA: 18, FIRE: 19, CRAFTING_TABLE: 20,
+  CHEST: 37,
 } as const;
 
 // ---------- folyadékok ----------
@@ -147,6 +149,7 @@ export const BLOCKS: Record<number, BlockDef> = {
     parts: crossParts('fire'), rots: [], boxes: [], pick: [], light: 15,
   },
   [B.CRAFTING_TABLE]: { name: 'Crafting Table', top: 'crafting_table_top', bottom: 'planks', side: 'crafting_table_side' },
+  [B.CHEST]: { name: 'Chest', top: 'chest_top', bottom: 'planks', side: 'chest_side' },
 };
 
 // a folyékony blokkok további szintjei (az inventoryban nem jelennek meg)
@@ -192,7 +195,7 @@ const BASE_KEY_NAMES: Record<number, string> = {
   [B.PLANKS]: 'oak_planks', [B.LEAVES]: 'oak_leaves', [B.COBBLE]: 'cobblestone', [B.BEDROCK]: 'bedrock',
   [B.GRAVEL]: 'gravel', [B.SANDSTONE]: 'sandstone', [B.COAL_ORE]: 'coal_ore', [B.IRON_ORE]: 'iron_ore',
   [B.GOLD_ORE]: 'gold_ore', [B.DIAMOND_ORE]: 'diamond_ore', [B.OBSIDIAN]: 'obsidian', [B.LAVA]: 'lava',
-  [B.FIRE]: 'fire', [B.CRAFTING_TABLE]: 'crafting_table',
+  [B.FIRE]: 'fire', [B.CRAFTING_TABLE]: 'crafting_table', [B.CHEST]: 'chest',
 };
 for (const [id, key] of Object.entries(BASE_KEY_NAMES)) {
   BLOCKS[Number(id)].key = key;
@@ -235,7 +238,7 @@ export interface GeneratedPack {
 const BASE_KEYS = new Set([
   'grass_block', 'dirt', 'stone', 'sand', 'oak_log', 'oak_planks', 'oak_leaves', 'cobblestone',
   'bedrock', 'gravel', 'sandstone', 'coal_ore', 'iron_ore', 'gold_ore', 'diamond_ore',
-  'obsidian', 'lava', 'fire', 'crafting_table',
+  'obsidian', 'lava', 'fire', 'crafting_table', 'chest',
 ]);
 
 /** Nem valódi, lerakható blokkok: állapot- és részletek, amiknek van textúrájuk, de nem kocka */

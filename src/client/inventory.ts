@@ -2,10 +2,11 @@ import { BLOCKS } from '../shared/blocks';
 import { ARMOR_SLOTS, ITEMS, armorOf, isItem, itemName, maxStack } from '../shared/items';
 import { matchRecipe, type Stack } from '../shared/recipes';
 import { SMELT_SECONDS, type Furnace } from '../shared/smelting';
+import { CHEST_SLOTS, type Chest } from '../shared/chest';
 
 export const HOTBAR_SIZE = 9;
 export const TOTAL_SLOTS = 36;
-type Area = 'inv' | 'craft' | 'armor';
+type Area = 'inv' | 'craft' | 'armor' | 'chest';
 
 /** A játékos tárolója: az első 9 hely a hotbar, a többi 27 a hátizsák */
 export class Inventory {
@@ -172,6 +173,10 @@ export class BagUI {
   private result: Stack | null = null;
   /** nyitva lévő tűzhely: a bemenet és az üzemanyag a `craft` rács két helye, a kimenet a tűzhelyé */
   private furnace: Furnace | null = null;
+  /** nyitva lévő láda (a hely a láda saját tárolója, nem másolat) */
+  private chest: Chest | null = null;
+  private chestEl = document.getElementById('chest-grid')!;
+  private chestViews: SlotView[] = [];
 
   /** a tartalom változott (a HUD hotbarját frissíteni kell) */
   onChange: () => void = () => {};
@@ -365,8 +370,22 @@ export class BagUI {
   }
 
   /** Megnyitás: 2 = a saját 2x2-es rács, 3 = munkapad */
-  open(size: 2 | 3 | 'furnace', furnace?: Furnace): void {
-    this.furnace = size === 'furnace' ? furnace ?? null : null;
+  open(size: 2 | 3 | 'furnace' | 'chest', furnace?: Furnace | Chest): void {
+    this.chest = size === 'chest' ? (furnace as Chest) ?? null : null;
+    if (this.chest) furnace = undefined;
+    this.root.classList.toggle('chest', !!this.chest);
+    this.chestEl.replaceChildren();
+    this.chestViews = [];
+    if (this.chest) {
+      for (let i = 0; i < CHEST_SLOTS; i++) {
+        const v = new SlotView(this.paint);
+        this.bindSlot(v.el, 'chest', i);
+        this.chestEl.appendChild(v.el);
+        this.chestViews.push(v);
+      }
+      size = 2;
+    }
+    this.furnace = size === 'furnace' ? (furnace as Furnace) ?? null : null;
     const cells = this.furnace ? 2 : (size as number) * (size as number);
     this.size = this.furnace ? 1 : (size as number);
     // a tűzhelynél a rács a tűzhely saját tárolója (nem másolat): amit ide teszel, ott marad bezárás után is
@@ -381,7 +400,7 @@ export class BagUI {
       this.craftEl.appendChild(v.el);
       this.craftViews.push(v);
     }
-    this.titleEl.textContent = this.furnace ? 'Furnace' : size === 3 ? 'Crafting Table' : 'Inventory';
+    this.titleEl.textContent = this.chest ? 'Chest' : this.furnace ? 'Furnace' : size === 3 ? 'Crafting Table' : 'Inventory';
     this.cursor = null;
     this.root.hidden = false;
     this.render();
@@ -391,11 +410,12 @@ export class BagUI {
   close(): void {
     if (this.root.hidden) return;
     // a tűzhely tartalma a tűzhelyben marad, csak a kézben lévő dolog kerül vissza
-    const back = this.furnace ? [this.cursor] : [this.cursor, ...this.craft];
+    const back = this.furnace || this.chest ? [this.cursor] : [this.cursor, ...this.craft];
     this.cursor = null;
     this.craft = [];
     this.furnace = null;
-    this.root.classList.remove('furnace');
+    this.chest = null;
+    this.root.classList.remove('furnace', 'chest');
     for (const s of back) if (s) this.inv.add(s.id, s.n, s.d); // ami nem fér el, elvész
     this.root.hidden = true;
     this.onChange();
@@ -429,7 +449,7 @@ export class BagUI {
 
   /** Újrarajzolás (pl. elem textúra betöltése után) */
   invalidate(): void {
-    [...this.invViews, ...this.craftViews, ...this.armorViews, this.outView, this.cursorView].forEach((v) => v.invalidate());
+    [...this.invViews, ...this.chestViews, ...this.craftViews, ...this.armorViews, this.outView, this.cursorView].forEach((v) => v.invalidate());
     if (this.isOpen) this.render();
   }
 
@@ -439,6 +459,7 @@ export class BagUI {
   private render(): void {
     this.invViews.forEach((v, k) => v.set(this.inv.slots[this.order[k]]));
     this.craftViews.forEach((v, i) => v.set(this.craft[i]));
+    this.chestViews.forEach((v, i) => v.set(this.chest?.slots[i] ?? null));
     this.armorViews.forEach((v, i) => { v.set(this.inv.armor[i]); v.el.classList.toggle('empty-ph', !this.inv.armor[i]); });
     this.result = this.furnace ? this.furnace.out : matchRecipe(this.craft, this.size, this.size);
     this.outView.set(this.result);
@@ -452,7 +473,7 @@ export class BagUI {
   }
 
   private list(area: Area): (Stack | null)[] {
-    return area === 'inv' ? this.inv.slots : area === 'armor' ? this.inv.armor : this.craft;
+    return area === 'inv' ? this.inv.slots : area === 'armor' ? this.inv.armor : area === 'chest' ? this.chest!.slots : this.craft;
   }
 
   /** idx: a tároló (vagy a rács) helye */
@@ -486,7 +507,12 @@ export class BagUI {
           if (!this.inv.slots[i]) { const m = Math.min(maxStack(from.id), left); this.inv.slots[i] = { id: from.id, n: m, d: from.d }; left -= m; }
         }
       };
-      if (area !== 'inv') tryRange(0, TOTAL_SLOTS);
+      if (this.chest && area === 'inv') {
+        // nyitott ládánál a hátizsákból a ládába megy
+        const cs = this.chest.slots;
+        left = this.chest.add(from.id, left, from.d);
+        void cs;
+      } else if (area !== 'inv') tryRange(0, TOTAL_SLOTS);
       else if (idx < HOTBAR_SIZE) tryRange(HOTBAR_SIZE, TOTAL_SLOTS);
       else tryRange(0, HOTBAR_SIZE);
       if (left > 0) list[idx] = { id: from.id, n: left, d: from.d };
@@ -536,7 +562,7 @@ export class BagUI {
       this.craft = this.craft.map((s) => (s && s.n > 1 ? { id: s.id, n: s.n - 1 } : null));
       return true;
     };
-    if (shift) { for (let i = 0; i < 64 && take(); i++); } else take();
+    if (shift) { for (let i = 0; i < 256 && take(); i++); } else take();
     this.render();
     this.onChange();
   }

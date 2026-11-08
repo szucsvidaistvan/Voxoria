@@ -10,6 +10,7 @@ import { I, ITEMS, armorPoints, isItem, itemName, toolOf } from '../shared/items
 import { CATEGORIES, categoryOf } from '../shared/categories';
 import { initRecipes } from '../shared/recipes';
 import { Furnace, initSmelting } from '../shared/smelting';
+import { Chest } from '../shared/chest';
 import { LIGHT, isOpaque } from '../shared/blocks';
 import { resetLightCache } from '../shared/light';
 import { breakRule, breakTime, dropFor } from '../shared/survival';
@@ -171,6 +172,7 @@ async function main(): Promise<void> {
   let dayCount = 1;
   /** a lerakott tűzhelyek állapota, a helyük szerint ("x,y,z") */
   const furnaces = new Map<string, Furnace>();
+  const chests = new Map<string, Chest>();
   const fkey = (x: number, y: number, z: number) => `${x},${y},${z}`;
   const spawn = { x: 8, z: 8 };
 
@@ -304,6 +306,8 @@ async function main(): Promise<void> {
     timeOfDay = save?.time ?? START_TIME;
     dayCount = save?.day ?? 1;
     furnaces.clear();
+    chests.clear();
+    for (const a of save?.chests ?? []) chests.set(fkey(a[0], a[1], a[2]), Chest.fromFlat(a.slice(3)));
     for (const a of save?.furnaces ?? []) furnaces.set(fkey(a[0], a[1], a[2]), Furnace.fromFlat(a.slice(3)));
 
     // játékmód és tároló (a régi mentések kreatívak voltak, csak a hotbarjuk volt meg)
@@ -339,7 +343,7 @@ async function main(): Promise<void> {
     const p = player.pos;
     writeSave({
       seed: world.seed, edits: world.exportEdits(), pos: [p.x, p.y, p.z], yaw: player.yaw, pitch: player.pitch,
-      time: timeOfDay, day: dayCount, furnaces: [...furnaces].map(([k, f]) => [...k.split(',').map(Number), ...f.toFlat()]), mode, hp: health.hp, food: health.food, sat: health.saturation, inv: inv.toFlat(), arm: inv.armorFlat(),
+      time: timeOfDay, day: dayCount, furnaces: [...furnaces].map(([k, f]) => [...k.split(',').map(Number), ...f.toFlat()]), chests: [...chests].map(([k, c]) => [...k.split(',').map(Number), ...c.toFlat()]), mode, hp: health.hp, food: health.food, sat: health.saturation, inv: inv.toFlat(), arm: inv.armorFlat(),
     });
   };
 
@@ -594,7 +598,7 @@ async function main(): Promise<void> {
     if (!input.touch) invSearch.focus();
   };
   /** Túlélő módban az inventory és a munkapad (2x2 vagy 3x3 rács) */
-  const openBag = (size: 2 | 3 | 'furnace', furnace?: Furnace) => {
+  const openBag = (size: 2 | 3 | 'furnace' | 'chest', furnace?: Furnace | Chest) => {
     if (state !== 'playing') return;
     state = 'inventory';
     input.enabled = false;
@@ -860,6 +864,14 @@ async function main(): Promise<void> {
         furnaces.delete(fkey(x, y, z));
       }
     }
+    // láda: a tartalma a földre esik
+    if (id === B.CHEST) {
+      const ch = chests.get(fkey(x, y, z));
+      if (ch) {
+        for (const s of ch.contents()) drops.spawn(s.id, s.n, x + 0.5, y + 0.5, z + 0.5);
+        chests.delete(fkey(x, y, z));
+      }
+    }
     // ajtó: a másik fele is eltűnik (egyetlen ajtót ad)
     const door = BLOCKS[id]?.door;
     if (door) {
@@ -961,6 +973,14 @@ async function main(): Promise<void> {
     // munkapad: megnyitja a 3x3-as barkácsrácsot
     if (blockKey(world.getBlock(hit.x, hit.y, hit.z)) === 'crafting_table') {
       openBag(3);
+      return;
+    }
+    // láda: megnyitja a tárolót
+    if (world.getBlock(hit.x, hit.y, hit.z) === B.CHEST) {
+      const k = fkey(hit.x, hit.y, hit.z);
+      let ch = chests.get(k);
+      if (!ch) chests.set(k, (ch = new Chest()));
+      openBag('chest', ch);
       return;
     }
     // tűzhely: megnyitja az olvasztó felületet

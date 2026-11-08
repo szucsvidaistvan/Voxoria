@@ -461,6 +461,9 @@ body.touch #hud-face { width: 34px; height: 34px; }
 }
 #bag.furnace #craft-area::before { content: '🔥'; font-size: 1.4rem; filter: grayscale(1) opacity(0.35); }
 #bag.furnace #craft-area.lit::before { filter: none; }
+#chest-grid { display: none; grid-template-columns: repeat(9, var(--slot)); gap: 4px; margin: 0 0 0.7rem; padding-bottom: 0.7rem; border-bottom: 3px solid var(--edge); }
+#bag.chest #chest-grid { display: grid; }
+#bag.chest #craft-area { display: none; }
 #bag-main, #bag-hot { display: grid; grid-template-columns: repeat(9, var(--slot)); gap: 4px; }
 #bag-hot { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 3px solid var(--edge); }
 .islot {
@@ -509,6 +512,11 @@ body.touch #hud-face { width: 34px; height: 34px; }
   #bag-main { grid-column: 2; grid-row: 2; }
   #bag-hot { grid-column: 2; grid-row: 3; margin-top: 0.4rem; padding-top: 0.4rem; }
   #bag .hint { display: none; }
+  /* láda: a láda a hátizsák fölött, egy oszlopban */
+  #bag.chest .bag-panel { --slot: min(52px, calc((100vh - 7.6rem) / 7), calc((100vw - 4rem) / 9.6)); grid-template-columns: auto; }
+  #bag.chest #chest-grid { grid-column: 1; grid-row: 2; margin: 0 0 0.4rem; padding-bottom: 0.4rem; }
+  #bag.chest #bag-main { grid-column: 1; grid-row: 3; }
+  #bag.chest #bag-hot { grid-column: 1; grid-row: 4; }
   #bag-cursor, #bag-cursor .islot { width: 36px; height: 36px; }
 }
 

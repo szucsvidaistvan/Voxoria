@@ -71,6 +71,7 @@ export function initRecipes(): void {
   add({ shape: ['P  ', 'PP ', 'PPP'], keys: { P: 'planks' }, out: woodOut('stairs', 4) });
   add({ shape: ['PPP', 'PPP'], keys: { P: 'planks' }, out: woodOut('trapdoor', 2) });
   add({ shape: ['PP', 'PP'], keys: { P: 'planks' }, out: { id: B.CRAFTING_TABLE, n: 1 } });
+  add({ shape: ['PPP', 'P P', 'PPP'], keys: { P: 'planks' }, out: { id: B.CHEST, n: 1 } });
   // ajtó: 2x3 deszka, a deszka fajtájának megfelelő ajtó (3 darab)
   add({
     shape: ['PP', 'PP', 'PP'], keys: { P: 'planks' },
