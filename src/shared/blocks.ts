@@ -511,6 +511,15 @@ export function registerGenerated(pack: GeneratedPack): number[] {
 
   // nem kocka alakú blokkok: előbb az alapállapotok (névsorban), utána az elforgatott változatok,
   // így a kockák és az alap alakú blokkok azonosítói stabilak maradnak
+  // a kaktusz sarkai nem lehetnek átlátszók: belső mag, hogy ne lehessen átlátni a rés mögé
+  const cactus = pack.blocks.find((b) => b.name === 'cactus' && b.kind === 'shape' && b.parts?.length === 3);
+  if (cactus) {
+    const t = cactus.parts![0].faces.west?.tex ?? cactus.parts![0].faces.north?.tex;
+    if (t) {
+      const f = (): ShapeFace => ({ uv: [0, 0, 16, 16], tex: t });
+      cactus.parts!.push({ from: [1, 0, 1], to: [15, 16, 15], faces: { north: f(), south: f(), east: f(), west: f() } });
+    }
+  }
   const shapes = pack.blocks
     .filter((b) => b.kind === 'shape' && b.parts?.length && !BASE_KEYS.has(b.name) && !SHAPE_SKIP.test(b.name) && !LATE_SHAPES.includes(b.name))
     .sort((a, b) => a.name.localeCompare(b.name));
