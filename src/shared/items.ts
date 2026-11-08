@@ -129,5 +129,10 @@ export const armorOf = (id: number | undefined): ItemDef['armor'] => (id === und
 
 export const isItem = (id: number): boolean => id >= ITEM_BASE;
 export const itemName = (id: number): string => ITEMS[id]?.name ?? BLOCKS[id]?.name ?? '?';
-export const maxStack = (id: number): number => ITEMS[id]?.stack ?? 64;
+/** Egy helyen legfeljebb ennyi lehet (a 64-es stackek nálunk 256-osak; a 16-os és az 1-es marad) */
+export const STACK_MAX = 256;
+export const maxStack = (id: number): number => {
+  const s = ITEMS[id]?.stack ?? 64;
+  return s === 64 ? STACK_MAX : s;
+};
 export const toolOf = (id: number | undefined): ItemDef['tool'] => (id === undefined ? undefined : ITEMS[id]?.tool);

@@ -279,6 +279,8 @@ const NO_COLLIDE = /(torch|rail|button|pressure_plate|sapling|tulip|orchid|alliu
 /** Nem lerakható állapot- és részblokkok */
 const SHAPE_SKIP = /^(potted_|attached_|redstone_wire$|tripwire$|lava_cauldron|water_cauldron|powder_snow_cauldron)|(_wall_torch|_crop|_plant)$/;
 /** Ezeknek van "fejjel lefelé" (felső fél) változata */
+/** ezek az alakú blokkok az összes többi után kapnak azonosítót */
+const LATE_SHAPES = ['chest'];
 const FLIPPABLE = /(_slab|_stairs|_trapdoor)$/;
 
 function shapeDef(b: GeneratedBlock, dir: number, flip: number): BlockDef {
@@ -510,7 +512,7 @@ export function registerGenerated(pack: GeneratedPack): number[] {
   // nem kocka alakú blokkok: előbb az alapállapotok (névsorban), utána az elforgatott változatok,
   // így a kockák és az alap alakú blokkok azonosítói stabilak maradnak
   const shapes = pack.blocks
-    .filter((b) => b.kind === 'shape' && b.parts?.length && !BASE_KEYS.has(b.name) && !SHAPE_SKIP.test(b.name))
+    .filter((b) => b.kind === 'shape' && b.parts?.length && !BASE_KEYS.has(b.name) && !SHAPE_SKIP.test(b.name) && !LATE_SHAPES.includes(b.name))
     .sort((a, b) => a.name.localeCompare(b.name));
   const baseIds: number[] = [];
   const kept: GeneratedBlock[] = [];
@@ -575,6 +577,22 @@ export function registerGenerated(pack: GeneratedPack): number[] {
       wallVariants.push(next++);
     }
     std.wallVariants = wallVariants;
+  }
+  // a később bevezetett alakú blokkok (láda) a végére kerülnek, hogy a korábbi azonosítók (és a mentések) ne csússzanak el
+  for (const key of LATE_SHAPES) {
+    const b = pack.blocks.find((x) => x.kind === 'shape' && x.name === key && x.parts?.length);
+    if (!b || next + 4 > MAX_BLOCK_ID) continue;
+    const id = next++;
+    BLOCKS[id] = shapeDef(b, 0, 0);
+    for (const p of b.parts!) for (const f of Object.values(p.faces)) tex.add(f!.tex);
+    KEY_ID.set(b.name, id);
+    ids.push(id);
+    const variants: number[] = [id];
+    for (let v = 1; v < 4; v++) {
+      BLOCKS[next] = { ...shapeDef(b, v, 0), hidden: true, base: id };
+      variants[v] = next++;
+    }
+    BLOCKS[id].variants = variants;
   }
   refreshLight();
 
