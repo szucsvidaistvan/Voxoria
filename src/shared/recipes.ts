@@ -1,4 +1,5 @@
 import { B, blockId, blockKey } from './blocks';
+import { extraRecipes } from './recipes-extra';
 import { ARMOR_ID, EXTRA_ID as X, I, TOOL_ID, type ToolType } from './items';
 
 export interface Stack {
@@ -9,9 +10,9 @@ export interface Stack {
 }
 
 /** Egy összetevő: konkrét azonosító, vagy címke ('planks', 'log') */
-type Ing = number | string;
+export type Ing = number | string;
 
-interface Recipe {
+export interface Recipe {
   /** alakhoz kötött recept: a sorok, a betűk a keys-ben vannak, a szóköz üres hely */
   shape?: string[];
   keys?: Record<string, Ing>;
@@ -150,6 +151,8 @@ export function initRecipes(): void {
       add({ shape: shapes[type], keys: { M: ing, S: I.STICK }, out: { id: TOOL_ID[m][type], n: 1 } });
     }
   }
+  // a többi blokk és tárgy receptjei (festék, színek, kő- és fafélék, ételek); a már meglévőt nem duplázza
+  extraRecipes(add, (outId) => recipes.some((r) => typeof r.out !== 'function' && r.out.id === outId));
 }
 
 type Grid = (Stack | null)[];

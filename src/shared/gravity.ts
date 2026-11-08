@@ -1,4 +1,4 @@
-import { AIR, blockKey, fluidKind } from './blocks';
+import { AIR, FLUID_WATER, blockId, blockKey, fluidKind } from './blocks';
 import { isReplaceable } from './fluids';
 import { CH, type World } from './world';
 
@@ -121,15 +121,29 @@ export class GravitySim {
       if (!w.isLoaded(f.x, f.z)) continue;
       if (ly < CH && canFallInto(w.getBlock(f.x, ly, f.z)) && w.setBlock(f.x, ly, f.z, f.id)) {
         this.onChange(f.x, ly, f.z, f.id);
-        this.notify(f.x, ly, f.z);
+        if (!this.harden(f.x, ly, f.z)) this.notify(f.x, ly, f.z);
       } else this.onDrop(f.x, ly, f.z, f.id);
     }
+  }
+
+  /** Betonpor, ami vízzel érintkezik, azonnal betonná szilárdul; igaz, ha átalakult */
+  private harden(x: number, y: number, z: number): boolean {
+    const w = this.world;
+    const k = blockKey(w.getBlock(x, y, z));
+    if (!k.endsWith('_concrete_powder')) return false;
+    const wet = [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0]]
+      .some(([dx, dy, dz]) => fluidKind(w.getBlock(x + dx, y + dy, z + dz)) === FLUID_WATER);
+    const concrete = blockId(k.replace('_powder', ''));
+    if (!wet || concrete === undefined || !w.setBlock(x, y, z, concrete)) return false;
+    this.onChange(x, y, z, concrete);
+    return true;
   }
 
   private run(x: number, y: number, z: number): void {
     const w = this.world;
     const id = w.getBlock(x, y, z);
     if (!isGravityBlock(id) || y <= 0) return;
+    if (this.harden(x, y, z)) return;
     if (!canFallInto(w.getBlock(x, y - 1, z))) return; // megvan a támaszték
     // a blokk kikerül a világból, és esni kezd
     if (!w.setBlock(x, y, z, AIR)) return;
