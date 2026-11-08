@@ -6,6 +6,7 @@ import {
 } from '../shared/blocks';
 import { FluidSim, isReplaceable } from '../shared/fluids';
 import { GravitySim } from '../shared/gravity';
+import { createFallingView } from './falling';
 import { I, ITEMS, armorPoints, isItem, itemName, toolOf } from '../shared/items';
 import { CATEGORIES, categoryOf } from '../shared/categories';
 import { initRecipes } from '../shared/recipes';
@@ -297,7 +298,11 @@ async function main(): Promise<void> {
     clearWorld();
     world = new World(seed);
     sim = new FluidSim(world, (x, _y, z) => markDirty(x, z));
-    gravity = new GravitySim(world, (x, y, z) => { markDirty(x, z); sim.notify(x, y, z); });
+    gravity = new GravitySim(
+      world,
+      (x, y, z) => { markDirty(x, z); sim.notify(x, y, z); },
+      (x, y, z, id) => drops.spawn(id, 1, x + 0.5, y + 0.5, z + 0.5),
+    );
     mobs = new MobManager(world);
     mobView.clear();
     dirty.clear();
@@ -381,6 +386,7 @@ async function main(): Promise<void> {
   const mobView = createMobView(scene);
   hand = createHandItem(paintStack, atlas, isItem, import.meta.env.BASE_URL);
   const collapse = createCollapse(scene, atlas, material, () => world);
+  const fallingView = createFallingView(scene, atlas, material);
   // harmadik személyű nézet (V): a játékos saját modellje a kamera előtt
   const playerView = createPlayerView(scene, import.meta.env.BASE_URL, atlas);
   /** nézet (V): 0 első személy, 1 hátulról, 2 elölről */
@@ -1278,6 +1284,7 @@ async function main(): Promise<void> {
       simAcc = Math.min(simAcc + dt, 0.25);
       while (simAcc >= 0.05) { simAcc -= 0.05; sim.update(); gravity.update(); }
     }
+    if (state !== 'menu') fallingView.update(gravity.fallers, simAcc / 0.05);
     flushDirty(3);
     resumeEl.hidden = !(state === 'playing' && !input.touch && !input.locked);
     if (state !== 'menu') {
