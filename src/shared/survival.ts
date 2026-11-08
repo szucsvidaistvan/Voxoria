@@ -77,6 +77,20 @@ export function dropFor(id: number, held: number | undefined, rand: () => number
     case 'coal_ore': return { id: I.COAL, n: 1 };
     case 'diamond_ore': return { id: I.DIAMOND, n: 1 };
     case 'gravel': return rand() < 0.1 ? { id: I.FLINT, n: 1 } : { id: base, n: 1 };
+    case 'lapis_ore': return { id: EXTRA_ID['lapis_lazuli'], n: 4 + Math.floor(rand() * 5) };
+    case 'emerald_ore': return { id: EXTRA_ID['emerald'], n: 1 };
+    case 'sugar_cane': return { id: EXTRA_ID['sugar_cane'], n: 1 };
+    case 'clay': return { id: EXTRA_ID['clay_ball'], n: 4 };
+    case 'snow': return { id: EXTRA_ID['snowball'], n: 1 };
+    case 'snow_block': return { id: EXTRA_ID['snowball'], n: 4 };
+    case 'cobweb': return { id: EXTRA_ID['string'], n: 1 };
+    case 'seagrass': {
+      // átmenetileg: a tengeri fűből néha hal kerül elő (amíg nincs horgászat)
+      const q = rand();
+      if (q < 0.03) return { id: EXTRA_ID['cod'], n: 1 };
+      if (q < 0.05) return { id: EXTRA_ID['salmon'], n: 1 };
+      return { id: base, n: 1 };
+    }
     case 'fire': case 'bedrock': return null;
     default:
   }
@@ -86,13 +100,17 @@ export function dropFor(id: number, held: number | undefined, rand: () => number
     const sapling = blockId(`${wood}_sapling`) ?? blockId('oak_sapling');
     if (sapling !== undefined && rand() < 0.06) return { id: sapling, n: 1 };
     if (/^(oak|dark_oak)$/.test(wood) && rand() < 0.02) return { id: I.APPLE, n: 1 };
+    if (wood === 'jungle' && rand() < 0.03) return { id: EXTRA_ID['cocoa_beans'], n: 1 };
     return null;
   }
-  if (/glass|ice$/.test(key) && !/^(glass_pane|iron_bars)$/.test(key)) return null;
+  if (/^(ice)$/.test(key)) return null;
+  if (/glass/.test(key) && !/pane$/.test(key)) return null;
   // fű és páfrány: néha búzamag
   if (/^(short_grass|grass|fern|tall_grass)$/.test(key)) {
-    const seeds = EXTRA_ID['wheat_seeds'];
-    return seeds !== undefined && rand() < 0.125 ? { id: seeds, n: 1 } : null;
+    // átmenetileg (amíg nincs földművelés/horgászat) a fű ritkán más növényi alapanyagot is ad
+    const q = rand();
+    const pick = q < 0.125 ? 'wheat_seeds' : q < 0.15 ? 'beetroot_seeds' : q < 0.17 ? 'wheat' : q < 0.185 ? 'carrot' : q < 0.2 ? 'potato' : q < 0.21 && key === 'fern' ? 'rabbit' : q < 0.22 ? 'beetroot' : null;
+    return pick && EXTRA_ID[pick] !== undefined ? { id: EXTRA_ID[pick], n: 1 } : null;
   }
   // a dinnye szeleteket ad (3-7), nem egész blokkot
   if (key === 'melon') {

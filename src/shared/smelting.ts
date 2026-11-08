@@ -41,6 +41,9 @@ export function initSmelting(): void {
   add('sandstone', blk('cut_sandstone'));
   add('red_sandstone', blk('cut_red_sandstone'));
   add('quartz_block', blk('smooth_quartz'));
+  add('cactus', { id: X.cactus_green, n: 1 });
+  for (const c of ['white','orange','magenta','light_blue','yellow','lime','pink','gray','light_gray','cyan','purple','blue','brown','green','red','black']) add(`${c}_terracotta`, blk(`${c}_glazed_terracotta`));
+  for (const c of ['tube','brain','bubble','fire','horn']) add(`${c}_coral_block`, blk(`dead_${c}_coral_block`));
   // minden rönk faszén lesz
   for (const id of Object.keys(blockIds())) if (/(_log|_wood)$/.test(blockKey(Number(id))) && !/^stripped_/.test(blockKey(Number(id)))) SMELT.set(Number(id), { id: I.CHARCOAL, n: 1 });
 

@@ -142,6 +142,7 @@ export class World {
         for (let y = h + 1; y <= SEA_LEVEL; y++) c.set(x, y, z, B.WATER);
         if (h < SEA_LEVEL) {
           if (freezes(seed, wx, wz)) c.set(x, SEA_LEVEL, z, G('ice', B.WATER));
+          else if (biome === 'ocean' && h < SEA_LEVEL - 1 && this.oceanFloor(c, x, z, wx, wz, h)) { /* tengerfenék díszei */ }
           else if (biome === 'ocean' && h >= SEA_LEVEL - 2 && hash2(wx, wz, seed + 141) < 0.06 && temperature(seed, wx, wz) > 0.4) {
             c.set(x, SEA_LEVEL + 1, z, G('lily_pad', AIR));
           }
@@ -171,9 +172,27 @@ export class World {
   }
 
   /** Kő, vagy ritkán érc. Minél mélyebben vagyunk, annál értékesebb érc fordul elő (egy blokkos telérek). */
+  /** Tengerfenék: tengeri fű, korallblokkok és szivacs foltokban; igaz, ha tett valamit */
+  private oceanFloor(c: Chunk, x: number, z: number, wx: number, wz: number, h: number): boolean {
+    const r = hash2(wx, wz, this.seed + 733);
+    const warm = temperature(this.seed, wx, wz) > 0.4;
+    if (r < 0.10) { c.set(x, h + 1, z, G('seagrass', B.WATER)); return true; }
+    if (warm && r > 0.985) {
+      const corals = ['tube', 'brain', 'bubble', 'fire', 'horn'];
+      c.set(x, h, z, G(`${corals[Math.floor(hash2(wx, wz, this.seed + 734) * 5)]}_coral_block`, B.SAND));
+      return true;
+    }
+    if (r > 0.9965) { c.set(x, h, z, G('wet_sponge', B.SAND)); return true; }
+    return false;
+  }
+
   private stoneOrOre(wx: number, y: number, wz: number): number {
     const r = hash2(wx, wz + y * 40503, this.seed + 500);
     if (y < 10 && r < 0.0015) return B.DIAMOND_ORE;
+    // mélyen: obszidián, magma és kvarcér (a kvarc nyersanyag a kvarc blokkokhoz)
+    if (y < 12 && r > 0.9985) return B.OBSIDIAN;
+    if (y < 14 && r > 0.996 && r <= 0.9985) return G('magma');
+    if (y < 24 && r > 0.992 && r <= 0.996) return G('quartz_block');
     if (y < 18 && r < 0.004) return B.GOLD_ORE;
     if (y < 30 && r < 0.010) return B.IRON_ORE;
     if (r < 0.020) return B.COAL_ORE;

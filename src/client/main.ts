@@ -7,7 +7,7 @@ import {
 import { FluidSim, isReplaceable } from '../shared/fluids';
 import { GravitySim } from '../shared/gravity';
 import { createFallingView } from './falling';
-import { I, ITEMS, armorPoints, isItem, itemName, toolOf } from '../shared/items';
+import { EXTRA_ID, I, ITEMS, armorPoints, isItem, itemName, toolOf } from '../shared/items';
 import { CATEGORIES, categoryOf } from '../shared/categories';
 import { initRecipes } from '../shared/recipes';
 import { Furnace, initSmelting } from '../shared/smelting';
@@ -1173,7 +1173,13 @@ async function main(): Promise<void> {
     if (mine.active && hit && isFinite(mine.need) && mine.need > 0.05 && mine.t > 0) cracks.show(hit.box, mine.t / mine.need);
     else cracks.hide();
 
-    if (input.placeQueued) useItem(hit);
+    if (input.placeQueued) {
+      // üres vödör + tehén: tej
+      if (mobFirst && mobHit!.mob.kind === 'cow' && held()?.id === I.BUCKET && EXTRA_ID['milk_bucket'] !== undefined) {
+        if (mode === 'survival') swapHeld(EXTRA_ID['milk_bucket']);
+        input.placeQueued = false;
+      } else useItem(hit);
+    }
     input.breakQueued = input.placeQueued = input.tapQueued = false;
   };
 
