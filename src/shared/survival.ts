@@ -1,5 +1,5 @@
 import { B, BLOCKS, blockId, blockKey } from './blocks';
-import { I, toolOf, type ToolType } from './items';
+import { EXTRA_ID, I, toolOf, type ToolType } from './items';
 
 /** Bontási szabály: keménység, a hozzá való szerszám, és a begyűjtéshez kellő minimális szint (0: bármi) */
 export interface BreakRule {
@@ -81,12 +81,23 @@ export function dropFor(id: number, held: number | undefined, rand: () => number
     default:
   }
   if (/leaves$/.test(key)) {
-    const sapling = blockId('oak_sapling');
+    // minden fafajta a saját csemetéjét adja (a tölgyé az alap, ha a fajtának nincs külön)
+    const wood = key.replace(/_leaves$/, '');
+    const sapling = blockId(`${wood}_sapling`) ?? blockId('oak_sapling');
     if (sapling !== undefined && rand() < 0.06) return { id: sapling, n: 1 };
-    if (rand() < 0.02) return { id: I.APPLE, n: 1 };
+    if (/^(oak|dark_oak)$/.test(wood) && rand() < 0.02) return { id: I.APPLE, n: 1 };
     return null;
   }
   if (/glass|ice$/.test(key) && !/^(glass_pane|iron_bars)$/.test(key)) return null;
-  if (/^(short_grass|grass|fern|tall_grass)$/.test(key)) return null;
+  // fű és páfrány: néha búzamag
+  if (/^(short_grass|grass|fern|tall_grass)$/.test(key)) {
+    const seeds = EXTRA_ID['wheat_seeds'];
+    return seeds !== undefined && rand() < 0.125 ? { id: seeds, n: 1 } : null;
+  }
+  // a dinnye szeleteket ad (3-7), nem egész blokkot
+  if (key === 'melon') {
+    const slice = EXTRA_ID['melon_slice'];
+    if (slice !== undefined) return { id: slice, n: 3 + Math.floor(rand() * 5) };
+  }
   return { id: base, n: 1 };
 }

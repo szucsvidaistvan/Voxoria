@@ -511,6 +511,26 @@ export function registerGenerated(pack: GeneratedPack): number[] {
 
   // nem kocka alakú blokkok: előbb az alapállapotok (névsorban), utána az elforgatott változatok,
   // így a kockák és az alap alakú blokkok azonosítói stabilak maradnak
+  // a kaktusz: a textúra teste 14 képpont széles, a tüskék 1 képponttal kilógnak. A lapok ezért 16 szélesek,
+  // de 1 képponttal beljebb vannak a blokk szélénél, így a test sarkai összeérnek és a tüskék kilógnak.
+  const cactus = pack.blocks.find((b) => b.name === 'cactus' && b.kind === 'shape' && b.parts && b.parts.length >= 3);
+  if (cactus) {
+    const side = cactus.parts![0].faces.west?.tex ?? cactus.parts![0].faces.north?.tex;
+    const top = cactus.parts!.find((p) => p.faces.up)?.faces.up;
+    const bottom = cactus.parts!.find((p) => p.faces.down)?.faces.down;
+    if (side && top && bottom) {
+      const f = (): ShapeFace => ({ uv: [0, 0, 16, 16], tex: side });
+      cactus.parts = [
+        { from: [1, 0, 1], to: [15, 16, 15], faces: {} }, // csak az ütközés és a kijelölés doboza
+        { from: [0, 0, 15], to: [16, 16, 15], faces: { south: f() } },
+        { from: [0, 0, 1], to: [16, 16, 1], faces: { north: f() } },
+        { from: [15, 0, 0], to: [15, 16, 16], faces: { east: f() } },
+        { from: [1, 0, 0], to: [1, 16, 16], faces: { west: f() } },
+        { from: [0, 16, 0], to: [16, 16, 16], faces: { up: { uv: [0, 0, 16, 16], tex: top.tex } } },
+        { from: [0, 0, 0], to: [16, 0, 16], faces: { down: { uv: [0, 0, 16, 16], tex: bottom.tex } } },
+      ];
+    }
+  }
   const shapes = pack.blocks
     .filter((b) => b.kind === 'shape' && b.parts?.length && !BASE_KEYS.has(b.name) && !SHAPE_SKIP.test(b.name) && !LATE_SHAPES.includes(b.name))
     .sort((a, b) => a.name.localeCompare(b.name));
