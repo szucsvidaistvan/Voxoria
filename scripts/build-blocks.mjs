@@ -496,6 +496,12 @@ blocks.sort((a, b) => a.name.localeCompare(b.name));
   blocks.length = 0; blocks.push(...keep);
 }
 
+// a láda modellje a csomag entity textúrájából (nem blokktextúra, ezért külön adjuk hozzá)
+{
+  const { chestBlock, CHEST_TEX } = await import('./chest-model.mjs');
+  if (zip.has(`${A}textures/${CHEST_TEX}.png`) && !blocks.some((b) => b.name === 'chest')) blocks.push(chestBlock(CHEST_TEX));
+}
+
 // a használt textúrák
 const used = new Set();
 for (const b of blocks) {

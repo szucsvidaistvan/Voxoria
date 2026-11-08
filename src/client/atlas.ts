@@ -15,7 +15,7 @@ const FALLBACK: Record<string, string> = {
   grass_top: '#8a8a8a', grass_side: '#6b5a3a', dirt: '#7a5636', stone: '#8d8d8d', sand: '#dbd0a0',
   log_side: '#6a4e2c', log_top: '#a98a55', planks: '#b08b52', leaves: '#9a9a9a', cobblestone: '#767676',
   water: '#3b68d4',
-  obsidian: '#14101f', lava: '#d4540f', fire: '#f08a1c', crafting_table_top: '#a07a44', crafting_table_side: '#8a6a3a', chest_top: '#a8782f', chest_side: '#98692a',
+  obsidian: '#14101f', lava: '#d4540f', fire: '#f08a1c', crafting_table_top: '#a07a44', crafting_table_side: '#8a6a3a',
   bedrock: '#3a3a3a', gravel: '#837f7d', sandstone: '#d8cc98', sandstone_top: '#dbd0a0', sandstone_bottom: '#cfc28c',
   coal_ore: '#4a4a4a', iron_ore: '#b49a86', gold_ore: '#d4b84a', diamond_ore: '#5ac8c8',
 };

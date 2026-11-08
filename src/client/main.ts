@@ -865,7 +865,7 @@ async function main(): Promise<void> {
       }
     }
     // láda: a tartalma a földre esik
-    if (id === B.CHEST) {
+    if (blockKey(id) === 'chest') {
       const ch = chests.get(fkey(x, y, z));
       if (ch) {
         for (const s of ch.contents()) drops.spawn(s.id, s.n, x + 0.5, y + 0.5, z + 0.5);
@@ -976,7 +976,7 @@ async function main(): Promise<void> {
       return;
     }
     // láda: megnyitja a tárolót
-    if (world.getBlock(hit.x, hit.y, hit.z) === B.CHEST) {
+    if (blockKey(world.getBlock(hit.x, hit.y, hit.z)) === 'chest') {
       const k = fkey(hit.x, hit.y, hit.z);
       let ch = chests.get(k);
       if (!ch) chests.set(k, (ch = new Chest()));
@@ -1030,6 +1030,7 @@ async function main(): Promise<void> {
     if (def?.variants) {
       // a blokk a játékos nézési irányába néz (a lépcső magas fele előre esik); a létra a megcélzott falra kerül
       let d = facing;
+      if (blockKey(id) === 'chest') d = (facing + 1) % 4; // a láda eleje a játékos felé néz
       if (def.wall !== undefined && hit.ny === 0) {
         const wallDir = hit.nx < 0 ? 0 : hit.nx > 0 ? 2 : hit.nz < 0 ? 1 : 3; // a fal a találati lappal szemben van
         d = (wallDir - def.wall + 4) % 4;
