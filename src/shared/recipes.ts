@@ -1,6 +1,6 @@
-import { B, blockId, blockKey } from './blocks';
+import { B, BLOCKS, blockId, blockKey } from './blocks';
 import { extraRecipes } from './recipes-extra';
-import { ARMOR_ID, EXTRA_ID as X, I, TOOL_ID, type ToolType } from './items';
+import { ARMOR_ID, EXTRA_ID as X, I, ITEMS, TOOL_ID, type ToolType } from './items';
 
 export interface Stack {
   id: number;
@@ -208,4 +208,16 @@ export function matchRecipe(grid: Grid, w: number, h: number): Stack | null {
     if (out) return { ...out };
   }
   return null;
+}
+
+/** Az összes recept (a receptkönyvhöz) */
+export const getRecipes = (): readonly Recipe[] => recipes;
+
+/** Egy címke összes tagja (blokkok és tárgyak azonosítói) */
+export function tagMembers(tag: string): number[] {
+  const f = TAGS[tag];
+  if (!f) return [];
+  const out: number[] = [];
+  for (const id of new Set([...Object.keys(BLOCKS), ...Object.keys(ITEMS)].map(Number))) if (id > 0 && f(id)) out.push(id);
+  return out.sort((a, b) => a - b);
 }

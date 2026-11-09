@@ -3,6 +3,7 @@ import { ARMOR_SLOTS, ITEMS, armorOf, isItem, itemName, maxStack } from '../shar
 import { matchRecipe, type Stack } from '../shared/recipes';
 import { SMELT_SECONDS, type Furnace } from '../shared/smelting';
 import { CHEST_SLOTS, type Chest } from '../shared/chest';
+import { BookUI } from './book';
 
 export const HOTBAR_SIZE = 9;
 export const TOTAL_SLOTS = 36;
@@ -177,12 +178,17 @@ export class BagUI {
   private chest: Chest | null = null;
   private chestEl = document.getElementById('chest-grid')!;
   private chestViews: SlotView[] = [];
+  /** receptkönyv (barkácslista) */
+  private book: BookUI;
+  private bookMode = false;
 
   /** a tartalom változott (a HUD hotbarját frissíteni kell) */
   onChange: () => void = () => {};
   onClose: () => void = () => {};
 
   constructor(private inv: Inventory, private paint: Painter) {
+    this.book = new BookUI(inv, paint, () => { this.render(); this.onChange(); });
+    document.getElementById('bag-toggle')!.addEventListener('click', () => this.toggleBook());
     this.outView = new SlotView(paint, 'islot out');
     this.cursorView = new SlotView(paint, 'islot');
     this.outEl.appendChild(this.outView.el);
@@ -370,7 +376,13 @@ export class BagUI {
   }
 
   /** Megnyitás: 2 = a saját 2x2-es rács, 3 = munkapad */
-  open(size: 2 | 3 | 'furnace' | 'chest', furnace?: Furnace | Chest): void {
+  open(size: 2 | 3 | 'furnace' | 'chest' | 'book', furnace?: Furnace | Chest): void {
+    this.book.cancel();
+    // a munkapad és a „book" a receptkönyvet nyitja (nincs barkácsrács); a 2 a táska
+    this.bookMode = size === 'book' || size === 3;
+    if (this.bookMode) size = 2;
+    this.root.classList.toggle('book', this.bookMode);
+    document.getElementById('bag-toggle')!.textContent = this.bookMode ? 'Inventory' : 'Recipes';
     this.chest = size === 'chest' ? (furnace as Chest) ?? null : null;
     if (this.chest) furnace = undefined;
     this.root.classList.toggle('chest', !!this.chest);
@@ -400,22 +412,35 @@ export class BagUI {
       this.craftEl.appendChild(v.el);
       this.craftViews.push(v);
     }
-    this.titleEl.textContent = this.chest ? 'Chest' : this.furnace ? 'Furnace' : size === 3 ? 'Crafting Table' : 'Inventory';
+    this.titleEl.textContent = this.chest ? 'Chest' : this.furnace ? 'Furnace' : this.bookMode ? 'Crafting' : 'Inventory';
     this.cursor = null;
     this.root.hidden = false;
     this.render();
+    if (this.bookMode) this.book.show();
   }
+
+  /** Váltás a táska és a receptkönyv között (a kézben lévő dolog visszakerül a tárolóba) */
+  toggleBook(): void {
+    if (this.root.hidden || this.chest || this.furnace) return;
+    if (this.cursor) { this.inv.add(this.cursor.id, this.cursor.n, this.cursor.d); this.cursor = null; }
+    this.open(this.bookMode ? 2 : 'book');
+    this.onChange();
+  }
+
+  get inBook(): boolean { return this.bookMode; }
 
   /** Bezárás: a kézben és a rácson lévő dolgok visszakerülnek a tárolóba */
   close(): void {
     if (this.root.hidden) return;
     // a tűzhely tartalma a tűzhelyben marad, csak a kézben lévő dolog kerül vissza
+    this.book.cancel();
     const back = this.furnace || this.chest ? [this.cursor] : [this.cursor, ...this.craft];
     this.cursor = null;
     this.craft = [];
     this.furnace = null;
     this.chest = null;
-    this.root.classList.remove('furnace', 'chest');
+    this.root.classList.remove('furnace', 'chest', 'book');
+    this.bookMode = false;
     for (const s of back) if (s) this.inv.add(s.id, s.n, s.d); // ami nem fér el, elvész
     this.root.hidden = true;
     this.onChange();
@@ -443,7 +468,8 @@ export class BagUI {
   }
 
   /** Minden képkockán hívjuk, amíg a tűzhely nyitva van: a haladás és a kimenet frissül */
-  tick(): void {
+  tick(dt = 0): void {
+    if (this.bookMode && this.isOpen) this.book.tick(dt);
     if (this.furnace && this.isOpen) this.render();
   }
 
@@ -451,6 +477,7 @@ export class BagUI {
   invalidate(): void {
     [...this.invViews, ...this.chestViews, ...this.craftViews, ...this.armorViews, this.outView, this.cursorView].forEach((v) => v.invalidate());
     if (this.isOpen) this.render();
+    if (this.bookMode) this.book.invalidate();
   }
 
   /** a tároló-nézetek sorrendje a képernyőn: hátizsák (9..35), alatta a hotbar (0..8) */

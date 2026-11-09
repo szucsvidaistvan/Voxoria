@@ -588,3 +588,41 @@ body.touch #hud-face { width: 34px; height: 34px; }
   background: var(--night);
   box-shadow: 0 3px 0 var(--night);
 }
+
+/* receptkönyv (barkácslista) */
+#book { display: none; gap: 0.8rem; width: min(52rem, 92vw); height: min(30rem, calc(100vh - 6rem)); }
+#bag.book #book { display: flex; }
+#bag.book #craft-area, #bag.book #chest-grid, #bag.book #bag-main, #bag.book #bag-hot, #bag.book #bag-hint { display: none; }
+#bag:not(.furnace) #craft-grid, #bag:not(.furnace) #craft-arrow, #bag:not(.furnace) #craft-out { display: none; }
+#bag.chest #bag-toggle, #bag.furnace #bag-toggle { display: none; }
+#book-left { flex: 1 1 55%; min-width: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+#book-search { padding: 0.45rem 0.6rem; font-size: 1rem; }
+#book-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+#book-tabs button { font: inherit; font-size: 0.85rem; padding: 0.25rem 0.6rem; cursor: pointer; background: var(--panel2, #3a3a3a); color: inherit; border: 2px solid var(--edge); }
+#book-tabs button.on { border-color: var(--gold); color: var(--gold); }
+.book-only { font-size: 0.85rem; display: flex; gap: 0.4rem; align-items: center; }
+#book-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding-right: 4px; }
+.book-row { display: flex; align-items: center; gap: 0.6rem; text-align: left; font: inherit; color: inherit; background: rgba(255,255,255,0.05); border: 2px solid transparent; padding: 0.2rem 0.4rem; cursor: pointer; }
+.book-row:hover { border-color: var(--edge); }
+.book-row.sel { border-color: var(--gold); }
+.book-row.no { opacity: 0.45; }
+.book-row .islot { flex: none; width: 38px; height: 38px; }
+.br-text { display: flex; flex-direction: column; min-width: 0; }
+.br-text small { opacity: 0.7; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#book-detail { flex: 1 1 45%; min-width: 0; display: flex; flex-direction: column; gap: 0.6rem; overflow-y: auto; }
+.bd-head { display: flex; align-items: center; gap: 0.8rem; }
+.bd-head h3 { margin: 0; font-size: 1.2rem; }
+.bd-head small { opacity: 0.7; }
+.bd-ing { display: flex; flex-direction: column; gap: 3px; }
+.bd-ing-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.15rem 0.4rem; background: rgba(255,255,255,0.05); }
+.bd-ing-row .islot { width: 32px; height: 32px; flex: none; }
+.bd-ing-row span { flex: 1; }
+.bd-ing-row.lack b { color: #ff6b5e; }
+.bd-qty { display: flex; gap: 0.3rem; }
+.bd-qty button { font: inherit; padding: 0.25rem 0.7rem; cursor: pointer; background: var(--panel2, #3a3a3a); color: inherit; border: 2px solid var(--edge); }
+.bd-qty button.on { border-color: var(--gold); color: var(--gold); }
+.bd-craft { width: 100% !important; }
+.bd-craft:disabled { opacity: 0.5; cursor: not-allowed; }
+.bd-bar { height: 10px; background: rgba(0,0,0,0.4); border: 2px solid var(--edge); }
+.bd-bar > div { height: 100%; width: 0; background: var(--gold); }
+@media (max-width: 700px) { #book { flex-direction: column; height: calc(100vh - 6rem); } #book-detail { flex: none; max-height: 45%; } }

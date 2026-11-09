@@ -604,7 +604,7 @@ async function main(): Promise<void> {
     if (!input.touch) invSearch.focus();
   };
   /** Túlélő módban az inventory és a munkapad (2x2 vagy 3x3 rács) */
-  const openBag = (size: 2 | 3 | 'furnace' | 'chest', furnace?: Furnace | Chest) => {
+  const openBag = (size: 2 | 3 | 'furnace' | 'chest' | 'book', furnace?: Furnace | Chest) => {
     if (state !== 'playing') return;
     state = 'inventory';
     input.enabled = false;
@@ -640,7 +640,12 @@ async function main(): Promise<void> {
   document.addEventListener('keydown', (e) => {
     if (state !== 'inventory') return;
     if (e.code === 'Escape') { e.preventDefault(); closeUI(true); }
-    else if (e.code === 'KeyE' && e.target !== invSearch) closeUI();
+    else if (e.code === 'KeyE' && !(e.target instanceof HTMLInputElement)) closeUI();
+    else if (e.code === 'KeyC' && !(e.target instanceof HTMLInputElement)) bag.toggleBook();
+  });
+  // C: receptkönyv (túlélőben, játék közben)
+  document.addEventListener('keydown', (e) => {
+    if (state === 'playing' && mode === 'survival' && e.code === 'KeyC' && !e.repeat && !(e.target instanceof HTMLInputElement)) openBag('book');
   });
 
   // ---------- halál és újraéledés ----------
@@ -739,7 +744,7 @@ async function main(): Promise<void> {
 
   $('controls').textContent = input.touch
     ? 'Move with the joystick on the left, look around by dragging on the right. Tap the screen to place a block, use what you hold or hit a mob; press and hold to mine (with food: eat, with a sword: block). The round button jumps, F5 changes the view, Items opens your inventory.'
-    : 'WASD to move, Space to jump or swim, hold left click to mine, right click to place or use (crafting table, doors, bucket, flint and steel, apple), hold right click with a sword to block (half damage from the front), V to change the view, 1–9 or scroll to choose a slot, E for the inventory, Esc for the menu.';
+    : 'WASD to move, Space to jump or swim, hold left click to mine, right click to place or use (crafting table, doors, bucket, flint and steel, apple), hold right click with a sword to block (half damage from the front), V to change the view, 1–9 or scroll to choose a slot, E for the inventory, C for recipes, Esc for the menu.';
   if (input.touch) $('bag-hint').textContent = 'Tap: pick up / place. Long press: take half / place one. Drag a stack to move it. Tap outside to close.';
   $('pack-note').hidden = atlas.usingPack;
 
@@ -978,7 +983,7 @@ async function main(): Promise<void> {
     }
     // munkapad: megnyitja a 3x3-as barkácsrácsot
     if (blockKey(world.getBlock(hit.x, hit.y, hit.z)) === 'crafting_table') {
-      openBag(3);
+      openBag('book');
       return;
     }
     // láda: megnyitja a tárolót
@@ -1312,7 +1317,7 @@ async function main(): Promise<void> {
       if (armorSig !== shownArmor) { shownArmor = armorSig; playerView.setArmor(inv.armor.map((s) => s?.id ?? 0)); }
       hand?.update(dt, held()?.id ?? 0, state === 'playing' && !thirdPerson, Math.min(1, Math.hypot(player.vel.x, player.vel.z) / 4) * (player.onGround ? 1 : 0), handAct, sky.light, eatT, blocking);
       if (state === 'inventory') {
-        bag.tick();
+        bag.tick(dt);
         if (bag.isOpen) {
           invPreview ??= createInventoryPreview($<HTMLCanvasElement>('inv-preview'), atlas);
           invPreview.render(inv.armor.map((s) => s?.id ?? 0), held()?.id ?? 0, mouseX, mouseY);
