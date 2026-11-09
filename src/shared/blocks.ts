@@ -280,7 +280,11 @@ const NO_COLLIDE = /(torch|rail|button|pressure_plate|sapling|tulip|orchid|alliu
 const SHAPE_SKIP = /^(potted_|attached_|redstone_wire$|tripwire$|lava_cauldron|water_cauldron|powder_snow_cauldron)|(_wall_torch|_crop|_plant)$/;
 /** Ezeknek van "fejjel lefelé" (felső fél) változata */
 /** ezek az alakú blokkok az összes többi után kapnak azonosítót */
-const LATE_SHAPES = ['chest'];
+const CROP_STAGES: [string, number][] = [['wheat', 8], ['carrots', 4], ['potatoes', 4], ['beetroots', 4]];
+const CROP_KEYS = CROP_STAGES.flatMap(([c, n]) => Array.from({ length: n }, (_, i) => `${c}_stage${i}`));
+/** a termés fázisai és a nedves szántóföld: csak a növekedés hozza létre (nincsenek a választóban) */
+const FARM_KEYS = new Set([...CROP_KEYS, 'farmland_moist']);
+const LATE_SHAPES = ['chest', ...FARM_KEYS];
 const FLIPPABLE = /(_slab|_stairs|_trapdoor)$/;
 
 function shapeDef(b: GeneratedBlock, dir: number, flip: number): BlockDef {
@@ -607,6 +611,7 @@ export function registerGenerated(pack: GeneratedPack): number[] {
     for (const p of b.parts!) for (const f of Object.values(p.faces)) tex.add(f!.tex);
     KEY_ID.set(b.name, id);
     ids.push(id);
+    if (FARM_KEYS.has(key)) { BLOCKS[id].hidden = true; continue; }
     const variants: number[] = [id];
     for (let v = 1; v < 4; v++) {
       BLOCKS[next] = { ...shapeDef(b, v, 0), hidden: true, base: id };

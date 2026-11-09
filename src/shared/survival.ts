@@ -10,8 +10,8 @@ export interface BreakRule {
 
 const baseOf = (id: number) => BLOCKS[id]?.base ?? id;
 
-const INSTANT = /(torch|sapling|^grass$|^short_grass$|^fern$|dead_bush|tulip|poppy|dandelion|allium|orchid|bluet|daisy|mushroom$|sugar_cane|seagrass|^fire$|cobweb|rail$|lever|button|lily_pad|carpet$|^snow$|^tall_grass)/;
-const SOFT = /^(dirt|grass_block|coarse_dirt|podzol|mycelium|farmland|dirt_path|sand|red_sand|gravel|clay|soul_sand|snow_block|concrete_powder)$|_concrete_powder$/;
+const INSTANT = /(torch|sapling|^grass$|^short_grass$|^fern$|dead_bush|tulip|poppy|dandelion|allium|orchid|bluet|daisy|mushroom$|sugar_cane|seagrass|^fire$|cobweb|rail$|lever|button|lily_pad|carpet$|^snow$|^tall_grass|_stage\d$)/;
+const SOFT = /^(dirt|grass_block|coarse_dirt|podzol|mycelium|farmland|farmland_moist|dirt_path|sand|red_sand|gravel|clay|soul_sand|snow_block|concrete_powder)$|_concrete_powder$/;
 const WOOD = /(planks|_log$|_wood$|^stripped_|fence|trapdoor|_door$|^crafting_table$|^bookshelf$|^chest$|^barrel$|^ladder$|^note_block$|^jukebox$)|^(oak|spruce|birch|jungle|acacia|dark_oak)_(stairs|slab|pressure_plate)$/;
 
 export function breakRule(id: number): BreakRule {
@@ -91,6 +91,7 @@ export function dropFor(id: number, held: number | undefined, rand: () => number
       if (q < 0.05) return { id: EXTRA_ID['salmon'], n: 1 };
       return { id: base, n: 1 };
     }
+    case 'farmland': case 'farmland_moist': case 'dirt_path': return { id: B.DIRT, n: 1 };
     case 'fire': case 'bedrock': return null;
     default:
   }
@@ -112,10 +113,27 @@ export function dropFor(id: number, held: number | undefined, rand: () => number
     const pick = q < 0.125 ? 'wheat_seeds' : q < 0.15 ? 'beetroot_seeds' : q < 0.17 ? 'wheat' : q < 0.185 ? 'carrot' : q < 0.2 ? 'potato' : q < 0.21 && key === 'fern' ? 'rabbit' : q < 0.22 ? 'beetroot' : null;
     return pick && EXTRA_ID[pick] !== undefined ? { id: EXTRA_ID[pick], n: 1 } : null;
   }
+  const crop = /^(wheat|carrots|potatoes|beetroots)_stage(\d)$/.exec(key);
+  if (crop) {
+    const ripe = Number(crop[2]) === (crop[1] === 'wheat' ? 7 : 3);
+    const seed = EXTRA_ID[crop[1] === 'wheat' ? 'wheat_seeds' : crop[1] === 'beetroots' ? 'beetroot_seeds' : crop[1] === 'carrots' ? 'carrot' : 'potato'];
+    if (crop[1] === 'carrots' || crop[1] === 'potatoes') return { id: seed, n: ripe ? 1 + Math.floor(rand() * 4) : 1 };
+    if (!ripe) return { id: seed, n: 1 };
+    return { id: EXTRA_ID[crop[1] === 'wheat' ? 'wheat' : 'beetroot'], n: 1 };
+  }
   // a dinnye szeleteket ad (3-7), nem egész blokkot
   if (key === 'melon') {
     const slice = EXTRA_ID['melon_slice'];
     if (slice !== undefined) return { id: slice, n: 3 + Math.floor(rand() * 5) };
   }
   return { id: base, n: 1 };
+}
+
+
+/** Érett búza és cékla: a mag is jár mellé (1-3 darab) */
+export function bonusDrop(id: number, rand: () => number = Math.random): { id: number; n: number } | null {
+  const crop = /^(wheat|beetroots)_stage(\d)$/.exec(blockKey(baseOf(id)));
+  if (!crop || Number(crop[2]) !== (crop[1] === 'wheat' ? 7 : 3)) return null;
+  const seed = EXTRA_ID[crop[1] === 'wheat' ? 'wheat_seeds' : 'beetroot_seeds'];
+  return seed === undefined ? null : { id: seed, n: 1 + Math.floor(rand() * 3) };
 }
