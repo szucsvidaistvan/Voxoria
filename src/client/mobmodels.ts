@@ -63,6 +63,23 @@ const legs4 = (tex: TexName, px: [number, number, number], uv: [number, number],
   ];
 };
 
+
+/**
+ * A pók egy lába két szakaszból: kifelé és enyhén felfelé, majd a térdtől lefelé a talajig.
+ * A második szakasz forgáspontját a számított térd adja, így a két rész összeér; a `fan` a láb előre/hátra legyezése.
+ */
+function spiderLeg(side: 1 | -1, z: number, fan: number, wag: number): TPart[] {
+  const y0 = 11, l1 = 8, l2 = 14, up = 0.3, down = 1.2;
+  const px0 = side * 4;
+  // a térd helye: a lefelé/felfelé dőlés (z körül), majd a legyezés (y körül)
+  const dx = side * l1 * Math.cos(up), dy = l1 * Math.sin(up);
+  const kx = px0 + dx * Math.cos(fan), kz = z - dx * Math.sin(fan), ky = y0 + dy;
+  return [
+    { tex: 'spider', px: [l1, 2, 2], uv: [18, 0], p: [px0 + side * l1 / 2, y0, z], pivot: [px0, y0, z], rz: side * up, ry: fan, wag },
+    { tex: 'spider', px: [l2, 2, 2], uv: [18, 0], p: [kx + side * l2 / 2, ky, kz], pivot: [kx, ky, kz], rz: -side * down, ry: fan, wag },
+  ];
+}
+
 export const TEXTURED: Partial<Record<string, TPart[]>> = {
   pig: [
     { tex: 'pig', px: [8, 8, 8], uv: [0, 0], p: [0, 12, -10] },
@@ -133,15 +150,12 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     ...legs4('wolf', [2, 8, 2], [0, 18], 2, 8, -4, 7),
     { tex: 'wolf', px: [2, 8, 2], uv: [9, 18], p: [0, 8.5, 9], pivot: [0, 12, 8], tilt: -0.8 },
   ],
-  // a pók: nyolc, szétterpesztett láb (a járás legyezi őket)
+  // a pók: lapos, hosszú potroh, szögletes fej, nyolc láb; a lábak kifelé és kicsit fel indulnak, majd a térdnél a földre lépnek
   spider: [
-    { tex: 'spider', px: [8, 8, 8], uv: [32, 4], p: [0, 11, -11] },
+    { tex: 'spider', px: [8, 8, 8], uv: [32, 4], p: [0, 10, -10] },
     { tex: 'spider', px: [6, 6, 6], uv: [0, 0], p: [0, 11, -3] },
-    { tex: 'spider', px: [10, 8, 12], uv: [0, 12], p: [0, 11, 9] },
-    ...[[2, 0.72, 0.2], [1, 0.6, 0.08], [0, 0.6, -0.08], [-1, 0.72, -0.2]].flatMap(([z, a, y], i): TPart[] => [
-      { tex: 'spider', px: [16, 2, 2], uv: [18, 0], p: [-12, 11, z + 2], pivot: [-4, 11, z + 2], rz: a, ry: -y * 2.2, wag: i % 2 ? 0.5 : -0.5 },
-      { tex: 'spider', px: [16, 2, 2], uv: [18, 0], p: [12, 11, z + 2], pivot: [4, 11, z + 2], rz: -a, ry: y * 2.2, wag: i % 2 ? -0.5 : 0.5 },
-    ]),
+    { tex: 'spider', px: [10, 8, 12], uv: [0, 12], p: [0, 12, 8] },
+    ...[[3, 0.55], [1, 0.2], [-1, -0.2], [-3, -0.55]].flatMap(([z, fan], i) => [-1, 1].flatMap((side) => spiderLeg(side as 1 | -1, z + 3, fan * side, (i % 2 ? 1 : -1) * side * 0.4))),
   ],
   // a jegesmedve (128x64)
   polarbear: [
@@ -155,15 +169,15 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'polarbear', px: [4, 10, 6], uv: [50, 0], p: [-4.5, 5, -8], pivot: [-4.5, 10, -8], swing: -1 },
     { tex: 'polarbear', px: [4, 10, 6], uv: [50, 0], p: [4.5, 5, -8], pivot: [4.5, 10, -8], swing: 1 },
   ],
-  // a ló (64x64): hosszú törzs, előre dőlő nyak sörénnyel, fej, négy láb, lelógó farok
+  // a ló (64x64): hosszú törzs, vastag, előre-felfelé dőlő nyak, lefelé hajló hosszú fej, két függőleges fül, rövid sörény
   horse: [
     { tex: 'horse', px: [10, 10, 24], uv: [0, 32], p: [0, 18, 0] },
-    { tex: 'horse', px: [4, 14, 8], uv: [0, 12], p: [0, 31, -9], pivot: [0, 24, -9], tilt: -0.5 },
-    { tex: 'horse', px: [2, 14, 4], uv: [56, 36], p: [0, 32, -5], pivot: [0, 24, -9], tilt: -0.5 },
-    { tex: 'horse', px: [6, 5, 7], uv: [0, 13], p: [0, 38, -19.5], pivot: [0, 38, -16], tilt: -0.5 },
-    { tex: 'horse', px: [4, 4, 4], uv: [0, 13], p: [0, 37.5, -25], pivot: [0, 38, -16], tilt: -0.5 },
-    { tex: 'horse', px: [2, 3, 1], uv: [2, 14], p: [-2, 42, -17], pivot: [0, 38, -16], tilt: -0.5 },
-    { tex: 'horse', px: [2, 3, 1], uv: [2, 14], p: [2, 42, -17], pivot: [0, 38, -16], tilt: -0.5 },
+    { tex: 'horse', px: [4, 16, 6], uv: [26, 36], p: [0, 29, -11], pivot: [0, 21, -11], tilt: -0.75 },
+    { tex: 'horse', px: [2, 14, 3], uv: [56, 36], p: [0, 30, -7], pivot: [0, 21, -11], tilt: -0.75 },
+    { tex: 'horse', px: [6, 5, 7], uv: [0, 13], p: [0, 33, -24.5], pivot: [0, 33, -22], tilt: -0.7 },
+    { tex: 'horse', px: [4, 4, 5], uv: [0, 13], p: [0, 32, -29.5], pivot: [0, 33, -22], tilt: -0.7 },
+    { tex: 'horse', px: [2, 4, 1], uv: [2, 14], p: [-2, 36.5, -23], pivot: [0, 33, -22], tilt: -0.7 },
+    { tex: 'horse', px: [2, 4, 1], uv: [2, 14], p: [2, 36.5, -23], pivot: [0, 33, -22], tilt: -0.7 },
     { tex: 'horse', px: [3, 4, 7], uv: [42, 36], p: [0, 20, 16], pivot: [0, 21, 12], tilt: 0.4 },
     ...legs4('horse', [4, 11, 4], [48, 21], 3, 14, -9, 9),
   ],
