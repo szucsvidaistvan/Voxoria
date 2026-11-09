@@ -157,17 +157,18 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'spider', px: [10, 8, 12], uv: [0, 12], p: [0, 12, 8] },
     ...[[3, 0.55], [1, 0.2], [-1, -0.2], [-3, -0.55]].flatMap(([z, fan], i) => [-1, 1].flatMap((side) => spiderLeg(side as 1 | -1, z + 3, fan * side, (i % 2 ? 1 : -1) * side * 0.4))),
   ],
-  // a jegesmedve (128x64)
+  // a jegesmedve (128x64): két tömb (alacsonyabb vállrész elöl, magasabb, keskenyebb hátsó rész), alacsonyan tartott fej
   polarbear: [
-    { tex: 'polarbear', px: [7, 7, 7], uv: [0, 0], p: [0, 13.5, -13] },
-    { tex: 'polarbear', px: [5, 3, 3], uv: [0, 44], p: [0, 11.5, -18] },
-    { tex: 'polarbear', px: [2, 2, 1], uv: [26, 0], p: [-3.5, 17, -14] },
-    { tex: 'polarbear', px: [2, 2, 1], uv: [26, 0], p: [3.5, 17, -14] },
-    { tex: 'polarbear', px: [14, 14, 11], uv: [0, 19], p: [0, 13.5, -2], rot: true },
-    { tex: 'polarbear', px: [4, 10, 4], uv: [50, 40], p: [-4.5, 5, 6], pivot: [-4.5, 10, 6], swing: 1 },
-    { tex: 'polarbear', px: [4, 10, 4], uv: [50, 40], p: [4.5, 5, 6], pivot: [4.5, 10, 6], swing: -1 },
-    { tex: 'polarbear', px: [4, 10, 6], uv: [50, 0], p: [-4.5, 5, -8], pivot: [-4.5, 10, -8], swing: -1 },
-    { tex: 'polarbear', px: [4, 10, 6], uv: [50, 0], p: [4.5, 5, -8], pivot: [4.5, 10, -8], swing: 1 },
+    { tex: 'polarbear', px: [7, 7, 7], uv: [0, 0], p: [0, 11.5, -13.5] },
+    { tex: 'polarbear', px: [5, 3, 3], uv: [0, 44], p: [0, 9.5, -18.5] },
+    { tex: 'polarbear', px: [2, 2, 1], uv: [26, 0], p: [-3.5, 15.5, -14] },
+    { tex: 'polarbear', px: [2, 2, 1], uv: [26, 0], p: [3.5, 15.5, -14] },
+    { tex: 'polarbear', px: [14, 14, 11], uv: [0, 19], p: [0, 13, -4], rot: true },
+    { tex: 'polarbear', px: [12, 12, 10], uv: [39, 0], p: [0, 15.5, 8], rot: true },
+    { tex: 'polarbear', px: [4, 10, 4], uv: [50, 40], p: [-4.5, 5, 9], pivot: [-4.5, 10, 9], swing: 1 },
+    { tex: 'polarbear', px: [4, 10, 4], uv: [50, 40], p: [4.5, 5, 9], pivot: [4.5, 10, 9], swing: -1 },
+    { tex: 'polarbear', px: [4, 10, 6], uv: [50, 0], p: [-4.5, 5, -7], pivot: [-4.5, 10, -7], swing: -1 },
+    { tex: 'polarbear', px: [4, 10, 6], uv: [50, 0], p: [4.5, 5, -7], pivot: [4.5, 10, -7], swing: 1 },
   ],
   // a ló (64x64): hosszú törzs, vastag, előre-felfelé dőlő nyak, lefelé hajló hosszú fej, két függőleges fül, rövid sörény
   horse: [
