@@ -596,19 +596,20 @@ body.touch #hud-face { width: 34px; height: 34px; }
 /* a számok jól olvasható, egyenlő szélességű betűvel (a pixelbetű 1/7/0 jegyei összetéveszthetők voltak) */
 .cnt, .bar span, #armor-num, .bd-ing-row b, .bd-head small, .br-text small .num, #book-detail .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -0.02em; }
 .cnt { font-size: 0.9rem; text-shadow: -1px 0 #000, 1px 0 #000, 0 -1px #000, 0 1px #000, 1px 1px 0 #000; }
-#book { display: none; gap: 0.9rem; width: min(54rem, 94vw); height: min(31rem, calc(100vh - 6rem)); }
-#bag.book #book { display: flex; }
-#bag.book .bag-panel { background: linear-gradient(180deg, #1f3566 0%, #16264a 100%); }
-#bag.book #craft-area, #bag.book #chest-grid, #bag.book #bag-main, #bag.book #bag-hot, #bag.book #bag-hint { display: none; }
+#book, #smelter { display: none; gap: 0.9rem; width: min(54rem, 94vw); height: min(31rem, calc(100vh - 6rem)); }
+#bag.book #book, #bag.smelter #smelter { display: flex; }
+#bag.book .bag-panel, #bag.smelter .bag-panel { background: linear-gradient(180deg, #1f3566 0%, #16264a 100%); }
+#bag.book #craft-area, #bag.book #chest-grid, #bag.book #bag-main, #bag.book #bag-hot, #bag.book #bag-hint,
+#bag.smelter #craft-area, #bag.smelter #chest-grid, #bag.smelter #bag-main, #bag.smelter #bag-hot, #bag.smelter #bag-hint { display: none; }
 #bag:not(.furnace) #craft-grid, #bag:not(.furnace) #craft-arrow, #bag:not(.furnace) #craft-out { display: none; }
 #bag.chest #bag-toggle, #bag.furnace #bag-toggle { display: none; }
-#book-left { flex: 1 1 56%; min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; }
-#book-search {
+#book-left, #sm-left { flex: 1 1 56%; min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+#book-search, #sm-search {
   padding: 0.55rem 0.8rem; font: inherit; font-size: 1rem; color: var(--chalk);
   background: var(--night-deep); border: 0; box-shadow: inset 0 0 0 2px var(--edge), inset 0 -3px 0 rgba(0,0,0,0.35);
 }
-#book-search:focus { outline: none; box-shadow: inset 0 0 0 2px var(--gold), inset 0 -3px 0 rgba(0,0,0,0.35); }
-#book-search::placeholder { color: var(--dim); }
+#book-search:focus, #sm-search:focus { outline: none; box-shadow: inset 0 0 0 2px var(--gold), inset 0 -3px 0 rgba(0,0,0,0.35); }
+#book-search::placeholder, #sm-search::placeholder { color: var(--dim); }
 #book-tabs { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 #book-tabs button {
   font: inherit; font-size: 0.85rem; padding: 0.3rem 0.7rem; cursor: pointer; color: var(--dim);
@@ -618,7 +619,7 @@ body.touch #hud-face { width: 34px; height: 34px; }
 #book-tabs button.on { color: #1b1500; background: var(--gold); box-shadow: inset 0 -3px 0 rgba(0,0,0,0.25); }
 .book-only { font-size: 0.85rem; display: flex; gap: 0.5rem; align-items: center; color: var(--dim); cursor: pointer; }
 .book-only input { accent-color: var(--gold); width: 1rem; height: 1rem; }
-#book-list {
+#book-list, #sm-list {
   flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding: 6px;
   background: var(--night-deep); box-shadow: inset 0 0 0 2px var(--edge);
   scrollbar-color: var(--edge) var(--night-deep); scrollbar-width: thin;
@@ -637,7 +638,7 @@ body.touch #hud-face { width: 34px; height: 34px; }
 .br-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
 .br-text b { font-weight: 600; font-size: 1rem; }
 .br-text small { color: var(--dim); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#book-detail {
+#book-detail, #sm-detail {
   flex: 1 1 44%; min-width: 0; display: flex; flex-direction: column; gap: 0.7rem; overflow-y: auto; padding: 0.8rem;
   background: var(--night-deep); box-shadow: inset 0 0 0 2px var(--edge);
 }
@@ -665,5 +666,17 @@ body.touch #hud-face { width: 34px; height: 34px; }
 .bd-craft:disabled { opacity: 0.45; cursor: not-allowed; }
 .bd-bar { height: 14px; background: #060b17; box-shadow: inset 0 0 0 2px var(--edge); padding: 2px; }
 .bd-bar > div { height: 100%; width: 0; background: repeating-linear-gradient(135deg, var(--gold) 0 8px, #e0b400 8px 16px); }
-#book-detail .hint { margin: 0; text-align: center; color: var(--dim); }
-@media (max-width: 700px) { #book { flex-direction: column; height: calc(100vh - 6rem); } #book-detail { flex: none; max-height: 48%; } }
+#book-detail .hint, #sm-detail .hint { margin: 0; text-align: center; color: var(--dim); }
+@media (max-width: 700px) { #book, #smelter { flex-direction: column; height: calc(100vh - 6rem); } #book-detail, #sm-detail { flex: none; max-height: 48%; } }
+
+.sm-sec { display: flex; flex-direction: column; gap: 0.35rem; }
+.sm-head .sm-arrow { font-size: 1.4rem; color: var(--gold); }
+.sm-head { border-bottom: 0 !important; padding-bottom: 0 !important; gap: 0.5rem; flex-wrap: wrap; }
+.sm-head h3 { font-size: 1rem; }
+.sm-line { margin: 0; font-size: 0.95rem; }
+.sm-small { padding: 0.25rem 0.6rem !important; font-size: 0.85rem !important; width: auto !important; background: var(--panel) !important; }
+.bd-ing-row .sm-small { margin-left: 0.2rem; }
+.sm-heat > div { background: repeating-linear-gradient(135deg, #ff9a3c 0 8px, #e8601c 8px 16px); }
+#sm-detail .bd-craft { margin-top: 0 !important; padding: 0.5rem !important; font-size: 1rem !important; }
+#sm-detail > *, .sm-sec > * { flex: none; }
+.sm-sec { gap: 0.3rem; }
