@@ -1,13 +1,14 @@
 import { BLOCKS, B, FLUID_LAVA, FLUID_WATER, LIGHT, blockId, dynamicBoxes, fluidKind, isOpaque, isSolid } from './blocks';
 import { EXTRA_ID, I } from './items';
 import { CH, type World } from './world';
+import { biomeAt } from './worldgen';
 
 /**
  * Mobok: logika, fizika és AI. Nem függ a rendereléstől (nincs benne three.js), így a szerver is használhatja.
  * A megjelenítés a client/mobview.ts-ben van.
  */
 
-export type MobKind = 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'skeleton';
+export type MobKind = 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'skeleton' | 'wolf' | 'polarbear' | 'horse' | 'spider';
 
 export interface MobDef {
   name: string;
@@ -19,6 +20,10 @@ export interface MobDef {
   /** a test félszélessége és magassága (ütközési doboz) */
   hw: number;
   h: number;
+  /** semleges: csak akkor támad, ha megsebezték */
+  neutral?: boolean;
+  /** egy ütés sebzése a játékosnak (fél szív); alapértelmezés 3 */
+  dmg?: number;
 }
 
 export const MOB_DEFS: Record<MobKind, MobDef> = {
@@ -28,9 +33,18 @@ export const MOB_DEFS: Record<MobKind, MobDef> = {
   chicken: { name: 'Chicken', hostile: false, hp: 4, speed: 1.4, hw: 0.2, h: 0.7 },
   zombie: { name: 'Zombie', hostile: true, hp: 20, speed: 2.6, hw: 0.3, h: 1.95 },
   skeleton: { name: 'Skeleton', hostile: true, hp: 20, speed: 2.2, hw: 0.3, h: 1.95 },
+  wolf: { name: 'Wolf', hostile: false, neutral: true, hp: 16, speed: 2.4, hw: 0.3, h: 0.85, dmg: 3 },
+  polarbear: { name: 'Polar Bear', hostile: false, neutral: true, hp: 30, speed: 2.2, hw: 0.65, h: 1.4, dmg: 6 },
+  horse: { name: 'Horse', hostile: false, hp: 24, speed: 2.2, hw: 0.65, h: 1.6 },
+  spider: { name: 'Spider', hostile: true, hp: 16, speed: 3, hw: 0.6, h: 0.9, dmg: 2 },
 };
 
 export const PASSIVE_KINDS: MobKind[] = ['pig', 'cow', 'sheep', 'chicken'];
+
+/** Biomonként melyik semleges/háziállat jelenhet meg a fenti alap-négy mellett (valószínűséggel) */
+const BIOME_FAUNA: Partial<Record<string, MobKind[]>> = {
+  plains: ['horse'], savanna: ['horse'], forest: ['wolf'], dark_forest: ['wolf'], taiga: ['wolf', 'polarbear'], mountains: ['polarbear'],
+};
 
 /** Mit ejt a mob, ha meghal (véletlen darabszámmal). A gyapjú azonosítója a blokkok regisztrálása után ismert. */
 export function mobDrops(kind: MobKind, rand: () => number = Math.random): { id: number; n: number }[] {
@@ -43,6 +57,9 @@ export function mobDrops(kind: MobKind, rand: () => number = Math.random): { id:
     case 'chicken': add(I.RAW_CHICKEN, 1); add(EXTRA_ID.feather, r(0, 2)); add(EXTRA_ID.egg, r(0, 1)); break;
     case 'sheep': add(blockId('white_wool'), 1); add(I.RAW_MUTTON, r(1, 2)); break;
     case 'zombie': add(I.ROTTEN_FLESH, r(0, 2)); break;
+    case 'spider': add(EXTRA_ID.string, r(0, 2)); break;
+    case 'horse': add(EXTRA_ID.leather, r(0, 2)); break;
+    case 'polarbear': add(EXTRA_ID.cod, r(0, 2)); break;
     case 'skeleton': add(EXTRA_ID.bone, r(0, 2)); add(I.GUNPOWDER, r(0, 2)); add(EXTRA_ID.string, r(0, 1)); break;
   }
   return out;
@@ -101,6 +118,8 @@ export class Mob {
   atkCd = 0;
   burnT = 0;
   expT = 0;
+  /** megsebezték: a semleges mob mostantól üldöz és támad */
+  angry = false;
   /** a csontváz célzása: 0: nem céloz, különben eltelt másodperc a lövésig */
   aim = 0;
 
@@ -121,7 +140,8 @@ export class Mob {
     this.vx = ((this.x - fx) / d) * 5;
     this.vz = ((this.z - fz) / d) * 5;
     if (this.onGround) this.vy = 5;
-    if (!this.def.hostile) {
+    if (this.def.neutral) this.angry = true;
+    else if (!this.def.hostile) {
       this.panicT = 4;
       this.panicYaw = Math.atan2(-(this.x - fx), -(this.z - fz)); // a sebzőtől elfelé
     }
@@ -235,7 +255,8 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
   const dx = ctx.px - m.x, dz = ctx.pz - m.z, dy = ctx.py - m.y;
   const dist = Math.hypot(dx, dz);
 
-  if (def.hostile && ctx.target && dist < 24 && Math.abs(dy) < 12) {
+  const aggressive = m.angry || (def.hostile && !(m.kind === 'spider' && ctx.day));
+  if (aggressive && ctx.target && dist < 24 && Math.abs(dy) < 12) {
     // üldözés
     lookAt(m, ctx.px, ctx.pz);
     if (m.kind === 'skeleton') {
@@ -257,7 +278,7 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
       speed = dist > 0.9 ? def.speed : 0;
       if (dist < 1.4 && Math.abs(dy) < 1.8 && priv.atkCd <= 0) {
         priv.atkCd = 1;
-        ctx.hurtPlayer(3, m.x, m.z);
+        ctx.hurtPlayer(def.dmg ?? 3, m.x, m.z);
       }
     }
   } else {
@@ -281,7 +302,7 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
   if (speed > 0) {
     const [fx, fz] = forward(m.yaw);
     // ne sétáljon le egy mély szakadékba a kóborló állat (csak üldözés/menekülés közben engedjük)
-    const free = def.hostile || priv.panicT > 0 || !dropAhead(world, m, fx, fz);
+    const free = aggressive || priv.panicT > 0 || !dropAhead(world, m, fx, fz);
     priv.wx = free ? fx * speed : 0;
     priv.wz = free ? fz * speed : 0;
     if (!free) { priv.wanderT = 0; }
@@ -401,8 +422,11 @@ export class MobManager {
     this.spawnT = passiveN < MOB_CAP_PASSIVE / 2 ? 0.4 : 2.5;
 
     if (passiveN < MOB_CAP_PASSIVE) this.trySpawn(px, pz, PASSIVE_KINDS[Math.floor(Math.random() * PASSIVE_KINDS.length)], 20, 44, 'surface');
+    // a biomhoz illő állatok (ló, farkas, jegesmedve): ritkábban, a játékostól távolabb
+    if (passiveN < MOB_CAP_PASSIVE && Math.random() < 0.3) this.trySpawn(px, pz, 'fauna', 24, 48, 'surface');
     if (hostileAllowed && this.count(true) < MOB_CAP_HOSTILE) {
-      const kind: MobKind = Math.random() < 0.6 ? 'zombie' : 'skeleton';
+      const roll = Math.random();
+      const kind: MobKind = roll < 0.45 ? 'zombie' : roll < 0.75 ? 'skeleton' : 'spider';
       if (night) this.trySpawn(px, pz, kind, 18, 40, 'surface');
       else if (Math.random() < 0.35) this.trySpawn(px, pz, kind, 14, 30, 'cave'); // barlangokban nappal is
     }
@@ -430,7 +454,7 @@ export class MobManager {
   }
 
   /** Egy csoport (passzív: 1–3) leszállítása a játékostól minRange..maxRange távolságra */
-  private trySpawn(px: number, pz: number, kind: MobKind, minR: number, maxR: number, where: 'surface' | 'cave'): void {
+  private trySpawn(px: number, pz: number, want: MobKind | 'fauna', minR: number, maxR: number, where: 'surface' | 'cave'): void {
     const w = this.world;
     const a = Math.random() * Math.PI * 2, r = minR + Math.random() * (maxR - minR);
     const x = Math.floor(px + Math.cos(a) * r), z = Math.floor(pz + Math.sin(a) * r);
@@ -442,6 +466,13 @@ export class MobManager {
       if (top < 14) return;
       y = 4 + Math.floor(Math.random() * (top - 8));
     }
+    let kind: MobKind;
+    if (want === 'fauna') {
+      const list = BIOME_FAUNA[biomeAt(w.seed, x, z, w.heightAt(x, z))];
+      if (!list) return;
+      kind = list[Math.floor(Math.random() * list.length)];
+      if (kind === 'polarbear' && Math.random() < 0.6) return; // ritka
+    } else kind = want;
     const below = w.getBlock(x, y - 1, z);
     if (!(isSolid(below) && fluidKind(below) === 0 && w.getBlock(x, y, z) === 0 && w.getBlock(x, y + 1, z) === 0)) return;
     // barlangban csak fedett helyre (legalább néhány blokk kő van fölötte)
@@ -449,7 +480,7 @@ export class MobManager {
     // szörny csak sötétben: fedett barlangban (fa lombja alatt nem), vagy éjjel a szabadban, és nem fáklya mellett
     if (MOB_DEFS[kind].hostile && !this.dark(x, y, z, where === 'cave')) return;
     // állatok csak füvön; a felszíni szörnyek bárhol, ahol szilárd a talaj
-    if (!MOB_DEFS[kind].hostile && below !== B.GRASS) return;
+    if (!MOB_DEFS[kind].hostile && below !== B.GRASS && !(kind === 'polarbear' && fluidKind(below) === 0)) return;
     const n = MOB_DEFS[kind].hostile ? 1 : 1 + Math.floor(Math.random() * 3);
     for (let i = 0; i < n; i++) {
       const sx = x + 0.5 + (Math.random() - 0.5) * 3, sz = z + 0.5 + (Math.random() - 0.5) * 3;
