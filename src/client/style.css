@@ -7,7 +7,9 @@
   --gold: #ffcf01;
   --chalk: #e9eefb;
   --dim: #9fb0d6;
-  --font: 'Pixelify Sans', ui-monospace, 'Courier New', monospace;
+  --font-digits: 'JetBrains Mono', ui-monospace, 'Courier New', monospace;
+  /* a számjegyek mindig a jól olvasható betűből jönnek (hiányzó jegynél a böngésző a következő betűre vált) */
+  --font: 'JetBrains Mono', 'Pixelify Sans', ui-monospace, 'Courier New', monospace;
 }
 
 * { box-sizing: border-box; }
@@ -590,10 +592,10 @@ body.touch #hud-face { width: 34px; height: 34px; }
 }
 
 /* receptkönyv (barkácslista) */
-:root { --font-num: 'JetBrains Mono', ui-monospace, 'Courier New', monospace; --ok: #6fd36f; --bad: #ff7366; }
+:root { --font-num: var(--font-digits); --ok: #6fd36f; --bad: #ff7366; }
 /* a számok jól olvasható, egyenlő szélességű betűvel (a pixelbetű 1/7/0 jegyei összetéveszthetők voltak) */
 .cnt, .bar span, #armor-num, .bd-ing-row b, .bd-head small, .br-text small .num, #book-detail .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -0.02em; }
-.cnt { font-size: 0.8rem; }
+.cnt { font-size: 0.9rem; text-shadow: -1px 0 #000, 1px 0 #000, 0 -1px #000, 0 1px #000, 1px 1px 0 #000; }
 #book, #smelter { display: none; gap: 0.9rem; width: min(54rem, 94vw); height: min(31rem, calc(100vh - 6rem)); }
 #bag.book #book, #bag.smelter #smelter { display: flex; }
 #bag.book .bag-panel, #bag.smelter .bag-panel { background: linear-gradient(180deg, #1f3566 0%, #16264a 100%); }

@@ -502,6 +502,12 @@ blocks.sort((a, b) => a.name.localeCompare(b.name));
   if (zip.has(`${A}textures/${CHEST_TEX}.png`) && !blocks.some((b) => b.name === 'chest')) blocks.push(chestBlock(CHEST_TEX));
 }
 
+// növények (búza, murok, krumpli, cékla fázisai) és a nedves szántóföld
+{
+  const { cropBlocks } = await import('./crop-models.mjs');
+  blocks.push(...cropBlocks(blocks, (t) => zip.has(`${A}textures/${t}.png`)));
+}
+
 // a használt textúrák
 const used = new Set();
 for (const b of blocks) {

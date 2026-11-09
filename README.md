@@ -77,6 +77,14 @@ Az **Új világ (túlélő)** és az **Új világ (kreatív)** gomb közül vál
 - **Kreatív:** végtelen blokk, nincs sebzés, a bontás egy kattintás. Az **E** a kereshető blokk- és tárgyválasztót nyitja: fülekre bontva (Building Blocks, Natural Blocks, Stairs, Slabs & Walls, Doors, Fences & Ladders, Plants, Decoration, Functional, Fluids & Fire, Tools, Materials & Food), az „All” fülön csoportcímekkel. Itt minden blokk és minden tárgy (eszközök, vödör, kova és acél, alma ...) elérhető.
 - **Túlélő:** üres kézzel indulsz. A bontás a blokk keménységétől és a kezedben lévő szerszámtól függ (tartsd nyomva), közben repedések jelennek meg a blokkon, a bontáskor törmelék repül szét, a blokk pedig a földre esik. Ha a közelébe érsz, a játékos felveszi (ha tele a tároló, a földön marad). Életerő (10 szív), esési sebzés, fulladás (buborékok), égés és láva sebzés, természetes gyógyulás. Halál után újraélesztés a kiinduló helyen, a tárgyaid megmaradnak.
 
+### Földművelés
+
+- **Szántás:** ásóval (bármilyen ásó) jobb klikk a fűre, földre, ösvényre vagy durva földre: szántóföld lesz (az ásó kopik).
+- **Vetés:** búzamag, murok, krumpli vagy cékla magja jobb klikkel a szántóföldre. A búza 8, a többi 4 fázisban nő (a fázis a blokk neve: `wheat_stage0..7`, `carrots_stage0..3`, `potatoes_stage0..3`, `beetroots_stage0..3`).
+- **Növekedés:** a játékos körüli betöltött chunkokban (3 chunk) véletlenszerűen, mint a véletlen tick. A víz 4 blokkon belül nedvesíti a szántóföldet (`farmland_moist`, kb. kétszer gyorsabb növekedés). Kiszáradt, vetetlen szántóföld visszaváltozik földdé. Szántóföld nélkül a növény eltűnik.
+- **Aratás:** bontásra. Érett búza: búza + 1-3 mag; érett cékla: cékla + 1-3 mag; murok/krumpli: 1-4 darab; éretlenül csak a mag vagy 1 darab.
+- A dinnye- és tökmag vetése még nincs meg.
+
 ### Inventory és barkácsolás
 
 Az **E** (telefonon a **Tárgyak** gomb) 36 helyes tárolót nyit (alul a 9 helyes hotbar) és a páncél helyeit. Barkácsolni a **receptkönyvvel** lehet: **C** billentyű, a táskában a **Recipes** gomb, vagy a munkapadra jobb klikk. Nincs rács: minden recept látszik (kategóriák, keresés, „csak amit el tudok készíteni" szűrő), és ha nálad vannak az összetevők, a **Craft** gomb 1–4 másodperc alatt elkészíti (×1/×5/×10/Max darab, megszakítható, ilyenkor az összetevők visszakerülnek). A címkés összetevőknél (pl. bármilyen deszka) azt használja, ami nálad van. Egérrel: kattintás felvesz / lerak, jobb gomb a felét veszi fel vagy egyet rak le, Shift+kattintás gyorsmozgatás. **Szétosztás** (barkácsoláshoz): tele kézzel nyomva tartva és végighúzva több helyen a stack egyenlően szétoszlik a helyek között (jobb gombbal húzva helyenként egy darab). Telefonon: koppintás felvesz / lerak, hosszan nyomva a stack fele (vagy egy darab), üres kézzel húzva a stack a másik helyre kerül, tele kézzel húzva szétosztás (nincs külön Half gomb); a sötét háttérre koppintva a panel bezárul. A tűzhely rácsa változatlan.
@@ -123,7 +131,8 @@ A világ állapota és a megjelenítés külön van választva. Ez teszi lehető
 - [x] Összekapcsolódó kerítések, falak és üvegtáblák; ajtók, kemence (olvasztás), láda
 - [x] Biomok (11 fajta), eső blokkok (homok, kavics, betonpor), minden blokk és tárgy megszerezhető túlélőben
 - [x] Receptkönyv (lista alapú barkácsolás, idő alatt készül)
-- [ ] Ágyak, földművelés, horgászat, több mob (nyúl, pók, hal, farkas)
+- [x] Új mobok: farkas, jegesmedve, ló, pók
+- [ ] Ágyak, horgászat, több mob (nyúl, hal, creeper-szerű szörny), szelídítés és lovaglás
 - [x] Éhség, szörnyek, szerszám-kopás
 - [ ] Mentés IndexedDB-be (nagy világokhoz)
 - [ ] Szerver (Node.js + WebSocket), közös világ

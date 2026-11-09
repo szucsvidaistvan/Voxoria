@@ -20,7 +20,7 @@ interface View {
   root: THREE.Group;
   /** a lény anyagai (a textúrázottak textúránként egy; a színes részeké `plain`); mind kapja a napszak-színezést */
   mats: THREE.MeshBasicMaterial[];
-  limbs: { g: THREE.Group; swing: number; tilt: number; flap: number; aim: number }[];
+  limbs: { g: THREE.Group; swing: number; tilt: number; flap: number; aim: number; rz: number; ry: number; wag: number }[];
   /** az íj (a csontváz kezében): a mob célzás-állapotához */
   bow?: THREE.Mesh;
   /** egy rész hozzáadása a modellhez; visszaadja az eltávolítóját */
@@ -85,16 +85,19 @@ function buildView(kind: string, scene: THREE.Scene, base: string): View {
       return m;
     };
     /** a rész a (pivot) csomóponton lóg, a doboz a közepénél van */
-    const attach = (mesh: THREE.Mesh, p: V3, pivot: V3 | undefined, tilt: number | undefined, swing: number | undefined, flap: number | undefined, aim?: number): THREE.Group | undefined => {
+    const attach = (mesh: THREE.Mesh, p: V3, pivot: V3 | undefined, tilt: number | undefined, swing: number | undefined, flap: number | undefined, aim?: number, st?: { rz?: number; ry?: number; wag?: number }): THREE.Group | undefined => {
       mesh.frustumCulled = false;
-      if (pivot || tilt) {
+      if (pivot || tilt || st?.rz || st?.ry) {
         const pv = pivot ?? p;
         const g = new THREE.Group();
         g.position.set(...pv);
         mesh.position.set(p[0] - pv[0], p[1] - pv[1], p[2] - pv[2]);
         g.add(mesh);
         root.add(g);
-        if (swing !== undefined || flap !== undefined || tilt) limbs.push({ g, swing: swing ?? 0, tilt: tilt ?? 0, flap: flap ?? 0, aim: aim ?? tilt ?? 0 });
+        const rz = st?.rz ?? 0, ry = st?.ry ?? 0;
+        g.rotation.z = rz;
+        g.rotation.y = ry;
+        if (swing !== undefined || flap !== undefined || tilt || rz || ry) limbs.push({ g, swing: swing ?? 0, tilt: tilt ?? 0, flap: flap ?? 0, aim: aim ?? tilt ?? 0, rz, ry, wag: st?.wag ?? 0 });
         return g;
       }
       mesh.position.set(...p);
@@ -105,7 +108,7 @@ function buildView(kind: string, scene: THREE.Scene, base: string): View {
     const k = 1 / 16;
     for (const part of TEXTURED[kind] ?? []) {
       const mesh = new THREE.Mesh(texturedGeo(part), material(part.tex));
-      const g = attach(mesh, part.p.map((x) => x * k) as V3, part.pivot?.map((x) => x * k) as V3 | undefined, part.tilt, part.swing, part.flap, part.aim);
+      const g = attach(mesh, part.p.map((x) => x * k) as V3, part.pivot?.map((x) => x * k) as V3 | undefined, part.tilt, part.swing, part.flap, part.aim, part);
       // a csontváz jobb keze (az egyetlen 1.55-ös célzó kar) tartja az íjat
       if (kind === 'skeleton' && g && part.aim === 1.55) {
         const geo = new THREE.PlaneGeometry(0.8, 0.8);
@@ -159,6 +162,7 @@ function makeArrow(): THREE.Group {
 
 export function createMobView(scene: THREE.Scene, base: string = import.meta.env.BASE_URL) {
   const views = new Map<number, View>();
+  const baseUrl = base;
   const build = (kind: MobKind): View => buildView(kind, scene, base);
   const arrowViews = new Map<number, THREE.Group>();
   const FWD = new THREE.Vector3(0, 0, -1);
@@ -175,6 +179,7 @@ export function createMobView(scene: THREE.Scene, base: string = import.meta.env
         alive.add(m.id);
         let v = views.get(m.id);
         if (!v) { v = build(m.kind); views.set(m.id, v); }
+        if (m.kind === 'wolf') v.mats[0].map = skin(baseUrl, m.angry ? 'wolf_angry' : 'wolf');
         v.root.position.set(m.x, m.y, m.z);
         v.root.rotation.y = m.yaw;
 
@@ -184,6 +189,7 @@ export function createMobView(scene: THREE.Scene, base: string = import.meta.env
         for (const l of v.limbs) {
           l.g.rotation.x = (m.aim > 0 ? l.aim : l.tilt) + (m.aim > 0 ? 0 : sw * l.swing);
           if (l.flap) l.g.rotation.z = l.flap * (m.onGround ? 0.1 : 0.9 + Math.sin(time * 30) * 0.5);
+          if (l.wag) l.g.rotation.y = l.ry + sw * l.wag;
         }
 
         // halál: oldalra dől; 
