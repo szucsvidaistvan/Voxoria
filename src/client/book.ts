@@ -147,11 +147,15 @@ export class BookUI {
     const h = document.createElement('h3');
     h.textContent = e.name + (e.out.n > 1 ? ` ×${e.out.n}` : '');
     const s = document.createElement('small');
-    s.textContent = `${e.seconds.toFixed(1)} s each`;
+    s.textContent = `Takes ${e.seconds.toFixed(1)} s`;
     t.append(h, s);
     head.append(icon.el, t);
     d.appendChild(head);
 
+    const lab = document.createElement('p');
+    lab.className = 'bd-label';
+    lab.textContent = 'Ingredients';
+    d.appendChild(lab);
     const ing = document.createElement('div');
     ing.className = 'bd-ing';
     for (const [id, n] of v.need) {
@@ -217,6 +221,7 @@ export class BookUI {
   private updateProgress(): void {
     if (!this.btn) return;
     const j = this.job;
+    this.btn.classList.toggle('cancel', j.active);
     this.btn.textContent = j.active ? `Cancel (${j.left} left)` : `Craft${this.qty > 1 ? ` ×${this.qty}` : ''}`;
     this.bar.style.width = `${j.active ? Math.round(j.progress * 100) : 0}%`;
     this.status.textContent = j.active ? 'Crafting…' : j.message;

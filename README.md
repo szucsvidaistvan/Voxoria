@@ -120,7 +120,10 @@ A világ állapota és a megjelenítés külön van választva. Ez teszi lehető
 - [x] Nem kocka alakú blokkok (lépcső, lap, növény, fáklya, kerítés oszlop, üvegtábla)
 - [x] Folyadékok (víz, láva), tűz, obszidián és kavics a láva és a víz találkozásából
 - [x] Inventory, életerő, túlélő és kreatív mód, barkácsolás, szerszámok, vödör
-- [ ] Összekapcsolódó kerítések, falak és üvegtáblák; ajtók, ágyak, kemence (olvasztás), láda
+- [x] Összekapcsolódó kerítések, falak és üvegtáblák; ajtók, kemence (olvasztás), láda
+- [x] Biomok (11 fajta), eső blokkok (homok, kavics, betonpor), minden blokk és tárgy megszerezhető túlélőben
+- [x] Receptkönyv (lista alapú barkácsolás, idő alatt készül)
+- [ ] Ágyak, földművelés, horgászat, több mob (nyúl, pók, hal, farkas)
 - [x] Éhség, szörnyek, szerszám-kopás
 - [ ] Mentés IndexedDB-be (nagy világokhoz)
 - [ ] Szerver (Node.js + WebSocket), közös világ
