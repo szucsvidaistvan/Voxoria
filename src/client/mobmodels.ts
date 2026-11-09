@@ -5,7 +5,7 @@ import { boxGeom, type BoxGeom } from './boxuv';
  * A koordináták pixelben: y felfelé a láb alatti talajtól, az előre a −z, a doboz a közepével van megadva.
  */
 export type ArmorTex = `armor_${'leather' | 'iron' | 'golden' | 'diamond'}_${1 | 2}`;
-export type TexName = 'pig' | 'cow' | 'sheep' | 'sheep_fur' | 'chicken' | 'player' | 'skeleton' | 'zombie' | ArmorTex;
+export type TexName = 'pig' | 'cow' | 'sheep' | 'sheep_fur' | 'chicken' | 'player' | 'skeleton' | 'zombie' | 'wolf' | 'wolf_angry' | 'spider' | 'polarbear' | 'horse' | ArmorTex;
 
 export interface TPart {
   tex: TexName;
@@ -24,6 +24,11 @@ export interface TPart {
   swing?: number;
   tilt?: number;
   flap?: number;
+  /** állandó elforgatás a forgáspont körül (z: lefelé dőlés, y: legyezés), pl. a pók lábai */
+  rz?: number;
+  ry?: number;
+  /** a járás ezzel legyezi a részt (y körül) */
+  wag?: number;
   /** célzáskor ez a dőlés az x tengely körül (a csontváz íjat tartó karja) */
   aim?: number;
 }
@@ -31,6 +36,7 @@ export interface TPart {
 /** A textúrák mérete pixelben */
 export const TEX_SIZE = {
   pig: [64, 32], cow: [64, 32], sheep: [64, 32], sheep_fur: [64, 32], chicken: [64, 32], player: [64, 64], skeleton: [64, 32], zombie: [64, 64],
+  wolf: [64, 32], wolf_angry: [64, 32], spider: [64, 32], polarbear: [128, 64], horse: [64, 64],
 } as Record<TexName, [number, number]>;
 for (const m of ['leather', 'iron', 'golden', 'diamond']) for (const l of [1, 2]) TEX_SIZE[`armor_${m}_${l}` as ArmorTex] = [64, 32];
 
@@ -114,6 +120,52 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'zombie', px: [4, 12, 4], uv: [40, 16], p: [6, 18, 0], pivot: [6, 24, 0], tilt: 1.45, swing: -0.12 },
     { tex: 'zombie', px: [4, 12, 4], uv: [0, 16], p: [-2, 6, 0], pivot: [-2, 12, 0], swing: 1 },
     { tex: 'zombie', px: [4, 12, 4], uv: [0, 16], p: [2, 6, 0], pivot: [2, 12, 0], swing: -1 },
+  ],
+
+  // a farkas (a csomag skinje; a test és a sörény fekvő doboz)
+  wolf: [
+    { tex: 'wolf', px: [6, 6, 4], uv: [0, 0], p: [0, 10.5, -7] },
+    { tex: 'wolf', px: [3, 3, 4], uv: [0, 10], p: [0, 9, -10] },
+    { tex: 'wolf', px: [2, 2, 1], uv: [16, 14], p: [-2, 14.5, -6.5] },
+    { tex: 'wolf', px: [2, 2, 1], uv: [16, 14], p: [2, 14.5, -6.5] },
+    { tex: 'wolf', px: [6, 9, 6], uv: [18, 14], p: [0, 10, 4.5], rot: true },
+    { tex: 'wolf', px: [8, 6, 7], uv: [21, 0], p: [0, 10.5, -3], rot: true },
+    ...legs4('wolf', [2, 8, 2], [0, 18], 2, 8, -4, 7),
+    { tex: 'wolf', px: [2, 8, 2], uv: [9, 18], p: [0, 8.5, 9], pivot: [0, 12, 8], tilt: -0.8 },
+  ],
+  // a pók: nyolc, szétterpesztett láb (a járás legyezi őket)
+  spider: [
+    { tex: 'spider', px: [8, 8, 8], uv: [32, 4], p: [0, 11, -11] },
+    { tex: 'spider', px: [6, 6, 6], uv: [0, 0], p: [0, 11, -3] },
+    { tex: 'spider', px: [10, 8, 12], uv: [0, 12], p: [0, 11, 9] },
+    ...[[2, 0.72, 0.2], [1, 0.6, 0.08], [0, 0.6, -0.08], [-1, 0.72, -0.2]].flatMap(([z, a, y], i): TPart[] => [
+      { tex: 'spider', px: [16, 2, 2], uv: [18, 0], p: [-12, 11, z + 2], pivot: [-4, 11, z + 2], rz: a, ry: -y * 2.2, wag: i % 2 ? 0.5 : -0.5 },
+      { tex: 'spider', px: [16, 2, 2], uv: [18, 0], p: [12, 11, z + 2], pivot: [4, 11, z + 2], rz: -a, ry: y * 2.2, wag: i % 2 ? -0.5 : 0.5 },
+    ]),
+  ],
+  // a jegesmedve (128x64)
+  polarbear: [
+    { tex: 'polarbear', px: [7, 7, 7], uv: [0, 0], p: [0, 13.5, -13] },
+    { tex: 'polarbear', px: [5, 3, 3], uv: [0, 44], p: [0, 11.5, -18] },
+    { tex: 'polarbear', px: [2, 2, 1], uv: [26, 0], p: [-3.5, 17, -14] },
+    { tex: 'polarbear', px: [2, 2, 1], uv: [26, 0], p: [3.5, 17, -14] },
+    { tex: 'polarbear', px: [14, 14, 11], uv: [0, 19], p: [0, 13.5, -2], rot: true },
+    { tex: 'polarbear', px: [4, 10, 4], uv: [50, 40], p: [-4.5, 5, 6], pivot: [-4.5, 10, 6], swing: 1 },
+    { tex: 'polarbear', px: [4, 10, 4], uv: [50, 40], p: [4.5, 5, 6], pivot: [4.5, 10, 6], swing: -1 },
+    { tex: 'polarbear', px: [4, 10, 6], uv: [50, 0], p: [-4.5, 5, -8], pivot: [-4.5, 10, -8], swing: -1 },
+    { tex: 'polarbear', px: [4, 10, 6], uv: [50, 0], p: [4.5, 5, -8], pivot: [4.5, 10, -8], swing: 1 },
+  ],
+  // a ló (64x64): hosszú törzs, előre dőlő nyak sörénnyel, fej, négy láb, lelógó farok
+  horse: [
+    { tex: 'horse', px: [10, 10, 24], uv: [0, 32], p: [0, 18, 0] },
+    { tex: 'horse', px: [4, 14, 8], uv: [0, 12], p: [0, 31, -9], pivot: [0, 24, -9], tilt: -0.5 },
+    { tex: 'horse', px: [2, 14, 4], uv: [56, 36], p: [0, 32, -5], pivot: [0, 24, -9], tilt: -0.5 },
+    { tex: 'horse', px: [6, 5, 7], uv: [0, 13], p: [0, 38, -19.5], pivot: [0, 38, -16], tilt: -0.5 },
+    { tex: 'horse', px: [4, 4, 4], uv: [0, 13], p: [0, 37.5, -25], pivot: [0, 38, -16], tilt: -0.5 },
+    { tex: 'horse', px: [2, 3, 1], uv: [2, 14], p: [-2, 42, -17], pivot: [0, 38, -16], tilt: -0.5 },
+    { tex: 'horse', px: [2, 3, 1], uv: [2, 14], p: [2, 42, -17], pivot: [0, 38, -16], tilt: -0.5 },
+    { tex: 'horse', px: [3, 4, 7], uv: [42, 36], p: [0, 20, 16], pivot: [0, 21, 12], tilt: 0.4 },
+    ...legs4('horse', [4, 11, 4], [48, 21], 3, 14, -9, 9),
   ],
   chicken: [
     { tex: 'chicken', px: [4, 6, 3], uv: [0, 0], p: [0, 12, -4.5] },
