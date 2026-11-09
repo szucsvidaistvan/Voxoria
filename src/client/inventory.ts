@@ -4,6 +4,7 @@ import { matchRecipe, type Stack } from '../shared/recipes';
 import { SMELT_SECONDS, type Furnace } from '../shared/smelting';
 import { CHEST_SLOTS, type Chest } from '../shared/chest';
 import { BookUI } from './book';
+import { SmelterUI } from './smelter';
 
 export const HOTBAR_SIZE = 9;
 export const TOTAL_SLOTS = 36;
@@ -180,6 +181,7 @@ export class BagUI {
   private chestViews: SlotView[] = [];
   /** receptkönyv (barkácslista) */
   private book: BookUI;
+  private smelter: SmelterUI;
   private bookMode = false;
 
   /** a tartalom változott (a HUD hotbarját frissíteni kell) */
@@ -187,6 +189,7 @@ export class BagUI {
   onClose: () => void = () => {};
 
   constructor(private inv: Inventory, private paint: Painter) {
+    this.smelter = new SmelterUI(inv, paint, () => { this.render(); this.onChange(); });
     this.book = new BookUI(inv, paint, () => { this.render(); this.onChange(); });
     document.getElementById('bag-toggle')!.addEventListener('click', () => this.toggleBook());
     this.outView = new SlotView(paint, 'islot out');
@@ -404,6 +407,8 @@ export class BagUI {
     this.craft = this.furnace ? this.furnace.slots : new Array(cells).fill(null);
     this.craftEl.style.setProperty('--n', this.furnace ? '1' : String(size));
     this.root.classList.toggle('furnace', !!this.furnace);
+    this.root.classList.toggle('smelter', !!this.furnace);
+    if (this.furnace) this.smelter.show(this.furnace);
     this.craftEl.replaceChildren();
     this.craftViews = [];
     for (let i = 0; i < cells; i++) {
@@ -412,7 +417,7 @@ export class BagUI {
       this.craftEl.appendChild(v.el);
       this.craftViews.push(v);
     }
-    this.titleEl.textContent = this.chest ? 'Chest' : this.furnace ? 'Furnace' : this.bookMode ? 'Crafting' : 'Inventory';
+    this.titleEl.textContent = this.chest ? 'Chest' : this.furnace ? 'Smelter' : this.bookMode ? 'Crafting' : 'Inventory';
     this.cursor = null;
     this.root.hidden = false;
     this.render();
@@ -439,7 +444,8 @@ export class BagUI {
     this.craft = [];
     this.furnace = null;
     this.chest = null;
-    this.root.classList.remove('furnace', 'chest', 'book');
+    this.root.classList.remove('furnace', 'smelter', 'chest', 'book');
+    this.smelter.hide();
     this.bookMode = false;
     for (const s of back) if (s) this.inv.add(s.id, s.n, s.d); // ami nem fér el, elvész
     this.root.hidden = true;
@@ -470,7 +476,7 @@ export class BagUI {
   /** Minden képkockán hívjuk, amíg a tűzhely nyitva van: a haladás és a kimenet frissül */
   tick(dt = 0): void {
     if (this.bookMode && this.isOpen) this.book.tick(dt);
-    if (this.furnace && this.isOpen) this.render();
+    if (this.furnace && this.isOpen) { this.smelter.tick(); this.render(); }
   }
 
   /** Újrarajzolás (pl. elem textúra betöltése után) */
@@ -478,6 +484,7 @@ export class BagUI {
     [...this.invViews, ...this.chestViews, ...this.craftViews, ...this.armorViews, this.outView, this.cursorView].forEach((v) => v.invalidate());
     if (this.isOpen) this.render();
     if (this.bookMode) this.book.invalidate();
+    if (this.furnace) this.smelter.invalidate();
   }
 
   /** a tároló-nézetek sorrendje a képernyőn: hátizsák (9..35), alatta a hotbar (0..8) */

@@ -72,17 +72,29 @@ function blockIds(): Record<number, true> {
 export const smeltResult = (id: number): Stack | null => { const r = SMELT.get(id); return r ? { ...r } : null; };
 export const fuelTime = (id: number): number => FUEL.get(id) ?? 0;
 
-/** Egy tűzhely állapota: bemenet, üzemanyag, kimenet, égési és főzési idő */
+/** Az összes olvasztási recept (az olvasztó menühöz) */
+export const smeltRecipes = (): { inp: number; out: Stack }[] => [...SMELT].map(([inp, out]) => ({ inp, out: { ...out } }));
+/** Az összes üzemanyag: azonosító és az égési idő (mp) */
+export const fuelList = (): { id: number; seconds: number }[] => [...FUEL].map(([id, seconds]) => ({ id, seconds }));
+
+/** Ennyi másodpercnyi hőt tárol legfeljebb az olvasztó */
+export const HEAT_CAP = 1200;
+
+/**
+ * Az olvasztó állapota. Nincsenek foglalatok: a betöltött alapanyag egyfajta (`slots[0]`), az üzemanyag nem tárgyként,
+ * hanem tárolt hőként (`heat`, másodpercben) van jelen: a tüzelő elégetésekor a benne lévő idő hozzáadódik. A hő a
+ * főzés alatt fogy; ha elfogy, az olvasztás megáll, amíg újabb tüzelőt nem adsz hozzá. A kész termék a kimenetben gyűlik.
+ */
 export class Furnace {
-  /** [0] bemenet, [1] üzemanyag */
+  /** [0] a betöltött alapanyag (a [1] csak a régi mentések átvételéhez van) */
   slots: (Stack | null)[] = [null, null];
   out: Stack | null = null;
-  /** hátralévő égési idő (mp) és az aktuális üzemanyag teljes ideje */
-  burn = 0;
-  burnMax = 1;
+  /** tárolt hő (mp) */
+  heat = 0;
   cook = 0;
 
-  get lit(): boolean { return this.burn > 0; }
+  get input(): Stack | null { return this.slots[0]; }
+  get lit(): boolean { return this.heat > 0 && !!this.canSmelt(); }
 
   private canSmelt(): Stack | null {
     const inp = this.slots[0];
@@ -93,54 +105,66 @@ export class Furnace {
     return r;
   }
 
+  /** Alapanyag betöltése (csak egyfajta lehet bent); visszaadja, mennyi fért be */
+  load(id: number, n: number): number {
+    if (!smeltResult(id) || n <= 0) return 0;
+    const cur = this.slots[0];
+    if (cur && cur.id !== id) return 0;
+    const m = Math.min(n, maxStack(id) - (cur?.n ?? 0));
+    if (m <= 0) return 0;
+    this.slots[0] = cur ? { id, n: cur.n + m } : { id, n: m };
+    return m;
+  }
+
+  /** Hő hozzáadása (mp); visszaadja, mennyit sikerült (a tároló korlátos) */
+  addHeat(seconds: number): number {
+    const m = Math.max(0, Math.min(seconds, HEAT_CAP - this.heat));
+    this.heat += m;
+    return m;
+  }
+
   /** Teljes frissítés dt másodperccel; igaz, ha a tartalma változott (a kijelzést újra kell rajzolni) */
   update(dt: number): boolean {
     let changed = false;
-    // a nagy dt-t (pl. a játék háttérben volt) kisebb lépésekre bontjuk, hogy ne vesszen el üzemanyag
     let left = Math.min(dt, 5);
     while (left > 1e-6) {
       const step = Math.min(left, 0.25);
       left -= step;
-      if (this.burn > 0) this.burn = Math.max(0, this.burn - step);
       const r = this.canSmelt();
-      if (r && this.burn <= 0) {
-        const fuel = this.slots[1];
-        const t = fuel ? fuelTime(fuel.id) : 0;
-        if (fuel && t > 0) {
-          this.burn = this.burnMax = t;
-          if (--fuel.n <= 0) this.slots[1] = null;
-          changed = true;
-        }
-      }
-      if (r && this.burn > 0) {
-        this.cook += step;
+      if (r && this.heat > 0) {
+        const use = Math.min(step, this.heat);
+        this.heat -= use;
+        this.cook += use;
         if (this.cook >= SMELT_SECONDS) {
-          this.cook = 0;
+          this.cook -= SMELT_SECONDS;
           this.out = this.out ? { id: this.out.id, n: this.out.n + r.n } : { ...r };
           const inp = this.slots[0]!;
           if (--inp.n <= 0) this.slots[0] = null;
           changed = true;
         }
-      } else if (this.cook > 0) this.cook = Math.max(0, this.cook - step * 2);
+      } else if (this.cook > 0 && !r) this.cook = 0;
     }
     return changed;
   }
 
-  /** [bemenet id, n, üzemanyag id, n, kimenet id, n, égés, égés max, főzés] */
+  /** [alapanyag id, n, 0, 0 (régi üzemanyag-hely), kimenet id, n, hő, 1, főzés] (a régi formátummal azonos hosszú) */
   toFlat(): number[] {
     const f = (s: Stack | null) => (s ? [s.id, s.n] : [0, 0]);
-    return [...f(this.slots[0]), ...f(this.slots[1]), ...f(this.out), this.burn, this.burnMax, this.cook];
+    return [...f(this.slots[0]), 0, 0, ...f(this.out), this.heat, 1, this.cook];
   }
   static fromFlat(a: number[]): Furnace {
     const f = new Furnace();
     const s = (i: number): Stack | null => (a[i] && a[i + 1] > 0 ? { id: a[i], n: a[i + 1] } : null);
-    f.slots = [s(0), s(2)];
+    f.slots = [s(0), null];
     f.out = s(4);
-    f.burn = a[6] ?? 0; f.burnMax = a[7] || 1; f.cook = a[8] ?? 0;
+    // régi mentés: a hátralévő égés és az üzemanyag-foglalat tartalma hővé alakul
+    const oldFuel = s(2);
+    f.heat = Math.min(HEAT_CAP, (a[6] ?? 0) + (oldFuel ? oldFuel.n * fuelTime(oldFuel.id) : 0));
+    f.cook = a[8] ?? 0;
     return f;
   }
-  /** Minden benne lévő dolog (a tűzhely bontásakor a földre esik) */
+  /** Minden benne lévő tárgy (a tűzhely bontásakor a földre esik) */
   contents(): Stack[] {
-    return [...this.slots, this.out].filter((s): s is Stack => !!s);
+    return [this.slots[0], this.out].filter((s): s is Stack => !!s);
   }
 }
