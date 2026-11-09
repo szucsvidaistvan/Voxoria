@@ -1,7 +1,7 @@
 import './style.css';
 import * as THREE from 'three';
 import {
-  AIR, B, BLOCKS, FLUID_LAVA, FLUID_WATER, HOTBAR, blockKey, fluidId, fluidKind, fluidLevel, placeableBlocks,
+  AIR, B, BLOCKS, FLUID_LAVA, FLUID_WATER, HOTBAR, blockId, blockKey, fluidId, fluidKind, fluidLevel, placeableBlocks,
   registerGenerated, type GeneratedPack, type RGB,
 } from '../shared/blocks';
 import { FluidSim, isReplaceable } from '../shared/fluids';
@@ -10,11 +10,12 @@ import { createFallingView } from './falling';
 import { EXTRA_ID, I, ITEMS, armorPoints, isItem, itemName, toolOf } from '../shared/items';
 import { CATEGORIES, categoryOf } from '../shared/categories';
 import { initRecipes } from '../shared/recipes';
+import { CropSim, SEED_CROP, isFarmland, isTillable } from '../shared/farming';
 import { Furnace, initSmelting } from '../shared/smelting';
 import { Chest } from '../shared/chest';
 import { LIGHT, isOpaque } from '../shared/blocks';
 import { resetLightCache } from '../shared/light';
-import { breakRule, breakTime, dropFor } from '../shared/survival';
+import { bonusDrop, breakRule, breakTime, dropFor } from '../shared/survival';
 import { raycast, type RayHit } from '../shared/raycast';
 import { CH, CS, SEA_LEVEL, World } from '../shared/world';
 import { buildAtlas, TILE } from './atlas';
@@ -158,6 +159,7 @@ async function main(): Promise<void> {
   // ---------- világ ----------
   let world: World;
   let gravity: GravitySim;
+  let crops: CropSim;
   let player: Player;
   let sim: FluidSim;
   let mobs: MobManager;
@@ -298,6 +300,7 @@ async function main(): Promise<void> {
     clearWorld();
     world = new World(seed);
     sim = new FluidSim(world, (x, _y, z) => markDirty(x, z));
+    crops = new CropSim(world, (x, y, z, id) => { setBlockAt(x, y, z, id); });
     gravity = new GravitySim(
       world,
       (x, y, z) => { markDirty(x, z); sim.notify(x, y, z); },
@@ -791,6 +794,8 @@ async function main(): Promise<void> {
   const giveDrop = (id: number, x: number, y: number, z: number) => {
     const d = dropFor(id, held()?.id);
     if (d) drops.spawn(d.id, d.n, x + 0.5, y + 0.5, z + 0.5);
+    const extra = bonusDrop(id);
+    if (extra) drops.spawn(extra.id, extra.n, x + 0.5, y + 0.5, z + 0.5);
   };
 
   /**
@@ -966,11 +971,36 @@ async function main(): Promise<void> {
     }
     // étel
     const food = ITEMS[id]?.food;
-    if (food) {
+    // a krumpli és a murok vethető is: szántóföldre célozva elvetés (nem evés)
+    const plantable = Object.keys(SEED_CROP).some((k) => EXTRA_ID[k] === id) && !!hit && isFarmland(world.getBlock(hit.x, hit.y, hit.z));
+    if (food && !plantable) {
       // csak éhesen lehet enni (kreatívban nincs éhség)
       return; // az evés a jobb gomb nyomva tartásával megy (lásd az interact-ot)
     }
     if (!hit) return;
+    // ásó: a föld felszántása (a fölötte lévő növény eltűnik); mag: elvetés a szántóföldre
+    {
+      const tid = world.getBlock(hit.x, hit.y, hit.z);
+      const above = world.getBlock(hit.x, hit.y + 1, hit.z);
+      if (toolOf(id)?.type === 'shovel' && isTillable(tid) && hit.ny >= 0 && (above === AIR || isReplaceable(above))) {
+        if (above !== AIR) setBlockAt(hit.x, hit.y + 1, hit.z, AIR);
+        const farm = blockId('farmland');
+        if (farm !== undefined && setBlockAt(hit.x, hit.y, hit.z, farm)) {
+          refresh(hit.x, hit.z);
+          if (mode === 'survival') wearHeld(1);
+        }
+        return;
+      }
+      const crop = Object.entries(SEED_CROP).find(([k]) => EXTRA_ID[k] === id)?.[1];
+      if (crop && isFarmland(tid) && hit.ny > 0 && (above === AIR || isReplaceable(above))) {
+        const stage0 = blockId(`${crop}_stage0`);
+        if (stage0 !== undefined && setBlockAt(hit.x, hit.y + 1, hit.z, stage0)) {
+          refresh(hit.x, hit.z);
+          if (mode === 'survival') { inv.takeOne(input.hotbar); paintHotbar(); }
+        }
+        return;
+      }
+    }
     // ajtó: nyitás és csukás
     const hitDoor = BLOCKS[world.getBlock(hit.x, hit.y, hit.z)]?.door;
     if (hitDoor) {
@@ -1294,6 +1324,7 @@ async function main(): Promise<void> {
       world.dynamic.length = 0;
       simAcc = Math.min(simAcc + dt, 0.25);
       while (simAcc >= 0.05) { simAcc -= 0.05; sim.update(); gravity.update(); }
+      if (state === 'playing' || state === 'inventory') crops.update(dt, player.pos.x, player.pos.z);
     }
     if (state !== 'menu') fallingView.update(gravity.fallers, simAcc / 0.05);
     flushDirty(3);
