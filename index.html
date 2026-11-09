@@ -63,6 +63,7 @@
     <div class="bag-panel">
       <header>
         <h2 id="bag-title">Inventory</h2>
+        <button id="bag-toggle" class="btn" type="button">Recipes</button>
         <button id="bag-close" class="btn" type="button">Close</button>
       </header>
       <div id="craft-area">
@@ -71,6 +72,15 @@
         <div id="craft-grid"></div>
         <span id="craft-arrow">→</span>
         <div id="craft-out"></div>
+      </div>
+      <div id="book">
+        <div id="book-left">
+          <input id="book-search" type="search" placeholder="Search recipes or ingredients" autocomplete="off" spellcheck="false" />
+          <div id="book-tabs"></div>
+          <label class="book-only"><input id="book-only" type="checkbox" /> Only what I can craft</label>
+          <div id="book-list"></div>
+        </div>
+        <div id="book-detail"></div>
       </div>
       <div id="chest-grid"></div>
       <div id="bag-main"></div>
