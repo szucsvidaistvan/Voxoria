@@ -173,12 +173,11 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
   // a ló (64x64): hosszú törzs, vastag, előre-felfelé dőlő nyak, lefelé hajló hosszú fej, két függőleges fül, rövid sörény
   horse: [
     { tex: 'horse', px: [10, 10, 24], uv: [0, 32], p: [0, 18, 0] },
-    { tex: 'horse', px: [4, 16, 6], uv: [26, 36], p: [0, 29, -11], pivot: [0, 21, -11], tilt: -0.75 },
-    { tex: 'horse', px: [2, 14, 3], uv: [56, 36], p: [0, 30, -7], pivot: [0, 21, -11], tilt: -0.75 },
-    { tex: 'horse', px: [6, 5, 7], uv: [0, 13], p: [0, 33, -24.5], pivot: [0, 33, -22], tilt: -0.7 },
-    { tex: 'horse', px: [4, 4, 5], uv: [0, 13], p: [0, 32, -29.5], pivot: [0, 33, -22], tilt: -0.7 },
-    { tex: 'horse', px: [2, 4, 1], uv: [2, 14], p: [-2, 36.5, -23], pivot: [0, 33, -22], tilt: -0.7 },
-    { tex: 'horse', px: [2, 4, 1], uv: [2, 14], p: [2, 36.5, -23], pivot: [0, 33, -22], tilt: -0.7 },
+    { tex: 'horse', px: [4, 16, 6], uv: [26, 36], p: [0, 29, -11], pivot: [0, 21, -11], tilt: -0.5, grow: 0.5 },
+    { tex: 'horse', px: [2, 14, 3], uv: [56, 36], p: [0, 31, -9.5], pivot: [0, 21, -11], tilt: -0.5 },
+    { tex: 'horse', px: [6, 5, 7], uv: [0, 13], p: [0, 33.5, -23.5], pivot: [0, 34.5, -19.5], tilt: -0.85, grow: 1 },
+    { tex: 'horse', px: [2, 4, 1], uv: [2, 14], p: [-2, 39.5, -20.5], pivot: [0, 34.5, -19.5], tilt: -0.5 },
+    { tex: 'horse', px: [2, 4, 1], uv: [2, 14], p: [2, 39.5, -20.5], pivot: [0, 34.5, -19.5], tilt: -0.5 },
     { tex: 'horse', px: [3, 4, 7], uv: [42, 36], p: [0, 20, 16], pivot: [0, 21, 12], tilt: 0.4 },
     ...legs4('horse', [4, 11, 4], [48, 21], 3, 14, -9, 9),
   ],
