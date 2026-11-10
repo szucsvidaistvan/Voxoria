@@ -173,14 +173,14 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
   // a ló (64x64): hosszú törzs, vastag, előre-felfelé dőlő nyak, lefelé hajló hosszú fej, két függőleges fül, rövid sörény
   horse: [
     { tex: 'horse', px: [10, 10, 24], uv: [0, 32], p: [0, 18, 0] },
-    // nyak: vastag, mély tömb a törzs elülső tetején; a fej a nyak tetején, a nyak elülső síkjával egy vonalban (minecrafti felépítés)
-    { tex: 'horse', px: [4, 14, 8], uv: [0, 35], p: [0, 29, -5.5], pivot: [0, 22, -5.5], tilt: -0.45 },
-    { tex: 'horse', px: [2, 15, 3], uv: [56, 36], p: [0, 30, 0.5], pivot: [0, 22, -5.5], tilt: -0.45 },
-    { tex: 'horse', px: [6, 5, 7], uv: [0, 13], p: [0, 31.56, -11.69], pivot: [0, 32.86, -15.19], tilt: -0.8 },
-    { tex: 'horse', px: [4, 5, 5], uv: [0, 25], p: [0, 31.56, -17.69], pivot: [0, 32.86, -15.19], tilt: -0.8 },
-    { tex: 'horse', px: [2, 4, 2], uv: [2, 14], p: [-2, 36.06, -8.69], pivot: [0, 32.86, -15.19], tilt: -0.8 },
-    { tex: 'horse', px: [2, 4, 2], uv: [2, 14], p: [2, 36.06, -8.69], pivot: [0, 32.86, -15.19], tilt: -0.8 },
-    { tex: 'horse', px: [3, 12, 3], uv: [42, 36], p: [0, 16, 13], pivot: [0, 22, 12], tilt: -0.5 },
+    // a minecrafti ló modellje szerint (ModelHorse): nyak, fej, pofa, fülek és sörény egy közös forgáspont körül, 30°-ban előre dőlve
+    { tex: 'horse', px: [4, 14, 8], uv: [0, 35], p: [0, 24.8, -10], pivot: [0, 22, -12], tilt: -0.5236 },
+    { tex: 'horse', px: [2, 16, 4], uv: [56, 36], p: [0, 25, -5], pivot: [0, 22, -12], tilt: -0.5236 },
+    { tex: 'horse', px: [6, 5, 7], uv: [0, 13], p: [0, 30.5, -10.5], pivot: [0, 22, -12], tilt: -0.5236 },
+    { tex: 'horse', px: [4, 5, 5], uv: [0, 25], p: [0, 30.5, -16.5], pivot: [0, 22, -12], tilt: -0.5236 },
+    { tex: 'horse', px: [2, 3, 1], uv: [19, 16], p: [-1.55, 33.5, -7.5], pivot: [0, 22, -12], tilt: -0.5236 },
+    { tex: 'horse', px: [2, 3, 1], uv: [19, 16], p: [1.55, 33.5, -7.5], pivot: [0, 22, -12], tilt: -0.5236 },
+    { tex: 'horse', px: [3, 14, 4], uv: [42, 36], p: [0, 16, 14], pivot: [0, 23, 12], tilt: -0.5236 },
     ...legs4('horse', [4, 11, 4], [48, 21], 3, 14, -9, 9),
   ],
   chicken: [
