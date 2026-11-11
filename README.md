@@ -166,3 +166,16 @@ A játékos modellje: az `entity/player.png` a projekt tulajdonosa által megado
 látható (harmadik személyű nézet), és a későbbi co-op társak megjelenítésére is ez szolgál.
 
 Megjegyzés: a `sheep_fur.png` egy módosított másolat (a törzs oldalain a pár átlátszó pixel ki van töltve, hogy ne lehessen belátni a gyapjúba), az eredeti szerzője Acaitart (CC BY 4.0).
+
+## Játék-tesztkörnyezet (headless böngésző)
+
+A teljes játék valódi böngészőben, automatikusan tesztelhető (képernyőképekkel, teleportálással, billentyűk nyomásával) – pl. a vízi növények vagy a menük ellenőrzésére.
+
+```
+npm run playtest:build          # lefordítja a játékot a .playtest/ mappába (esbuild)
+npm run playtest:water          # példa: tavirózsa és tengeri fű képek + „rá lehet-e állni" ellenőrzés
+```
+
+- A játékhoz `?debug` címen elérhető a `window.__voxoria` (világ, játékos, `newGame(seed, mode)`, `teleport`, `look`, `setBlock`).
+- `scripts/playtest/lib.mjs`: `launch({w, h, touch})` indítja a headless Chrome-ot szoftveres WebGL-lel; `newGame`, `teleport`, `look`, `hold('KeyW', ms)`, `find('lily_pad')`, `shot('kep.png')`.
+- Három környezeti változó, ha nincs `node_modules`: `THREE_PATH` (a `three.module.js` útvonala), `ESBUILD_PATH`, `PLAYWRIGHT_PATH`.
