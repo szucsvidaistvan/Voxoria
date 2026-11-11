@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { AIR, B, BLOCKS, FLUID_LAVA, connectedParts, fluidHeight, fluidKind, fluidLevel, isOpaque, rotPoint, type BlockDef, type Dir, type FaceKind, type ShapeFace, type ShapePart, type Vec3 } from '../shared/blocks';
+import { AIR, B, BLOCKS, FLUID_LAVA, FLUID_WATER, connectedParts, fluidHeight, fluidKind, fluidLevel, isOpaque, waterKind, rotPoint, type BlockDef, type Dir, type FaceKind, type ShapeFace, type ShapePart, type Vec3 } from '../shared/blocks';
 import { CH, CS, type Chunk, type World } from '../shared/world';
 import { BLOCK_CURVE, SKY_CURVE, computeLight, type LightField } from '../shared/light';
 import type { Atlas } from './atlas';
@@ -137,8 +137,8 @@ function addShape(
 /** A szomszéd folyadék felszínének magassága (0, ha nem ugyanaz a folyadék) */
 function fluidTop(world: World, x: number, y: number, z: number, kind: number): number {
   const id = world.getBlock(x, y, z);
-  if (fluidKind(id) !== kind) return 0;
-  return fluidKind(world.getBlock(x, y + 1, z)) === kind ? 1 : fluidHeight(fluidLevel(id));
+  if (waterKind(id) !== kind) return 0;
+  return waterKind(world.getBlock(x, y + 1, z)) === kind ? 1 : fluidHeight(fluidLevel(id));
 }
 
 /** Egy víz- vagy lávablokk: a felszín a szint szerint alacsonyabb, a szomszédos azonos folyadékok között nincs lap */
@@ -146,7 +146,7 @@ function addFluid(
   buf: Buffers, def: BlockDef, id: number, kind: number, world: World, wx: number, y: number, wz: number, x: number, z: number, atlas: Atlas,
 ): void {
   const above = world.getBlock(wx, y + 1, wz);
-  const h = fluidKind(above) === kind ? 1 : fluidHeight(fluidLevel(id));
+  const h = waterKind(above) === kind ? 1 : fluidHeight(fluidLevel(id));
   const lava = kind === FLUID_LAVA;
   const [u0, v0, u1, v1] = atlas.anim.uv(def.top);
   for (const f of FACES) {
@@ -154,12 +154,12 @@ function addFluid(
     const nid = world.getBlock(nx, ny, nz);
     let yb = 0;
     if (f.dir[1] === 1) {
-      if (fluidKind(nid) === kind || isOpaque(nid)) continue;
+      if (waterKind(nid) === kind || isOpaque(nid)) continue;
     } else if (f.dir[1] === -1) {
-      if (fluidKind(nid) === kind || isOpaque(nid)) continue;
+      if (waterKind(nid) === kind || isOpaque(nid)) continue;
     } else {
       if (isOpaque(nid)) continue;
-      if (fluidKind(nid) === kind) {
+      if (waterKind(nid) === kind) {
         yb = fluidTop(world, nx, ny, nz, kind);
         if (yb >= h) continue; // a szomszéd magasabb vagy ugyanolyan: nincs mit mutatni
       }
@@ -201,6 +201,8 @@ export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): Ch
             let packed = lf.get(ox + x, y, oz + z);
             if (def.light && (packed & 15) < def.light) packed = (packed & 0xf0) | def.light;
             addShape(solid, def, parts, world, ox + x, y, oz + z, x, z, (t) => atlas.uv(t), false, packed);
+            // a vízbe ültetett növény körül víz van: nem rajzolódik ki üres doboz a cella körül
+            if (def.water) addFluid(water, BLOCKS[B.WATER], B.WATER, FLUID_WATER, world, ox + x, y, oz + z, x, z, atlas);
           }
           continue;
         }

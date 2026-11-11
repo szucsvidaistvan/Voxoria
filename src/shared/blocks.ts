@@ -36,6 +36,11 @@ FK[B.LAVA] = FLUID_LAVA;
 for (let l = 1; l <= 7; l++) { FK[LAVA_FLOW + l] = FLUID_LAVA; FL[LAVA_FLOW + l] = l; }
 FK[LAVA_FALL] = FLUID_LAVA; FL[LAVA_FALL] = 8;
 
+/** A vízbe ültetett növény (tengeri fű) cellája víz is: a rajzolás és az úszás víznek veszi */
+export const isWaterPlant = (id: number): boolean => BLOCKS[id]?.water === true;
+/** Mint a fluidKind, de a vízbe ültetett növény cellája is víznek számít */
+export const waterKind = (id: number): number => (id < 64 ? FK[id] : isWaterPlant(id) ? FLUID_WATER : 0);
+
 /** 0: nem folyadék, 1: víz, 2: láva */
 export const fluidKind = (id: number): number => (id < 64 ? FK[id] : 0);
 /** 0: forrás, 1..7: folyó (minél nagyobb, annál vékonyabb), 8: zuhanó */
@@ -69,6 +74,8 @@ export type Rot = ['x' | 'y', number];
 
 export interface BlockDef {
   name: string;
+  /** vízbe ültetett növény (tengeri fű, hínár): a cellájában víz is van, úgy viselkedik, mint a víz */
+  water?: boolean;
   top: TexName;
   bottom: TexName;
   side: TexName;
@@ -275,6 +282,7 @@ function rotBox(b: Box, rots: Rot[]): Box {
 }
 
 /** Ezek a nem kocka alakú blokkok átjárhatóak (növények, fáklya, sín, gomb ...) */
+const WATER_PLANT = /^(seagrass|tall_seagrass|kelp|kelp_plant|sea_pickle)$/;
 const NO_COLLIDE = /(torch|rail|button|pressure_plate|sapling|tulip|orchid|allium|bluet|cornflower|daisy|dandelion|poppy|lily|rose|bush|fern|grass|mushroom|fungus|roots|vine|lever|tripwire|stem|wheat|cobweb|sugar_cane|coral|small_dripleaf|repeater|comparator|redstone|wildflowers|torchflower|berry|flower)/;
 /** Nem lerakható állapot- és részblokkok */
 const SHAPE_SKIP = /^(potted_|attached_|redstone_wire$|tripwire$|lava_cauldron|water_cauldron|powder_snow_cauldron)|(_wall_torch|_crop|_plant)$/;
@@ -335,11 +343,13 @@ function shapeDef(b: GeneratedBlock, dir: number, flip: number): BlockDef {
     opaque: false,
     parts, rots, tintColor,
     tint: tintColor ? { top: tintColor, bottom: tintColor, side: tintColor } : undefined,
-    boxes: NO_COLLIDE.test(b.name) ? [] : boxes,
+    // a tavirózsa levelén lehet járni: vékony (1,5/16) doboz; a többi növény átjárható
+    boxes: b.name === 'lily_pad' ? [[0, 0, 0, 1, 0.09375, 1]] : NO_COLLIDE.test(b.name) ? [] : boxes,
     pick,
     wall: b.name === 'ladder' ? 1 : undefined,
     // a létra a falra van szerelve: a fal iránya a forgatással együtt változik
     attach: b.name === 'ladder' ? (1 + dir) % 4 : undefined,
+    water: WATER_PLANT.test(b.name) || undefined,
     light: EMITTERS[b.name],
   };
 }
