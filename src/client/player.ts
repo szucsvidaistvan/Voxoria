@@ -1,4 +1,4 @@
-import { B, BLOCKS, FLUID_LAVA, FLUID_WATER, dynamicBoxes, fluidKind, isSolid } from '../shared/blocks';
+import { B, BLOCKS, FLUID_LAVA, FLUID_WATER, dynamicBoxes, fluidKind, isSolid, waterKind } from '../shared/blocks';
 import type { World } from '../shared/world';
 
 const HALF_W = 0.3, HEIGHT = 1.8, EPS = 1e-3;
@@ -103,8 +103,8 @@ export class Player {
     const body = this.world.getBlock(bx, Math.floor(p.y + 0.6), bz);
     const feet = this.world.getBlock(bx, Math.floor(p.y + 0.1), bz);
     const head = this.world.getBlock(bx, Math.floor(p.y + EYE), bz);
-    this.inWater = fluidKind(body) === FLUID_WATER;
-    this.headUnderwater = fluidKind(head) === FLUID_WATER;
+    this.inWater = waterKind(body) === FLUID_WATER;
+    this.headUnderwater = waterKind(head) === FLUID_WATER;
     this.inLava = fluidKind(body) === FLUID_LAVA || fluidKind(feet) === FLUID_LAVA;
     this.headInLava = fluidKind(head) === FLUID_LAVA;
     this.inFire = body === B.FIRE || feet === B.FIRE;
