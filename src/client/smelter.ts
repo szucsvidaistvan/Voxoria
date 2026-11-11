@@ -36,6 +36,7 @@ export class SmelterUI {
   show(f: Furnace): void {
     this.furnace = f;
     this.msg = '';
+    this.el.classList.add('mode-detail'); // telefonon a kemence állapota az első oldal, onnan lehet új dolgot választani
     this.rebuildList();
     this.renderDetail();
   }
@@ -65,7 +66,7 @@ export class SmelterUI {
       sm.textContent = `→ ${r.out.n > 1 ? r.out.n + '× ' : ''}${itemName(r.out.id)}${r.have ? ` · you have ${r.have}` : ''}`;
       text.append(nm, sm);
       row.append(icon.el, text);
-      row.addEventListener('click', () => { this.selected = r.inp; this.msg = ''; this.rebuildList(); this.renderDetail(); });
+      row.addEventListener('click', () => { this.selected = r.inp; this.msg = ''; this.el.classList.add('mode-detail'); this.rebuildList(); this.renderDetail(); });
       this.listEl.appendChild(row);
     }
   }
@@ -95,6 +96,12 @@ export class SmelterUI {
     const f = this.furnace;
     this.detail.replaceChildren();
     if (!f) return;
+    const pick = document.createElement('button');
+    pick.type = 'button';
+    pick.className = 'bd-back';
+    pick.textContent = '＋ Choose what to smelt';
+    pick.addEventListener('click', () => this.el.classList.remove('mode-detail'));
+    this.detail.appendChild(pick);
 
     // 1) a kiválasztott recept betöltése
     const rec = this.section('Smelt');
