@@ -1366,6 +1366,32 @@ async function main(): Promise<void> {
     renderer.render(scene, camera);
     hand?.render(renderer, camera); // a kéz a világ után, külön (a víz nem takarja el)
   };
+  // tesztkörnyezet (scripts/playtest): `?debug` esetén a játék belső állapota elérhető a böngészőből
+  if (new URLSearchParams(location.search).has('debug')) {
+    (window as unknown as { __voxoria: unknown }).__voxoria = {
+      get world() { return world; },
+      get player() { return player; },
+      get mobs() { return mobs; },
+      get state() { return state; },
+      get mode() { return mode; },
+      inv, input, camera, scene, BLOCKS, blockId,
+      /** Új világ adott maggal, a menü kihagyásával (pointer lock nélkül is fut) */
+      newGame: (seed: number, m: Mode = 'survival') => {
+        clearSave();
+        startWorld(seed, null, m);
+        started = true;
+        state = 'playing';
+        menu.hidden = true;
+        hud.hidden = false;
+        input.reset();
+        input.enabled = true;
+      },
+      teleport: (x: number, y: number, z: number) => { player.pos = { x, y, z }; stream(x, z, 2, Infinity, Infinity); },
+      look: (yaw: number, pitch: number) => { player.yaw = yaw; player.pitch = pitch; },
+      setBlock: (x: number, y: number, z: number, id: number) => setBlockAt(x, y, z, id),
+    };
+  }
+
   requestAnimationFrame(loop);
 }
 
