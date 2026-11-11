@@ -35,7 +35,7 @@ import { createBlockIcons } from './icons';
 import { Input } from './input';
 import { buildChunkGeometry } from './mesher';
 import { EYE, Player } from './player';
-import { clearSave, loadSave, loadSettings, writeSave, writeSettings, type SaveData } from './save';
+import { clearSave, initSave, loadSave, loadSettings, writeSave, writeSettings, type SaveData } from './save';
 
 const SKY = 0x8fb8ff;
 const SKY_DIST = 300; // a nap, a hold és a csillagok távolsága (a kamera far értéke 400)
@@ -55,6 +55,7 @@ async function loadGenerated(): Promise<number> {
 }
 
 async function main(): Promise<void> {
+  await initSave();
   const extraCount = await loadGenerated();
   initRecipes(); // a generált blokkok után, mert a receptek hivatkoznak rájuk
   initSmelting();
@@ -759,6 +760,9 @@ async function main(): Promise<void> {
 
   setInterval(() => { if (state !== 'menu') saveGame(); }, 20000);
   window.addEventListener('beforeunload', saveGame);
+  window.addEventListener('pagehide', saveGame);
+  // telefonon az oldal háttérbe kerülésekor nem biztos, hogy a beforeunload lefut: itt is mentünk
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveGame(); });
 
   // ---------- fő ciklus ----------
   const dir = new THREE.Vector3();
