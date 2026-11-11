@@ -44,8 +44,21 @@ export class BookUI {
   get busy(): boolean { return this.job.active; }
 
   show(): void {
+    this.el.classList.remove('mode-detail');
     this.rebuildList();
     this.renderDetail();
+  }
+
+  /** keskeny képernyőn (telefon) a lista és a részletek külön „oldal": a CSS csak ott használja */
+  private setDetail(on: boolean): void { this.el.classList.toggle('mode-detail', on); }
+
+  private backButton(label: string): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'bd-back';
+    b.textContent = label;
+    b.addEventListener('click', () => { if (!this.job.active) this.setDetail(false); });
+    return b;
   }
 
   /** Bezárás / váltás: a félbemaradt készítés megszakad, az összetevők visszakerülnek */
@@ -84,8 +97,11 @@ export class BookUI {
     this.listEl.replaceChildren();
     this.rows.clear();
     let shown = 0;
-    for (const e of getBook()) {
-      if (!this.matches(e)) continue;
+    // az elkészíthető receptek előre kerülnek (a sorrend egyébként marad)
+    const list = getBook().filter((e) => this.matches(e));
+    const ok = (e: BookEntry): number => (canMake(this.inv, bestVariant(this.inv, e)) >= 1 ? 0 : 1);
+    list.sort((a, b) => ok(a) - ok(b));
+    for (const e of list) {
       if (++shown > 400) break;
       const row = document.createElement('button');
       row.type = 'button';
@@ -100,7 +116,7 @@ export class BookUI {
       sm.textContent = this.summary(e);
       text.append(nm, sm);
       row.append(icon.el, text);
-      row.addEventListener('click', () => { if (!this.job.active) { this.selected = e; this.qty = 1; this.renderDetail(); this.markSelected(); } });
+      row.addEventListener('click', () => { if (!this.job.active) { this.selected = e; this.qty = 1; this.setDetail(true); this.renderDetail(); this.markSelected(); } });
       this.listEl.appendChild(row);
       this.rows.set(e.key, { row, icon });
     }
@@ -139,6 +155,7 @@ export class BookUI {
       return;
     }
     const v = bestVariant(this.inv, e);
+    d.appendChild(this.backButton('← Back to recipes'));
     const head = document.createElement('div');
     head.className = 'bd-head';
     const icon = new SlotView(this.paint, 'islot out');
@@ -193,19 +210,22 @@ export class BookUI {
     }
     d.appendChild(q);
 
+    const foot = document.createElement('div');
+    foot.className = 'bd-foot';
     this.btn = document.createElement('button');
     this.btn.type = 'button';
     this.btn.className = 'btn bd-craft';
     this.btn.addEventListener('click', () => this.job.active ? this.cancel() : this.start());
-    d.appendChild(this.btn);
+    foot.appendChild(this.btn);
     const bar = document.createElement('div');
     bar.className = 'bd-bar';
     this.bar = document.createElement('div');
     bar.appendChild(this.bar);
-    d.appendChild(bar);
+    foot.appendChild(bar);
     this.status = document.createElement('p');
     this.status.className = 'hint';
-    d.appendChild(this.status);
+    foot.appendChild(this.status);
+    d.appendChild(foot);
     this.updateProgress();
     this.btn.disabled = !this.job.active && max < 1;
   }
