@@ -31,3 +31,16 @@ export function fbm(x: number, z: number, s: number): number {
   }
   return v / sum;
 }
+
+/** 3D értékzaj (barlangokhoz) */
+export function valueNoise3(x: number, y: number, z: number, s: number): number {
+  const x0 = Math.floor(x), y0 = Math.floor(y), z0 = Math.floor(z);
+  const fx = smooth(x - x0), fy = smooth(y - y0), fz = smooth(z - z0);
+  const h = (dx: number, dy: number, dz: number) => hash2(x0 + dx, z0 + dz + Math.imul(y0 + dy, 7919), s);
+  const l = (a: number, b: number, t: number) => a + (b - a) * t;
+  return l(
+    l(l(h(0, 0, 0), h(1, 0, 0), fx), l(h(0, 0, 1), h(1, 0, 1), fx), fz),
+    l(l(h(0, 1, 0), h(1, 1, 0), fx), l(h(0, 1, 1), h(1, 1, 1), fx), fz),
+    fy,
+  );
+}

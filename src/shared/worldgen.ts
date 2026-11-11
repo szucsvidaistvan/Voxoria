@@ -1,6 +1,6 @@
 import { AIR, B, blockId } from './blocks';
 import type { Chunk } from './world';
-import { CH, CS, SEA_LEVEL, fbm, hash2, valueNoise } from './noise';
+import { CH, CS, SEA_LEVEL, fbm, hash2, valueNoise, valueNoise3 } from './noise';
 
 /**
  * Biomok, felszín, fák és növények. A hőmérséklet és a csapadék két lassú zajból jön, ebből dől el a biom.
@@ -284,4 +284,30 @@ export function sugarCane(c: Chunk, seed: number, x: number, z: number, wx: numb
   if (!nearWater || hash2(wx, wz, seed + 131) > 0.18) return;
   const n = 1 + Math.floor(hash2(wx, wz, seed + 132) * 3);
   for (let i = 0; i < n; i++) plant(c, x, y + i, z, 'sugar_cane');
+}
+
+// ---------- barlangok ----------
+
+/**
+ * Barlang-e a (wx, y, wz) pont? Két 3D zaj közel nulla (0,5 körüli) sávjának metszete adja a kanyargó „spagetti" járatot,
+ * egy lassabb zaj nagy üregeket nyit. Mélyen (y ≤ 7) a barlang aljára láva kerül, lásd `caveFill`.
+ */
+export function isCave(seed: number, wx: number, y: number, wz: number): boolean {
+  if (y < 2) return false;
+  const a = valueNoise3(wx / 14, y / 9, wz / 14, seed + 910) - 0.5;
+  const b = valueNoise3(wx / 14, y / 9, wz / 14, seed + 920) - 0.5;
+  const w = 0.026 + 0.018 * Math.min(1, y / 20); // lent szűkebb, feljebb tágasabb járat
+  if (a * a + b * b < w * w) return true;
+  // nagy üregek: ritka, lapos kamrák
+  return valueNoise3(wx / 22, y / 7, wz / 22, seed + 930) > 0.82 && valueNoise3(wx / 9, y / 5, wz / 9, seed + 940) > 0.5;
+}
+
+/** Felszíni bejárat: a kő feletti talajréteg is kivágható ott, ahol ez a lassú zaj magas */
+export function caveEntrance(seed: number, wx: number, wz: number): boolean {
+  return valueNoise(wx / 18, wz / 18, seed + 950) > 0.84;
+}
+
+/** Mit tegyünk a kivájt helyre: mélyen láva, különben levegő */
+export function caveFill(y: number): number {
+  return y <= 7 ? B.LAVA : AIR;
 }

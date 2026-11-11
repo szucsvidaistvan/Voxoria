@@ -1,6 +1,6 @@
 import { AIR, B, LIGHT, fluidKind } from './blocks';
 import { CH, CS, SEA_LEVEL, fbm, hash2, valueNoise } from './noise';
-import { G, biomeAt, decorate, freezes, mountainBump, soilDepth, stoneVariant, sugarCane, surfaceOf, temperature } from './worldgen';
+import { G, biomeAt, caveEntrance, caveFill, decorate, isCave, freezes, mountainBump, soilDepth, stoneVariant, sugarCane, surfaceOf, temperature } from './worldgen';
 
 export { CS, CH, SEA_LEVEL };
 
@@ -129,9 +129,12 @@ export class World {
         const biome = biomeAt(seed, wx, wz, h);
         const depth = soilDepth(biome);
         const mountain = biome === 'mountains';
+        // barlang csak szárazföld alatt (a part és a tenger alatt nem, hogy ne ömöljön be a víz); bejáratnál a talajon át is
+        const caveTop = h < SEA_LEVEL + 3 ? -1 : caveEntrance(seed, wx, wz) ? h - 1 : h - depth - 3;
         for (let y = 0; y <= h; y++) {
           let id: number;
           if (y === 0) id = B.BEDROCK;
+          else if (y <= caveTop && isCave(seed, wx, y, wz)) id = caveFill(y);
           else if (y < h - depth) {
             id = this.stoneOrOre(wx, y, wz);
             if (id === B.STONE) id = stoneVariant(seed, wx, y, wz, mountain);
@@ -148,7 +151,7 @@ export class World {
           }
         } else if (biome !== 'ocean') {
           const top = c.get(x, h, z);
-          decorate(c, seed, biome, x, z, wx, wz, h + 1, top);
+          if (top !== AIR) decorate(c, seed, biome, x, z, wx, wz, h + 1, top);
           if (h === SEA_LEVEL + 1 && (biome === 'plains' || biome === 'forest' || biome === 'swamp' || biome === 'jungle')) {
             const near = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => this.heightAt(wx + dx, wz + dz) <= SEA_LEVEL);
             sugarCane(c, seed, x, z, wx, wz, h + 1, near);
