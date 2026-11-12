@@ -10,7 +10,8 @@
     "textures": "node scripts/extract-textures.mjs",
     "blocks": "node scripts/build-blocks.mjs",
     "playtest:build": "node scripts/playtest/build.mjs",
-    "playtest:water": "node scripts/playtest/water.mjs"
+    "playtest:water": "node scripts/playtest/water.mjs",
+    "playtest:tall": "node scripts/playtest/tall.mjs"
   },
   "dependencies": {
     "three": "^0.170.0"

@@ -1,6 +1,6 @@
 import { AIR, B, blockId } from './blocks';
 import type { Chunk } from './world';
-import { CH, CS, SEA_LEVEL, fbm, hash2, valueNoise, valueNoise3 } from './noise';
+import { CH, CS, SEA_LEVEL, fbm, lvl, hash2, valueNoise, valueNoise3 } from './noise';
 
 /**
  * Biomok, felszín, fák és növények. A hőmérséklet és a csapadék két lassú zajból jön, ebből dől el a biom.
@@ -32,13 +32,13 @@ export const humidity = (seed: number, wx: number, wz: number) => stretch(fbm(wx
 
 /** Hegyek: lassú zaj, ami a terepet helyenként megemeli */
 export function mountainBump(seed: number, wx: number, wz: number): number {
-  const m = valueNoise(wx / 70, wz / 70, seed + 700);
-  return m > 0.64 ? (m - 0.64) * 60 : 0;
+  const m = valueNoise(wx / 120, wz / 120, seed + 700);
+  return m > 0.64 ? (m - 0.64) * 100 : 0;
 }
 
 export function biomeAt(seed: number, wx: number, wz: number, h: number): Biome {
   if (h <= SEA_LEVEL) return 'ocean';
-  if (h >= 38) return 'mountains';
+  if (h >= lvl(38)) return 'mountains';
   const t = temperature(seed, wx, wz), hu = humidity(seed, wx, wz);
   if (t < 0.25) return 'taiga';
   if (t > 0.66) {
@@ -47,7 +47,7 @@ export function biomeAt(seed: number, wx: number, wz: number, h: number): Biome 
     if (hu < 0.65) return 'savanna';
     return 'jungle';
   }
-  if (hu > 0.62) return h <= SEA_LEVEL + 3 ? 'swamp' : 'dark_forest';
+  if (hu > 0.62) return h <= SEA_LEVEL + 7 ? 'swamp' : 'dark_forest';
   if (hu > 0.45) return 'forest';
   return 'plains';
 }
@@ -76,9 +76,9 @@ export function surfaceOf(b: Biome, seed: number, wx: number, wz: number, y: num
     case 'desert': return y < h - 2 ? B.SANDSTONE : B.SAND;
     case 'badlands': return top ? G('red_sand', B.SAND) : G(BANDS[(y + 3) % BANDS.length], B.DIRT);
     case 'mountains': {
-      if (h >= 46) return top ? G('snow_block', B.STONE) : B.STONE;
+      if (h >= lvl(46)) return top ? G('snow_block', B.STONE) : B.STONE;
       if (valueNoise(wx / 8, wz / 8, seed + 55) > 0.62) return top ? B.GRAVEL : B.STONE;
-      if (h >= 42) return B.STONE;
+      if (h >= lvl(42)) return B.STONE;
       return top ? B.GRASS : B.DIRT;
     }
     case 'taiga':
@@ -216,7 +216,7 @@ export function decorate(c: Chunk, seed: number, b: Biome, x: number, z: number,
     case 'savanna': if (r < 0.006) wood = 'acacia'; break;
     case 'jungle': if (r < 0.05) wood = 'jungle'; break;
     case 'swamp': if (r < 0.012) wood = 'oak'; break;
-    case 'mountains': if (r < 0.004 && y < 44) wood = 'spruce'; break;
+    case 'mountains': if (r < 0.004 && y < lvl(44)) wood = 'spruce'; break;
   }
   if (wood) {
     const m = TREE_MARGIN[wood];
@@ -307,5 +307,5 @@ export function caveEntrance(seed: number, wx: number, wz: number): boolean {
 
 /** Mit tegyünk a kivájt helyre: mélyen láva, különben levegő */
 export function caveFill(y: number): number {
-  return y <= 7 ? B.LAVA : AIR;
+  return y <= 10 ? B.LAVA : AIR;
 }

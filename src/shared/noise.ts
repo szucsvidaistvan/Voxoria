@@ -1,8 +1,12 @@
 /** Determinisztikus zajfüggvények a világgeneráláshoz */
 
 export const CS = 16; // chunk szélesség (X és Z)
-export const CH = 64; // világ magassága
-export const SEA_LEVEL = 28; // a terep kb. 17%-át önti el a víz
+export const CH = 384; // világ magassága: Minecraft-méret (y −64…319 → nálunk 0…383)
+export const Y0 = 64; // eltolás: Minecraft Y + Y0 = a mi Y-unk
+export const SEA_LEVEL = 63 + Y0; // 127: a terep kb. 17%-át önti el a víz
+/** A korábbi (64 magas) világ magasságait vetíti át: a tengerszinthez képest HS-szeresére nyújtva */
+export const HS = 2.4;
+export const lvl = (old: number): number => Math.round(SEA_LEVEL + (old - 28) * HS);
 
 export function hash2(x: number, z: number, s: number): number {
   let h = Math.imul(x, 374761393) ^ Math.imul(z, 668265263) ^ Math.imul(s, 1442695041);

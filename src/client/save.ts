@@ -1,7 +1,11 @@
+import { CH } from '../shared/noise';
+
 const SAVE_KEY = 'kockavilag-save-v1';
 const SETTINGS_KEY = 'kockavilag-settings-v1';
 
 export interface SaveData {
+  /** a világ magassága a mentéskor (hiányzik: régi, 64 magas világ) */
+  ch?: number;
   seed: number;
   edits: number[];
   pos: [number, number, number];
@@ -141,8 +145,10 @@ async function flush(): Promise<void> {
   flushing = false;
 }
 
-export const loadSave = (): SaveData | null => cache;
+/** Más világmagasságnál készült (régi) mentés nem tölthető be: a koordináták nem stimmelnének. Marad a tárolóban, az új mentés felülírja. */
+export const loadSave = (): SaveData | null => (cache && (cache.ch ?? 64) === CH ? cache : null);
 export const writeSave = (d: SaveData): void => {
+  d = { ...d, ch: CH };
   cache = d;
   pending = { data: d }; // az újabb mentés felülírja a még nem írtat
   void flush();

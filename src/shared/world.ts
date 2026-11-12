@@ -1,5 +1,5 @@
 import { AIR, B, LIGHT, fluidKind } from './blocks';
-import { CH, CS, SEA_LEVEL, fbm, hash2, valueNoise } from './noise';
+import { CH, CS, HS, SEA_LEVEL, fbm, hash2, valueNoise } from './noise';
 import { placeOres } from './ores';
 import { G, biomeAt, caveEntrance, caveFill, decorate, isCave, freezes, mountainBump, soilDepth, stoneVariant, sugarCane, surfaceOf, temperature } from './worldgen';
 
@@ -8,6 +8,8 @@ export { CS, CH, SEA_LEVEL };
 export class Chunk {
   /** két bájtos blokkazonosítók (65535 különböző blokk) */
   data = new Uint16Array(CS * CH * CS);
+  /** a legmagasabb valaha beállított nem-levegő blokk magassága (felső korlát: efölött csak levegő van) */
+  top = 0;
   /** a világító blokkok helyei (az `data` indexei): ebből tudja a fényszámítás, hol kell kezdeni */
   emit = new Set<number>();
   constructor(public cx: number, public cz: number) {}
@@ -19,6 +21,7 @@ export class Chunk {
   }
   setIndex(i: number, id: number): void {
     this.data[i] = id;
+    if (id !== AIR && (i >> 8) > this.top) this.top = i >> 8;
     if (LIGHT[id]) this.emit.add(i);
     else if (this.emit.size) this.emit.delete(i);
   }
@@ -69,7 +72,9 @@ export class World {
   }
 
   heightAt(wx: number, wz: number): number {
-    return Math.floor(18 + fbm(wx / 48, wz / 48, this.seed) * 28 + mountainBump(this.seed, wx, wz));
+    // a régi (64 magas) terep, függőlegesen HS-szeresre nyújtva, vízszintesen kb. kétszeres hullámhosszal (hogy ne legyen túl meredek)
+    const old = 18 + fbm(wx / 100, wz / 100, this.seed) * 28 + mountainBump(this.seed, wx, wz);
+    return Math.floor(SEA_LEVEL + (old - 28) * HS);
   }
 
   getBlock(x: number, y: number, z: number): number {
