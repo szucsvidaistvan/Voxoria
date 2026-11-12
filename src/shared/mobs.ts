@@ -107,6 +107,8 @@ export class Mob {
   deadT = -1;
   /** a járás animációjának fázisa (a megtett úttal nő) */
   walk = 0;
+  /** a pók éppen falat mászik (felfelé halad, nem hat rá a gravitáció) */
+  climb = false;
   /** nyílt ég alatt áll-e (a zombi csak ott ég napfényben) */
   exposed = true;
   // AI-állapot (a mobs.ts belső használatára)
@@ -180,7 +182,7 @@ export function boxBlocked(world: World, x: number, y: number, z: number, hw: nu
   return false;
 }
 
-const GRAVITY = 28, JUMP = 8.4;
+const GRAVITY = 28, JUMP = 8.4, CLIMB = 3.2;
 
 /** A fizika egy lépése: a kívánt sebesség felé gyorsul, gravitáció, ütközés, akadály előtt ugrik */
 function physics(world: World, m: Mob, dt: number): void {
@@ -199,6 +201,7 @@ function physics(world: World, m: Mob, dt: number): void {
   let wall = false;
   for (let i = 0; i < steps; i++) {
     if (m.inWater) m.vy = Math.max(m.vy - 6 * hh, -2) + (m.vy < 1.2 ? 14 * hh : 0); // lassan feljön a felszínre
+    else if (m.climb) m.vy = CLIMB; // a pók a falon felmászik (a gravitáció nem húzza vissza)
     else m.vy = Math.max(m.vy - GRAVITY * hh, m.kind === 'chicken' ? -2.2 : -50);
     const nx = m.x + m.vx * hh;
     if (boxBlocked(world, nx, m.y, m.z, hw, h)) { wall = true; m.vx = 0; } else m.x = nx;
@@ -215,9 +218,11 @@ function physics(world: World, m: Mob, dt: number): void {
   }
   // akadály (egy blokk magas lépcső, fal) előtt: ha akar menni, ugrik
   const want = Math.hypot(m.wx, m.wz) > 0.1;
-  if (wall && want && m.onGround) m.vy = JUMP;
+  // a pók a fal felé haladva mászik (a következő lépésben nincs gravitáció), mások ugranak
+  m.climb = m.kind === 'spider' && wall && want;
+  if (wall && want && m.onGround && !m.climb) m.vy = JUMP;
   if (m.y < -20) m.hp = 0; // kiesett a világból
-  m.walk += Math.hypot(m.vx, m.vz) * dt * 1.6;
+  m.walk += Math.hypot(m.vx, m.vz, m.climb ? m.vy : 0) * dt * 1.6;
 }
 
 // ---------- AI ----------
