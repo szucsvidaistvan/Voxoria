@@ -307,7 +307,8 @@ export function caveEntrance(seed: number, wx: number, wz: number): boolean {
   return valueNoise(wx / 18, wz / 18, seed + 950) > 0.84;
 }
 
-/** Mit tegyünk a kivájt helyre: mélyen láva, különben levegő */
-export function caveFill(y: number): number {
-  return y <= 7 ? B.LAVA : AIR;
+/** Mit tegyünk a kivájt helyre: mélyen láva; tenger alatt a tengerszintig víz; különben levegő */
+export function caveFill(y: number, flooded: boolean = false): number {
+  if (y <= 7) return B.LAVA;
+  return flooded && y <= SEA_LEVEL ? B.WATER : AIR;
 }

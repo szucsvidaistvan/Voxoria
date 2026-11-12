@@ -129,12 +129,13 @@ export class World {
         const biome = biomeAt(seed, wx, wz, h);
         const depth = soilDepth(biome);
         const mountain = biome === 'mountains';
-        // barlang csak szárazföld alatt (a part és a tenger alatt nem, hogy ne ömöljön be a víz); bejáratnál a talajon át is
-        const caveTop = h < SEA_LEVEL + 3 ? -1 : caveEntrance(seed, wx, wz) ? h - 1 : h - depth - 3;
+        // barlang a tenger alatt is lehet (ott vízzel telik meg); bejáratnál a talajon át is kivág
+        const caveTop = h < 6 ? -1 : caveEntrance(seed, wx, wz) ? h - 1 : h - depth - 3;
+        const flooded = h < SEA_LEVEL;
         for (let y = 0; y <= h; y++) {
           let id: number;
           if (y === 0) id = B.BEDROCK;
-          else if (y <= caveTop && isCave(seed, wx, y, wz)) id = caveFill(y);
+          else if (y <= caveTop && isCave(seed, wx, y, wz)) id = caveFill(y, flooded);
           else if (y < h - depth) {
             id = this.stoneOrOre(wx, y, wz);
             if (id === B.STONE) id = stoneVariant(seed, wx, y, wz, mountain);
