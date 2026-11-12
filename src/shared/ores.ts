@@ -1,15 +1,13 @@
 import { AIR, B } from './blocks';
 import type { Biome } from './worldgen';
 import { G, isCave } from './worldgen';
-import { CH, CS, SEA_LEVEL, hash2 } from './noise';
+import { CH, CS, Y0, hash2 } from './noise';
 
 /**
  * Érctelérek: a Minecraft 1.18+ érckonfigurációja (próbálkozás/chunk, telérméret, magasság-eloszlás, levegő-kitettség),
  * átszámolva a mi 64 blokk magas világunkra.
  *
- * A magasságokat a "Minecraft Y" skálán adjuk meg (-64..320), és `mapY` képezi le a mi világunkra: a tengerszint alatti rész
- * (Y ≤ 63) 0..28-ra, a felette lévő a 28..52-re préselődik. Hogy az érc sűrűsége blokkra vetítve ugyanaz maradjon, minden próbálkozás
- * csak a leképezés meredekségének megfelelő eséllyel valósul meg (`slope`).
+ * A magasságokat a Minecraft Y skáláján adjuk meg (-64..319); a világunk ugyanilyen magas, `mapY` csak eltolja (Y0).
  * Egy telér nem egy blokk, hanem összefüggő csomó (kisebb 4–9, nagyobb 12–17 blokk).
  */
 
@@ -48,14 +46,10 @@ const FEATURES: OreFeature[] = [
   { ore: 'emerald_ore', size: 3, count: 100, dist: 'triangle', min: -16, max: 319, discard: 0, biome: 'mountains' },
 ];
 
-const MC_MIN = -64, MC_SEA = 63;
-const K_LOW = SEA_LEVEL / (MC_SEA - MC_MIN);       // ≈ 0,22: a tengerszint alatti rész
-const K_HIGH = (CH - 12 - SEA_LEVEL) / (320 - MC_SEA); // ≈ 0,093: a felette lévő
+const MC_MIN = -64;
 
-/** Minecraft Y → a mi Y-unk */
-export const mapY = (mcY: number): number =>
-  mcY <= MC_SEA ? Math.round(SEA_LEVEL + (mcY - MC_SEA) * K_LOW) : Math.round(SEA_LEVEL + (mcY - MC_SEA) * K_HIGH);
-const slope = (mcY: number): number => (mcY <= MC_SEA ? K_LOW : K_HIGH);
+/** Minecraft Y → a mi Y-unk (a világ ugyanolyan magas, csak eltolva) */
+export const mapY = (mcY: number): number => Math.round(mcY) + Y0;
 
 function rng(seed: number): () => number {
   let a = seed >>> 0;
@@ -99,9 +93,8 @@ export function placeOres(c: Target, seed: number, biomeAt: (wx: number, wz: num
         for (let i = 0; i < n; i++) {
           const mcY = sampleY(r, f);
           const wx = sx + Math.floor(r() * CS), wz = sz + Math.floor(r() * CS);
-          const keep = r() < slope(mcY); // a világ összenyomása miatt ritkított próbálkozás
           const rv = r;
-          if (mcY < MC_MIN || mcY > 319 || !keep) continue;
+          if (mcY < MC_MIN || mcY > 319) continue;
           if (f.biome && biomeAt(wx, wz) !== f.biome) continue;
           vein(c, ox, oz, wx, mapY(mcY), wz, f, oreIds[fi], isStone, rv, seed);
         }

@@ -55,7 +55,8 @@ export class CropSim {
     const w = this.world;
     const moistId = blockId('farmland_moist'), dryId = blockId('farmland');
     if (moistId === undefined || dryId === undefined) return;
-    for (let y = SEA_LEVEL - 6; y < CH - 1; y++) {
+    const top = Math.min(CH - 1, (w.getChunk(Math.floor(x / CS), Math.floor(z / CS))?.top ?? 0) + 1);
+    for (let y = SEA_LEVEL - 6; y < top; y++) {
       const id = w.getBlock(x, y, z);
       const c = cropOf(id);
       if (c) {
