@@ -104,8 +104,6 @@ export function stoneVariant(seed: number, wx: number, y: number, wz: number, mo
   if (n < 0.16) return G('diorite');
   if (valueNoise(wx / 9 - y * 0.11, wz / 9 + y * 0.15, seed + 820) > 0.83) return G('andesite');
   const r = hash2(wx, wz + y * 40503, seed + 777);
-  if (y < 24 && r < 0.0012) return G('lapis_ore');
-  if (mountain && y > 26 && r > 0.9992) return G('emerald_ore');
   return B.STONE;
 }
 
