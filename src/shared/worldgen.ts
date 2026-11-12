@@ -278,8 +278,15 @@ export function decorate(c: Chunk, seed: number, b: Biome, x: number, z: number,
 }
 
 /** Nád a víz mellett: a tengerszint feletti első sáv, ha a szomszéd oszlop már víz */
+let caneSoil: Set<number> | undefined;
+/** Amin cukornád megáll: homok, föld, fű és rokonaik */
+const CANE_SOIL = (): Set<number> =>
+  (caneSoil ??= new Set([B.SAND, B.DIRT, B.GRASS, G('red_sand', B.SAND), G('coarse_dirt', B.DIRT), G('podzol', B.DIRT), G('mycelium', B.DIRT), G('clay', B.DIRT)]));
+
 export function sugarCane(c: Chunk, seed: number, x: number, z: number, wx: number, wz: number, y: number, nearWater: boolean): void {
   if (!nearWater || hash2(wx, wz, seed + 131) > 0.18) return;
+  // csak üres cellába, megfelelő talajra: ha a fű/virág már elfoglalta a helyet, nem nő rajta (és fölötte sem) cukornád
+  if (c.get(x, y, z) !== AIR || !CANE_SOIL().has(c.get(x, y - 1, z))) return;
   const n = 1 + Math.floor(hash2(wx, wz, seed + 132) * 3);
   for (let i = 0; i < n; i++) plant(c, x, y + i, z, 'sugar_cane');
 }
