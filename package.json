@@ -10,6 +10,7 @@
     "textures": "node scripts/extract-textures.mjs",
     "blocks": "node scripts/build-blocks.mjs",
     "playtest:build": "node scripts/playtest/build.mjs",
+    "playtest:mob": "node scripts/playtest/mobshot.mjs",
     "playtest:water": "node scripts/playtest/water.mjs"
   },
   "dependencies": {
