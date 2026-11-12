@@ -24,6 +24,8 @@ export class BookUI {
   private status!: HTMLElement;
   private btn!: HTMLButtonElement;
   private only = false;
+  /** munkapadnál nyílt meg (a nagy receptek is készíthetők) */
+  private atTable = false;
 
   constructor(private inv: Inventory, private paint: Painter, private onChange: () => void) {
     this.job = new CraftJob(inv, () => { this.onChange(); this.refresh(); });
@@ -43,7 +45,8 @@ export class BookUI {
 
   get busy(): boolean { return this.job.active; }
 
-  show(): void {
+  show(atTable = false): void {
+    this.atTable = atTable;
     this.el.classList.remove('mode-detail');
     this.rebuildList();
     this.renderDetail();
@@ -83,13 +86,16 @@ export class BookUI {
     if (this.cat !== 'All' && e.cat !== this.cat) return false;
     const q = this.search.value.trim().toLowerCase();
     if (q && !e.name.toLowerCase().includes(q) && !e.variants.some((v) => v.need.some(([id]) => itemName(id).toLowerCase().includes(q)))) return false;
-    if (this.only && canMake(this.inv, bestVariant(this.inv, e)) < 1) return false;
+    if (this.only && (!this.can(e) || canMake(this.inv, bestVariant(this.inv, e)) < 1)) return false;
     return true;
   }
 
+  /** itt elkészíthető-e (a nagy recepthez munkapad kell) */
+  private can(e: BookEntry): boolean { return !e.big || this.atTable; }
+
   private summary(e: BookEntry): string {
     const v = bestVariant(this.inv, e);
-    return v.need.map(([id, n]) => `${n}× ${itemName(id)}`).join(', ') + (e.variants.length > 1 ? ' …' : '');
+    return (this.can(e) ? '' : 'Needs a crafting table · ') + v.need.map(([id, n]) => `${n}× ${itemName(id)}`).join(', ') + (e.variants.length > 1 ? ' …' : '');
   }
 
   private rebuildList(): void {
@@ -99,7 +105,7 @@ export class BookUI {
     let shown = 0;
     // az elkészíthető receptek előre kerülnek (a sorrend egyébként marad)
     const list = getBook().filter((e) => this.matches(e));
-    const ok = (e: BookEntry): number => (canMake(this.inv, bestVariant(this.inv, e)) >= 1 ? 0 : 1);
+    const ok = (e: BookEntry): number => (this.can(e) && canMake(this.inv, bestVariant(this.inv, e)) >= 1 ? 0 : 1);
     list.sort((a, b) => ok(a) - ok(b));
     for (const e of list) {
       if (++shown > 400) break;
@@ -134,7 +140,7 @@ export class BookUI {
   private refresh(): void {
     for (const e of getBook()) {
       const r = this.rows.get(e.key);
-      if (r) r.row.classList.toggle('no', canMake(this.inv, bestVariant(this.inv, e)) < 1);
+      if (r) r.row.classList.toggle('no', !this.can(e) || canMake(this.inv, bestVariant(this.inv, e)) < 1);
     }
     if (this.selected) this.renderDetail();
   }
@@ -150,7 +156,7 @@ export class BookUI {
     if (!e) {
       const p = document.createElement('p');
       p.className = 'hint';
-      p.textContent = 'Pick a recipe on the left. If you carry the ingredients, it is crafted in a few seconds, no crafting table needed.';
+      p.textContent = 'Pick a recipe on the left. If you carry the ingredients, it is crafted in a few seconds, a 2×2 recipe works anywhere; bigger ones need a crafting table.';
       d.appendChild(p);
       return;
     }
@@ -197,6 +203,12 @@ export class BookUI {
     }
 
     const max = Math.max(0, canMake(this.inv, v));
+    if (!this.can(e)) {
+      const need = document.createElement('p');
+      need.className = 'bd-need';
+      need.textContent = 'Needs a crafting table. Place one (4 planks) and use it.';
+      d.appendChild(need);
+    }
     const q = document.createElement('div');
     q.className = 'bd-qty';
     for (const n of [1, 5, 10, 0]) {
@@ -227,11 +239,11 @@ export class BookUI {
     foot.appendChild(this.status);
     d.appendChild(foot);
     this.updateProgress();
-    this.btn.disabled = !this.job.active && max < 1;
+    this.btn.disabled = !this.job.active && (max < 1 || !this.can(e));
   }
 
   private start(): void {
-    if (!this.selected) return;
+    if (!this.selected || !this.can(this.selected)) return;
     const max = canMake(this.inv, bestVariant(this.inv, this.selected));
     this.job.start(this.selected, Math.max(1, Math.min(this.qty, max)));
     this.onChange();

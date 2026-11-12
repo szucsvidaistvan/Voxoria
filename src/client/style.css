@@ -717,3 +717,6 @@ body.touch #hud-face { width: 34px; height: 34px; }
 #sm-detail .bd-craft { margin-top: 0 !important; padding: 0.5rem !important; font-size: 1rem !important; }
 #sm-detail > *, .sm-sec > * { flex: none; }
 .sm-sec { gap: 0.3rem; }
+
+/* receptkönyv: a nagy recepthez munkapad kell */
+.bd-need { margin: 8px 0 0; padding: 8px 10px; border: 2px solid #8a3a3a; background: rgba(138, 58, 58, 0.25); color: #ffb4a8; font-size: 13px; }
