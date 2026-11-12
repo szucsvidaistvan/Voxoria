@@ -1,5 +1,6 @@
 import { AIR, B, LIGHT, fluidKind } from './blocks';
 import { CH, CS, SEA_LEVEL, fbm, hash2, valueNoise } from './noise';
+import { placeOres } from './ores';
 import { G, biomeAt, caveEntrance, caveFill, decorate, isCave, freezes, mountainBump, soilDepth, stoneVariant, sugarCane, surfaceOf, temperature } from './worldgen';
 
 export { CS, CH, SEA_LEVEL };
@@ -163,6 +164,7 @@ export class World {
         }
       }
     }
+    placeOres(c, seed, (wx, wz) => biomeAt(seed, wx, wz, Math.min(this.heightAt(wx, wz), CH - 12)));
     const edits = this.edits.get(World.key(c.cx, c.cz));
     if (edits) {
       for (const [i, id] of edits) {
@@ -191,14 +193,10 @@ export class World {
 
   private stoneOrOre(wx: number, y: number, wz: number): number {
     const r = hash2(wx, wz + y * 40503, this.seed + 500);
-    if (y < 10 && r < 0.0015) return B.DIAMOND_ORE;
     // mélyen: obszidián, magma és kvarcér (a kvarc nyersanyag a kvarc blokkokhoz)
     if (y < 12 && r > 0.9985) return B.OBSIDIAN;
     if (y < 14 && r > 0.996 && r <= 0.9985) return G('magma');
     if (y < 24 && r > 0.992 && r <= 0.996) return G('quartz_block');
-    if (y < 18 && r < 0.004) return B.GOLD_ORE;
-    if (y < 30 && r < 0.010) return B.IRON_ORE;
-    if (r < 0.020) return B.COAL_ORE;
     return B.STONE;
   }
 }
