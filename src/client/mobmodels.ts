@@ -27,8 +27,12 @@ export interface TPart {
   /** állandó elforgatás a forgáspont körül (z: lefelé dőlés, y: legyezés), pl. a pók lábai */
   rz?: number;
   ry?: number;
-  /** a járás ezzel legyezi a részt (y körül) */
+  /** a járás ezzel legyezi a részt (y körül); az előjele a láb járásfázisát adja (ellenkező előjel: ellentétes fázis) */
   wag?: number;
+  /** járáskor ennyit emelkedik a rész a lendítés közben (z körül, radián); a pók lábához */
+  lift?: number;
+  /** az előző rész csomópontjához kapcsolódik (a forgáspontja az előző rész forgáspontjához képest van), így együtt mozognak: a pók lábának második szakasza */
+  child?: boolean;
   /** célzáskor ez a dőlés az x tengely körül (a csontváz íjat tartó karja) */
   aim?: number;
 }
@@ -71,12 +75,11 @@ const legs4 = (tex: TexName, px: [number, number, number], uv: [number, number],
 function spiderLeg(side: 1 | -1, z: number, fan: number, wag: number): TPart[] {
   const y0 = 11, l1 = 8, l2 = 14, up = 0.3, down = 1.2;
   const px0 = side * 4;
-  // a térd helye: a lefelé/felfelé dőlés (z körül), majd a legyezés (y körül)
-  const dx = side * l1 * Math.cos(up), dy = l1 * Math.sin(up);
-  const kx = px0 + dx * Math.cos(fan), kz = z - dx * Math.sin(fan), ky = y0 + dy;
+  // az első szakasz a csípőn forog; a második az első csomópontjának gyereke (a térdén), így járás közben összeérnek.
+  // A gyerek forgatása az első után értendő: a vízszintes helyzete -side*down, tehát a szülőhöz képest -side*(down+up).
   return [
-    { tex: 'spider', px: [l1, 2, 2], uv: [18, 0], p: [px0 + side * l1 / 2, y0, z], pivot: [px0, y0, z], rz: side * up, ry: fan, wag },
-    { tex: 'spider', px: [l2, 2, 2], uv: [18, 0], p: [kx + side * l2 / 2, ky, kz], pivot: [kx, ky, kz], rz: -side * down, ry: fan, wag },
+    { tex: 'spider', px: [l1, 2, 2], uv: [18, 0], p: [px0 + side * l1 / 2, y0, z], pivot: [px0, y0, z], rz: side * up, ry: fan, wag, lift: 0.5 },
+    { tex: 'spider', px: [l2, 2, 2], uv: [18, 0], p: [px0 + side * (l1 + l2 / 2), y0, z], pivot: [px0 + side * l1, y0, z], rz: -side * (down + up), child: true },
   ];
 }
 

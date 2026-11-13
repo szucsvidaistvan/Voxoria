@@ -1017,7 +1017,7 @@ async function main(): Promise<void> {
     }
     // munkapad: megnyitja a 3x3-as barkácsrácsot
     if (blockKey(world.getBlock(hit.x, hit.y, hit.z)) === 'crafting_table') {
-      openBag('book');
+      openBag(3);
       return;
     }
     // láda: megnyitja a tárolót

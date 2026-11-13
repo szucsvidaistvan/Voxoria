@@ -83,7 +83,7 @@ export function computeLight(world: World, cx: number, cz: number): LightField {
       const c = chunks[(rz >> 4) * 3 + (rx >> 4)];
       if (!c) { top[rz * W + rx] = CH; continue; } // betöltetlen oszlop: nem forrása a napfénynek
       const base = ((rz & 15) << 4) | (rx & 15);
-      let y = CH - 1;
+      let y = Math.min(CH - 1, c.top);
       while (y >= 0 && !opaque(c.data[(y << 8) | base])) y--;
       top[rz * W + rx] = y + 1;
     }

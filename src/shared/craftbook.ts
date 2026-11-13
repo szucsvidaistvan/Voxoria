@@ -19,6 +19,8 @@ export interface BookEntry {
   variants: Variant[];
   /** egy darab elkészítésének ideje másodpercben */
   seconds: number;
+  /** nagy recept (3x3-as rács kell hozzá): csak munkapadnál készíthető */
+  big: boolean;
 }
 
 export const CATEGORIES = ['All', 'Building', 'Color', 'Food', 'Tools & Armor', 'Other'] as const;
@@ -62,6 +64,12 @@ function expand(r: Recipe): Variant[] {
   return out;
 }
 
+/** A recept nem fér el a saját 2x2-es rácson (a Minecraftban is munkapad kell hozzá) */
+export function needsTable(r: Recipe): boolean {
+  if (r.shape) return r.shape.length > 2 || r.shape.some((row) => row.length > 2);
+  return (r.shapeless?.length ?? 0) > 4;
+}
+
 let book: BookEntry[] | null = null;
 
 /** A receptkönyv összeállítása (a receptek elkészülte után; egyszer, aztán gyorsítótárból) */
@@ -74,7 +82,7 @@ export function getBook(): BookEntry[] {
       let e = byOut.get(v.out.id);
       if (!e) {
         const total = v.need.reduce((a, [, n]) => a + n, 0);
-        e = { key: `${ri}:${v.out.id}`, out: v.out, name: itemName(v.out.id), cat: categoryOf(v.out.id), variants: [], seconds: craftSeconds(total) };
+        e = { key: `${ri}:${v.out.id}`, out: v.out, name: itemName(v.out.id), cat: categoryOf(v.out.id), variants: [], seconds: craftSeconds(total), big: needsTable(r) };
         byOut.set(v.out.id, e);
         entries.push(e);
       }

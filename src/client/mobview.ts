@@ -20,7 +20,7 @@ interface View {
   root: THREE.Group;
   /** a lény anyagai (a textúrázottak textúránként egy; a színes részeké `plain`); mind kapja a napszak-színezést */
   mats: THREE.MeshBasicMaterial[];
-  limbs: { g: THREE.Group; swing: number; tilt: number; flap: number; aim: number; rz: number; ry: number; wag: number }[];
+  limbs: { g: THREE.Group; swing: number; tilt: number; flap: number; aim: number; rz: number; ry: number; wag: number; lift: number }[];
   /** az íj (a csontváz kezében): a mob célzás-állapotához */
   bow?: THREE.Mesh;
   /** egy rész hozzáadása a modellhez; visszaadja az eltávolítóját */
@@ -85,19 +85,20 @@ function buildView(kind: string, scene: THREE.Scene, base: string): View {
       return m;
     };
     /** a rész a (pivot) csomóponton lóg, a doboz a közepénél van */
-    const attach = (mesh: THREE.Mesh, p: V3, pivot: V3 | undefined, tilt: number | undefined, swing: number | undefined, flap: number | undefined, aim?: number, st?: { rz?: number; ry?: number; wag?: number }): THREE.Group | undefined => {
+    const attach = (mesh: THREE.Mesh, p: V3, pivot: V3 | undefined, tilt: number | undefined, swing: number | undefined, flap: number | undefined, aim?: number, st?: { rz?: number; ry?: number; wag?: number; lift?: number }, parent?: THREE.Group): THREE.Group | undefined => {
       mesh.frustumCulled = false;
       if (pivot || tilt || st?.rz || st?.ry) {
         const pv = pivot ?? p;
         const g = new THREE.Group();
         g.position.set(...pv);
+        if (parent) g.position.sub(parent.position); // a szülő csomópont rendszerében (a szülő forgása a gyereket is viszi)
         mesh.position.set(p[0] - pv[0], p[1] - pv[1], p[2] - pv[2]);
         g.add(mesh);
-        root.add(g);
+        (parent ?? root).add(g);
         const rz = st?.rz ?? 0, ry = st?.ry ?? 0;
         g.rotation.z = rz;
         g.rotation.y = ry;
-        if (swing !== undefined || flap !== undefined || tilt || rz || ry) limbs.push({ g, swing: swing ?? 0, tilt: tilt ?? 0, flap: flap ?? 0, aim: aim ?? tilt ?? 0, rz, ry, wag: st?.wag ?? 0 });
+        if (swing !== undefined || flap !== undefined || tilt || rz || ry) limbs.push({ g, swing: swing ?? 0, tilt: tilt ?? 0, flap: flap ?? 0, aim: aim ?? tilt ?? 0, rz, ry, wag: st?.wag ?? 0, lift: st?.lift ?? 0 });
         return g;
       }
       mesh.position.set(...p);
@@ -106,9 +107,11 @@ function buildView(kind: string, scene: THREE.Scene, base: string): View {
     };
     let bow: THREE.Mesh | undefined;
     const k = 1 / 16;
+    let prevG: THREE.Group | undefined;
     for (const part of TEXTURED[kind] ?? []) {
       const mesh = new THREE.Mesh(texturedGeo(part), material(part.tex));
-      const g = attach(mesh, part.p.map((x) => x * k) as V3, part.pivot?.map((x) => x * k) as V3 | undefined, part.tilt, part.swing, part.flap, part.aim, part);
+      const g = attach(mesh, part.p.map((x) => x * k) as V3, part.pivot?.map((x) => x * k) as V3 | undefined, part.tilt, part.swing, part.flap, part.aim, part, part.child ? prevG : undefined);
+      prevG = g;
       // a csontváz jobb keze (az egyetlen 1.55-ös célzó kar) tartja az íjat
       if (kind === 'skeleton' && g && part.aim === 1.55) {
         const geo = new THREE.PlaneGeometry(0.8, 0.8);
@@ -184,12 +187,17 @@ export function createMobView(scene: THREE.Scene, base: string = import.meta.env
         v.root.rotation.y = m.yaw;
 
         // járás: a lábak a megtett úttal lendülnek, a szárnyak csapkodnak, ha a csirke a levegőben van
-        const speed = Math.min(1, Math.hypot(m.vx, m.vz) / 2.5);
+        const speed = Math.min(1, Math.hypot(m.vx, m.vz, m.climb ? m.vy : 0) / 2.5);
         const sw = Math.sin(m.walk * 3.2) * 0.85 * speed;
         for (const l of v.limbs) {
           l.g.rotation.x = (m.aim > 0 ? l.aim : l.tilt) + (m.aim > 0 ? 0 : sw * l.swing);
           if (l.flap) l.g.rotation.z = l.flap * (m.onGround ? 0.1 : 0.9 + Math.sin(time * 30) * 0.5);
-          if (l.wag) l.g.rotation.y = l.ry + sw * l.wag;
+          if (l.lift) {
+            // pókláb: előre lendítés közben felemelkedik, hátra lendítés közben (a talajon) tolja a testet; az előjel adja a fázist
+            const ang = m.walk * 3.2 + (l.wag < 0 ? Math.PI : 0);
+            l.g.rotation.y = l.ry + Math.sin(ang) * Math.abs(l.wag) * 1.4 * speed;
+            l.g.rotation.z = l.rz + Math.max(0, Math.cos(ang)) * l.lift * speed * Math.sign(l.rz || 1);
+          } else if (l.wag) l.g.rotation.y = l.ry + sw * l.wag;
         }
 
         // halál: oldalra dől; 

@@ -186,7 +186,7 @@ export function buildChunkGeometry(world: World, chunk: Chunk, atlas: Atlas): Ch
   const ox = chunk.cx * CS, oz = chunk.cz * CS;
   const lf: LightField = computeLight(world, chunk.cx, chunk.cz);
 
-  for (let y = 0; y < CH; y++) {
+  for (let y = 0; y <= chunk.top && y < CH; y++) {
     for (let z = 0; z < CS; z++) {
       for (let x = 0; x < CS; x++) {
         const id = chunk.get(x, y, z);

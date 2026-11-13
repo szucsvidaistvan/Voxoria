@@ -378,9 +378,14 @@ export class BagUI {
     return !this.root.hidden;
   }
 
+  private atTable = false;
+  private switching = false;
+
   /** Megnyitás: 2 = a saját 2x2-es rács, 3 = munkapad */
   open(size: 2 | 3 | 'furnace' | 'chest' | 'book', furnace?: Furnace | Chest): void {
     this.book.cancel();
+    // a munkapadnál (3) a nagy receptek is elérhetők; a táska/könyv váltása közben ez megmarad
+    if (size === 3) this.atTable = true; else if (!this.switching) this.atTable = false;
     // a munkapad és a „book" a receptkönyvet nyitja (nincs barkácsrács); a 2 a táska
     this.bookMode = size === 'book' || size === 3;
     if (this.bookMode) size = 2;
@@ -421,14 +426,16 @@ export class BagUI {
     this.cursor = null;
     this.root.hidden = false;
     this.render();
-    if (this.bookMode) this.book.show();
+    if (this.bookMode) this.book.show(this.atTable);
   }
 
   /** Váltás a táska és a receptkönyv között (a kézben lévő dolog visszakerül a tárolóba) */
   toggleBook(): void {
     if (this.root.hidden || this.chest || this.furnace) return;
     if (this.cursor) { this.inv.add(this.cursor.id, this.cursor.n, this.cursor.d); this.cursor = null; }
+    this.switching = true;
     this.open(this.bookMode ? 2 : 'book');
+    this.switching = false;
     this.onChange();
   }
 
