@@ -105,6 +105,8 @@ export interface BlockDef {
   conn?: Conn;
   /** ajtó: melyik fele, nyitva van-e, merre néz; ids: a 16 változat ([fél * 8 + nyitva * 4 + irány]) */
   door?: { half: 0 | 1; open: 0 | 1; dir: number; ids: number[] };
+  /** kakaóhüvely: fázis (0–2) és irány; a rönk, amin függ, a COCOA_LOG[dir] irányban van */
+  cocoa?: { stage: number; dir: number };
   /** falra szerelhető blokk (létra, fáklya): az az irány, amerre alapállásban a fal van (0 kelet, 1 dél, 2 nyugat, 3 észak) */
   wall?: number;
   /** fali változat esetén: merre van a fal, amire a blokk fel van szerelve (0 kelet, 1 dél, 2 nyugat, 3 észak). Ha a fal eltűnik, a blokk leesik. */
@@ -292,7 +294,10 @@ const CROP_STAGES: [string, number][] = [['wheat', 8], ['carrots', 4], ['potatoe
 const CROP_KEYS = CROP_STAGES.flatMap(([c, n]) => Array.from({ length: n }, (_, i) => `${c}_stage${i}`));
 /** a termés fázisai és a nedves szántóföld: csak a növekedés hozza létre (nincsenek a választóban) */
 const FARM_KEYS = new Set([...CROP_KEYS, 'farmland_moist']);
-const LATE_SHAPES = ['chest', ...FARM_KEYS];
+const COCOA_KEYS = ['cocoa_stage0', 'cocoa_stage1', 'cocoa_stage2'];
+const LATE_SHAPES = ['chest', ...FARM_KEYS, ...COCOA_KEYS];
+/** merre van a rönk a kakaóhüvelytől (irány: 0..3) */
+export const COCOA_LOG: [number, number][] = [[0, 1], [-1, 0], [0, -1], [1, 0]];
 const FLIPPABLE = /(_slab|_stairs|_trapdoor)$/;
 
 function shapeDef(b: GeneratedBlock, dir: number, flip: number): BlockDef {
@@ -628,6 +633,11 @@ export function registerGenerated(pack: GeneratedPack): number[] {
       variants[v] = next++;
     }
     BLOCKS[id].variants = variants;
+    if (COCOA_KEYS.includes(key)) {
+      // kakaóhüvely: csak a rönkre rakható / a fán terem, nincs a választóban
+      const stage = COCOA_KEYS.indexOf(key);
+      variants.forEach((vid, dir) => { BLOCKS[vid].cocoa = { stage, dir }; BLOCKS[vid].hidden = true; BLOCKS[vid].name = 'Cocoa'; });
+    }
   }
   refreshLight();
 

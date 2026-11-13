@@ -1,4 +1,4 @@
-import { AIR, B, blockId, blockKey } from './blocks';
+import { AIR, B, BLOCKS, COCOA_LOG, blockId, blockKey } from './blocks';
 import { CH, CS, SEA_LEVEL } from './noise';
 import { fluidKind } from './blocks';
 import type { World } from './world';
@@ -58,11 +58,24 @@ export class CropSim {
     const top = Math.min(CH - 1, (w.getChunk(Math.floor(x / CS), Math.floor(z / CS))?.top ?? 0) + 1);
     for (let y = SEA_LEVEL - 6; y < top; y++) {
       const id = w.getBlock(x, y, z);
+      const co = BLOCKS[id]?.cocoa;
+      if (co) {
+        // kakaóhüvely: a jungle rönkön függ (nélküle leesik), lassan érik (0 → 1 → 2)
+        const [lx, lz] = COCOA_LOG[co.dir];
+        if (!/^jungle_(log|wood)$/.test(blockKey(w.getBlock(x + lx, y, z + lz)))) { this.set(x, y, z, AIR); continue; }
+        if (co.stage < 2 && rand() < 0.12) {
+          const next = blockId(`cocoa_stage${co.stage + 1}`);
+          const v = next === undefined ? undefined : BLOCKS[next].variants?.[co.dir];
+          if (v !== undefined) this.set(x, y, z, v);
+        }
+        continue;
+      }
       const c = cropOf(id);
       if (c) {
         const below = w.getBlock(x, y - 1, z);
-        if (!isFarmland(below)) { this.set(x, y, z, AIR); continue; }
         const max = CROP_STAGES[c.crop] - 1;
+        // a vad (kifejlett) növény füves/földes talajon is megmarad; a fiatal csak szántóföldön
+        if (!isFarmland(below) && !(c.stage === max && isTillable(below))) { this.set(x, y, z, AIR); continue; }
         if (c.stage < max && rand() < (below === moistId ? 0.6 : 0.3)) {
           const next = blockId(`${c.crop}_stage${c.stage + 1}`);
           if (next !== undefined) this.set(x, y, z, next);

@@ -56,7 +56,7 @@ export function mobDrops(kind: MobKind, rand: () => number = Math.random): { id:
     case 'cow': add(I.RAW_BEEF, r(1, 3)); add(EXTRA_ID.leather, r(0, 2)); break;
     case 'chicken': add(I.RAW_CHICKEN, 1); add(EXTRA_ID.feather, r(0, 2)); add(EXTRA_ID.egg, r(0, 1)); break;
     case 'sheep': add(blockId('white_wool'), 1); add(I.RAW_MUTTON, r(1, 2)); break;
-    case 'zombie': add(I.ROTTEN_FLESH, r(0, 2)); break;
+    case 'zombie': add(I.ROTTEN_FLESH, r(0, 2)); add(EXTRA_ID.carrot, r(0, 39) === 0 ? 1 : 0); add(EXTRA_ID.potato, r(0, 39) === 0 ? 1 : 0); break; // ritkán murok/krumpli is (2,5%)
     case 'spider': add(EXTRA_ID.string, r(0, 2)); break;
     case 'horse': add(EXTRA_ID.leather, r(0, 2)); break;
     case 'polarbear': add(EXTRA_ID.cod, r(0, 2)); break;

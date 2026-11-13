@@ -13,7 +13,7 @@ import { initRecipes } from '../shared/recipes';
 import { CropSim, SEED_CROP, isFarmland, isTillable } from '../shared/farming';
 import { Furnace, initSmelting } from '../shared/smelting';
 import { Chest } from '../shared/chest';
-import { LIGHT, isOpaque } from '../shared/blocks';
+import { COCOA_LOG, LIGHT, isOpaque } from '../shared/blocks';
 import { resetLightCache } from '../shared/light';
 import { bonusDrop, breakRule, breakTime, dropFor } from '../shared/survival';
 import { raycast, type RayHit } from '../shared/raycast';
@@ -992,6 +992,18 @@ async function main(): Promise<void> {
         if (farm !== undefined && setBlockAt(hit.x, hit.y, hit.z, farm)) {
           refresh(hit.x, hit.z);
           if (mode === 'survival') wearHeld(1);
+        }
+        return;
+      }
+      // kakaóbab: a jungle rönk oldalára ültetve hüvely nő belőle
+      if (id === EXTRA_ID.cocoa_beans && /^jungle_(log|wood)$/.test(blockKey(tid)) && (hit.nx !== 0 || hit.nz !== 0)) {
+        const there = world.getBlock(hit.px, hit.py, hit.pz);
+        const dir = COCOA_LOG.findIndex(([lx, lz]) => hit.px + lx === hit.x && hit.pz + lz === hit.z);
+        const stage0 = blockId('cocoa_stage0');
+        const v = stage0 === undefined || dir < 0 ? undefined : BLOCKS[stage0].variants?.[dir];
+        if ((there === AIR || isReplaceable(there)) && v !== undefined && setBlockAt(hit.px, hit.py, hit.pz, v)) {
+          refresh(hit.px, hit.pz);
+          if (mode === 'survival') { inv.takeOne(input.hotbar); paintHotbar(); }
         }
         return;
       }
