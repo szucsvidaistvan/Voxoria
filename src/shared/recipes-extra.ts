@@ -70,6 +70,7 @@ export function extraRecipes(
   give({ shapeless: [b('lapis_block')] }, X.lapis_lazuli, 9);
   give({ shapeless: [b('emerald_block')] }, X.emerald, 9);
   give({ shape: ['SS', 'SS'], keys: { S: X.string } }, b('white_wool'));
+  give({ shape: ['WWW', 'PPP'], keys: { W: 'wool', P: 'planks' } }, 'bed_foot'); // ágy: 3 gyapjú + 3 deszka
   give({ shape: ['SS', 'SS'], keys: { S: X.snowball } }, b('snow_block'));
   give({ shape: ['CC', 'CC'], keys: { C: X.clay_ball } }, b('clay'));
   give({ shape: ['BB', 'BB'], keys: { B: X.brick } }, b('bricks'));

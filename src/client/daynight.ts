@@ -12,7 +12,7 @@ export const START_TIME = 0.04;
  * 38% (kb. 7 és fél perc). A nap íve nem egyenletes: napkelte és napnyugta lassan, elnyújtva telik, az éjszakát
  * pedig a hold fázisai változtatják: telihold idején világosabb, újholdkor sötétebb.
  */
-const DAY_FRACTION = 0.62;
+export const DAY_FRACTION = 0.62;
 
 /** A nap szöge: 0 = napkelte, PI = napnyugta, 2 PI = újra napkelte. A sin értéke a nap magassága. */
 export function sunAngle(time: number): number {
@@ -20,6 +20,9 @@ export function sunAngle(time: number): number {
     ? Math.PI * (time / DAY_FRACTION)
     : Math.PI + Math.PI * ((time - DAY_FRACTION) / (1 - DAY_FRACTION));
 }
+
+/** Éjszaka van-e (a nap a horizont alatt vagy épp csak felette): ilyenkor lehet aludni */
+export const isNight = (time: number): boolean => Math.sin(sunAngle(time)) < 0.1;
 
 /** Játékbeli óra: napkelte 6:00, dél 12:00, napnyugta 18:00, éjfél 0:00 */
 export function clockHours(time: number): number {
