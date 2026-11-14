@@ -626,6 +626,8 @@ export function registerGenerated(pack: GeneratedPack): number[] {
     const id = next++;
     BLOCKS[id] = shapeDef(b, 0, 0);
     for (const p of b.parts!) for (const f of Object.values(p.faces)) tex.add(f!.tex);
+    // az ágy ikonja lapos kép (mint a növényeké), nem kocka: a pack tárgy-textúrája
+    if (key === 'bed_foot') { BLOCKS[id].side = 'block__bed_item' as TexName; tex.add('block__bed_item'); }
     KEY_ID.set(b.name, id);
     ids.push(id);
     if (FARM_KEYS.has(key)) { BLOCKS[id].hidden = true; continue; }

@@ -2,7 +2,7 @@ import { BLOCKS, type ShapePart } from '../shared/blocks';
 import { TILE, type Atlas } from './atlas';
 
 /** Ezek a blokkok laposak vagy vékonyak: sima képként (nem kockaként) jelennek meg az ikonokon (a kerítés, szőnyeg, fal, ajtó és csapóajtó dobozokból épített alakot kap) */
-const FLAT = /(torch|sapling|rail|ladder|_pane$|^iron_bars$|^fire$|lily_pad|button|pressure_plate|tulip|poppy|dandelion|allium|orchid|bluet|daisy|mushroom|^short_grass$|^fern$|dead_bush|sugar_cane|seagrass|cobweb|lever|tripwire)/;
+const FLAT = /(torch|sapling|rail|ladder|_pane$|^iron_bars$|^fire$|lily_pad|button|pressure_plate|tulip|poppy|dandelion|allium|orchid|bluet|daisy|mushroom|^short_grass$|^fern$|dead_bush|sugar_cane|seagrass|cobweb|lever|tripwire|^bed_foot$)/;
 
 type Pt = [number, number];
 type Proj = (x: number, y: number, z: number) => Pt;
