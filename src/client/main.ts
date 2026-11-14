@@ -1460,7 +1460,7 @@ async function main(): Promise<void> {
       // a viselt páncél látszik a karakteren (harmadik személyű nézet)
       const armorSig = inv.armor.map((s) => s?.id ?? 0).join(',');
       if (armorSig !== shownArmor) { shownArmor = armorSig; playerView.setArmor(inv.armor.map((s) => s?.id ?? 0)); }
-      hand?.update(dt, held()?.id ?? 0, state === 'playing' && !thirdPerson, Math.min(1, Math.hypot(player.vel.x, player.vel.z) / 4) * (player.onGround ? 1 : 0), handAct, sky.light, eatT, blocking);
+      hand?.update(dt, held()?.id ?? 0, state === 'playing' && !thirdPerson && !sleepSeq, Math.min(1, Math.hypot(player.vel.x, player.vel.z) / 4) * (player.onGround ? 1 : 0), handAct && !sleepSeq, sky.light, eatT, blocking);
       if (state === 'inventory') {
         bag.tick(dt);
         if (bag.isOpen) {
