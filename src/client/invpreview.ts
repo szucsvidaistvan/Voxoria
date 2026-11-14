@@ -40,7 +40,7 @@ export function createInventoryPreview(canvas: HTMLCanvasElement, atlas: Atlas, 
       const dx = Math.max(-1, Math.min(1, (mx - (r.left + r.width / 2)) / 260));
       const dy = Math.max(-1, Math.min(1, (my - (r.top + r.height * 0.3)) / 260));
       // a modell a kamera felé néz (+z), és az egér irányába fordul
-      view.set(0, 0, 0, Math.PI + dx * 0.9, 0, 0, [1, 1, 1]);
+      view.set(0, 0, 0, Math.PI + dx * 0.9, 0, 0, [1, 1, 1], { swing: 0, eat: 0, chewPhase: 0, snap: true });
       void dy;
       renderer.render(scene, cam);
     },

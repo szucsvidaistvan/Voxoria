@@ -252,6 +252,11 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
   const armorRemovers: (() => void)[] = [];
   const isRightArm = (g: THREE.Group) => Math.abs(g.position.x - 6 / 16) < 1e-3 && Math.abs(g.position.y - 24 / 16) < 1e-3;
   const rightArm = v.limbs.find((l) => isRightArm(l.g))!.g;
+  const isHead = (g: THREE.Group) => Math.abs(g.position.x) < 1e-3 && Math.abs(g.position.y - 24 / 16) < 1e-3;
+  // a test iránya lemarad a fej mögött (mint a minecraftban): a fej legfeljebb 50°-ot fordul a testhez képest
+  let bodyYaw = 0, bodyInit = false, leanS = 0;
+  const angDiff = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+  v.root.rotation.order = 'YXZ';
 
   // a kézben tartott tárgy: a jobb kar csomópontján lóg (a kéz a kar alsó vége)
   const flatMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
@@ -309,11 +314,26 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
      * @param walk a megtett út fázisa (nő járás közben), @param speed 0..1 a járás üteme, @param light a napszak színe (RGB)
      * @param act az ütés fázisa (0..1, 0: nincs), az evés előrehaladása (0..1) és a rágás fázisa
      */
-    set(x: number, y: number, z: number, yaw: number, walk: number, speed: number, light: [number, number, number], act: { swing: number; eat: number; chewPhase: number; block?: boolean } = { swing: 0, eat: 0, chewPhase: 0 }): void {
+    set(x: number, y: number, z: number, yaw: number, walk: number, speed: number, light: [number, number, number], act: { swing: number; eat: number; chewPhase: number; block?: boolean; pitch?: number; sprint?: number; snap?: boolean } = { swing: 0, eat: 0, chewPhase: 0 }): void {
       v.root.position.set(x, y, z);
-      v.root.rotation.y = yaw;
-      const sw = Math.sin(walk * 3.2) * 0.85 * Math.min(1, speed);
-      for (const l of v.limbs) l.g.rotation.x = l.tilt + sw * l.swing;
+      if (!bodyInit) { bodyYaw = yaw; bodyInit = true; }
+      // a test a mozgás / ütés / evés irányába fordul, állva csak akkor, ha a fej több mint 50°-ot fordult
+      const busy = speed > 0.05 || act.swing > 0 || act.eat > 0 || !!act.block;
+      let d = angDiff(yaw, bodyYaw);
+      if (act.snap) bodyYaw = yaw;
+      else if (busy) bodyYaw += d * 0.25;
+      else if (Math.abs(d) > 0.87) bodyYaw = yaw - Math.sign(d) * 0.87;
+      d = angDiff(yaw, bodyYaw);
+      v.root.rotation.y = bodyYaw;
+      // futás: a test előre dől, a lendítés nagyobb
+      const sprint = act.sprint ?? 0;
+      leanS += (sprint - leanS) * 0.2;
+      v.root.rotation.x = -0.22 * leanS;
+      const sw = Math.sin(walk * 3.2) * 0.85 * Math.min(1.3, speed);
+      for (const l of v.limbs) {
+        l.g.rotation.x = l.tilt + sw * l.swing;
+        if (isHead(l.g)) { l.g.rotation.order = 'YXZ'; l.g.rotation.y = d; l.g.rotation.x = Math.max(-1.3, Math.min(1.3, act.pitch ?? 0)) + 0.22 * leanS; }
+      }
       // a tárgyat tartó jobb kar (a kockajátékok szerint): tartáskor kissé előre áll, ütéskor gyorsan előre-fel lendül,
       // lassabban visszatér (a lendítés lüktetése 1−(1−p)³ szerint), a törzs felé billen; evéskor a szájhoz emelkedik és rág
       const p = act.swing;
