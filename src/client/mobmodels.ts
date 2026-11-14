@@ -166,8 +166,9 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'polarbear', px: [5, 3, 3], uv: [0, 44], p: [0, 9.5, -18.5] },
     { tex: 'polarbear', px: [2, 2, 1], uv: [26, 0], p: [-3.5, 15.5, -14] },
     { tex: 'polarbear', px: [2, 2, 1], uv: [26, 0], p: [3.5, 15.5, -14] },
-    { tex: 'polarbear', px: [14, 14, 11], uv: [0, 19], p: [0, 13, -4], rot: true },
-    { tex: 'polarbear', px: [12, 12, 10], uv: [39, 0], p: [0, 15.5, 8], rot: true },
+    // elöl a közepes (12), hátul a legnagyobb (14): fej < közepes < nagy
+    { tex: 'polarbear', px: [12, 12, 10], uv: [39, 0], p: [0, 13, -4], rot: true },
+    { tex: 'polarbear', px: [14, 14, 11], uv: [0, 19], p: [0, 14, 7.5], rot: true },
     { tex: 'polarbear', px: [4, 10, 4], uv: [50, 40], p: [-4.5, 5, 9], pivot: [-4.5, 10, 9], swing: 1 },
     { tex: 'polarbear', px: [4, 10, 4], uv: [50, 40], p: [4.5, 5, 9], pivot: [4.5, 10, 9], swing: -1 },
     { tex: 'polarbear', px: [4, 10, 6], uv: [50, 0], p: [-4.5, 5, -7], pivot: [-4.5, 10, -7], swing: -1 },
