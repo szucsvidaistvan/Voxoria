@@ -240,6 +240,7 @@ async function main(): Promise<void> {
   const chests = new Map<string, Chest>();
   const fkey = (x: number, y: number, z: number) => `${x},${y},${z}`;
   const spawn = { x: 8, z: 8 };
+  let menuY = SEA_LEVEL;
 
   const dropMeshes = (key: string) => {
     const list = meshes.get(key);
@@ -1395,8 +1396,11 @@ async function main(): Promise<void> {
     } else {
       // a menü mögött a világ lassan körbeforog
       angle += dt * 0.07;
-      camera.position.set(spawn.x + Math.cos(angle) * 30, 52, spawn.z + Math.sin(angle) * 30);
-      camera.lookAt(spawn.x, 28, spawn.z);
+      // a kamera a terep fölött kering (a világ magassága megnőtt, a fix 52 már föld alatt lenne)
+      const gy = world.isLoaded(spawn.x, spawn.z) ? world.heightAt(spawn.x, spawn.z) : SEA_LEVEL;
+      menuY += (gy - menuY) * Math.min(1, dt * 2);
+      camera.position.set(spawn.x + Math.cos(angle) * 30, menuY + 24, spawn.z + Math.sin(angle) * 30);
+      camera.lookAt(spawn.x, menuY + 2, spawn.z);
       cx = spawn.x;
       cz = spawn.z;
     }
