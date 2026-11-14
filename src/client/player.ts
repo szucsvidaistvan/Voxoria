@@ -4,6 +4,11 @@ import type { World } from '../shared/world';
 const HALF_W = 0.3, HEIGHT = 1.8, EPS = 1e-3;
 export const EYE = 1.62;
 const GRAVITY = 28, JUMP_SPEED = 8.5, WALK_SPEED = 4.6, MAX_FALL = 50;
+/** futás: a séta sebességének 1,3-szorosa (mint a minecraftban) */
+const SPRINT_MUL = 1.3;
+/** a jég, a tömör jég és a kék jég (az alapsebesség ennyivel/s igazodik a célhoz: kisebb = csúszósabb) */
+const ICE = /(^|_)ice$/;
+const ICE_GRIP = 1.2;
 // vízben: lassabb mozgás, gyenge gravitáció, a szóköz felfelé úsztat
 const WATER_GRAVITY = 7, WATER_SPEED = 0.6, MAX_SINK = 3.5, SWIM_UP = 3.5, SWIM_SURFACE = 6;
 // lávában: nagyon lassú mozgás, még a vízinél is lassabb úszás
@@ -95,7 +100,14 @@ export class Player {
   /** a mozgás szorzója (pl. kardos védekezés közben lassabb) */
   speedMul = 1;
 
-  update(dt: number, mx: number, mz: number, jump: boolean): void {
+  /** a vízszintes mozgás lendülete (jégen lassan áll át a célsebességre) */
+  private mv = { x: 0, z: 0 };
+  /** a legutóbbi talajon csúszós-e (jég) */
+  private slip = false;
+  /** fut-e most (a main.ts a látómezőhöz és az éhezéshez használja) */
+  sprinting = false;
+
+  update(dt: number, mx: number, mz: number, jump: boolean, sprint = false): void {
     const p = this.pos;
     if (!this.world.isLoaded(p.x, p.z)) return; // várjuk meg a terepet
 
@@ -114,10 +126,19 @@ export class Player {
 
     const len = Math.hypot(mx, mz);
     if (len > 1) { mx /= len; mz /= len; }
-    const speed = (this.inLava ? WALK_SPEED * LAVA_SPEED : this.inWater ? WALK_SPEED * WATER_SPEED : WALK_SPEED) * this.speedMul;
+    this.sprinting = sprint && mz > 0.1 && !swim && !ladder;
+    const speed = (this.inLava ? WALK_SPEED * LAVA_SPEED : this.inWater ? WALK_SPEED * WATER_SPEED : WALK_SPEED) * this.speedMul * (this.sprinting ? SPRINT_MUL : 1);
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
-    this.vel.x = (-sin * mz + cos * mx) * speed;
-    this.vel.z = (-cos * mz - sin * mx) * speed;
+    // jégen a sebesség lassan igazodik a célhoz (csúszás), egyébként szinte azonnal; levegőben az utolsó talaj szabálya él
+    if (this.onGround) {
+      const under = this.world.getBlock(Math.floor(p.x), Math.floor(p.y - 0.05), Math.floor(p.z));
+      this.slip = ICE.test(BLOCKS[under]?.key ?? '');
+    }
+    const a = swim || ladder ? 1 : 1 - Math.exp(-(this.slip ? ICE_GRIP : 40) * Math.min(dt, 0.1));
+    this.mv.x += ((-sin * mz + cos * mx) * speed - this.mv.x) * a;
+    this.mv.z += ((-cos * mz - sin * mx) * speed - this.mv.z) * a;
+    this.vel.x = this.mv.x;
+    this.vel.z = this.mv.z;
     this.vel.x += this.knock.x;
     this.vel.z += this.knock.z;
     const kd = Math.exp(-7 * Math.min(dt, 0.1));
@@ -150,9 +171,9 @@ export class Player {
           : Math.max(this.vel.y - GRAVITY * h, -MAX_FALL);
 
       p.x += this.vel.x * h;
-      if (this.collides(p.x, p.y, p.z) && !this.stepUp(p, swim || ladder)) p.x -= this.vel.x * h;
+      if (this.collides(p.x, p.y, p.z) && !this.stepUp(p, swim || ladder)) { p.x -= this.vel.x * h; this.mv.x = 0; }
       p.z += this.vel.z * h;
-      if (this.collides(p.x, p.y, p.z) && !this.stepUp(p, swim || ladder)) p.z -= this.vel.z * h;
+      if (this.collides(p.x, p.y, p.z) && !this.stepUp(p, swim || ladder)) { p.z -= this.vel.z * h; this.mv.z = 0; }
 
       const dy = this.vel.y * h;
       p.y += dy;

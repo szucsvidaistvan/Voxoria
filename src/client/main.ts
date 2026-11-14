@@ -1347,10 +1347,13 @@ async function main(): Promise<void> {
       const { mx, mz } = sleepSeq ? { mx: 0, mz: 0 } : input.getMove();
       const wasGround = player.onGround, px0 = player.pos.x, pz0 = player.pos.z;
       player.speedMul = blocking ? 0.8 : 1;
-      player.update(dt, mx, mz, sleepSeq ? false : input.jump);
+      player.update(dt, mx, mz, sleepSeq ? false : input.jump, !sleepSeq && !blocking && health.food > 6 && input.wantsSprint());
+      // futás közben tágabb látómező
+      const tf = player.sprinting ? 83 : 75;
+      if (Math.abs(camera.fov - tf) > 0.05) { camera.fov += (tf - camera.fov) * Math.min(1, dt * 10); camera.updateProjectionMatrix(); }
       if (mode === 'survival') {
         // a mozgás (méterenként) és az ugrás kimerít
-        health.exhaust(Math.hypot(player.pos.x - px0, player.pos.z - pz0) * 0.025);
+        health.exhaust(Math.hypot(player.pos.x - px0, player.pos.z - pz0) * (player.sprinting ? 0.1 : 0.025));
         if (wasGround && !player.onGround && player.vel.y > 0) health.exhaust(0.05);
       }
 
