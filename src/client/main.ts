@@ -1400,9 +1400,25 @@ async function main(): Promise<void> {
           camera.position.set(player.pos.x - sy * cp * dist, player.pos.y + EYE + sp * dist, player.pos.z - cy * cp * dist);
           camera.rotation.set(-player.pitch, player.yaw + Math.PI, 0);
         } else camera.position.set(player.pos.x + sy * cp * dist, player.pos.y + EYE - sp * dist, player.pos.z + cy * cp * dist);
+        // a kamera ne kerüljön blokkba (különben átlátni a földön, a barlangokat és az érceket): a szemtől a kamera felé
+        // vizsgáljuk az első ütközési dobozos blokkot, és előtte megállunk
+        {
+          const ex = player.pos.x, ey = player.pos.y + EYE, ez = player.pos.z;
+          const vx = camera.position.x - ex, vy = camera.position.y - ey, vz = camera.position.z - ez;
+          const vl = Math.hypot(vx, vy, vz) || 1;
+          let t0 = 0, lim = vl;
+          for (let i = 0; i < 12 && t0 < vl; i++) {
+            const r = raycast(world, ex + (vx / vl) * t0, ey + (vy / vl) * t0, ez + (vz / vl) * t0, vx / vl, vy / vl, vz / vl, vl - t0);
+            if (!r) break;
+            const dd = t0 + Math.hypot(r.hx - (ex + (vx / vl) * t0), r.hy - (ey + (vy / vl) * t0), r.hz - (ez + (vz / vl) * t0));
+            if (BLOCKS[world.getBlock(r.x, r.y, r.z)]?.boxes?.length !== 0) { lim = Math.max(0.25, dd - 0.3); break; }
+            t0 = dd + 0.02;
+          }
+          if (lim < vl) camera.position.set(ex + (vx / vl) * lim, ey + (vy / vl) * lim, ez + (vz / vl) * lim);
+        }
         playerView.setHeld(held()?.id ?? 0);
         playerView.set(player.pos.x, player.pos.y, player.pos.z, player.yaw, walkPhase, Math.hypot(player.vel.x, player.vel.z) / 4, skyAt(timeOfDay, dayCount).light,
-          { swing: hand?.swingP ?? 0, eat: hand?.eatP ?? 0, chewPhase: hand?.eatPhase ?? 0, block: blocking });
+          { swing: hand?.swingP ?? 0, eat: hand?.eatP ?? 0, chewPhase: hand?.eatPhase ?? 0, block: blocking, pitch: player.pitch, sprint: player.sprinting ? 1 : 0 });
       }
       cx = player.pos.x;
       cz = player.pos.z;

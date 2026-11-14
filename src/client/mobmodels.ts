@@ -52,7 +52,7 @@ export function armorParts(material: string, slot: number): TPart[] {
   const t1 = `armor_${material}_1` as ArmorTex, t2 = `armor_${material}_2` as ArmorTex;
   const leg = (tex: ArmorTex, x: number, sw: number, grow: number): TPart => ({ tex, px: [4, 12, 4], uv: [0, 16], p: [x, 6, 0], pivot: [x, 12, 0], swing: sw, grow });
   const arm = (x: number, sw: number): TPart => ({ tex: t1, px: [4, 12, 4], uv: [40, 16], p: [x, 18, 0], pivot: [x, 24, 0], swing: sw, grow: 0.9 });
-  if (slot === 0) return [{ tex: t1, px: [8, 8, 8], uv: [0, 0], p: [0, 28, 0], grow: 0.9 }];
+  if (slot === 0) return [{ tex: t1, px: [8, 8, 8], uv: [0, 0], p: [0, 28, 0], pivot: [0, 24, 0], swing: 0, grow: 0.9 }];
   if (slot === 1) return [{ tex: t1, px: [8, 12, 4], uv: [16, 16], p: [0, 18, 0], grow: 0.9 }, arm(6, -1), arm(-6, 1)];
   if (slot === 2) return [{ tex: t2, px: [8, 12, 4], uv: [16, 16], p: [0, 18, 0], grow: 0.5 }, leg(t2, 2, 1, 0.5), leg(t2, -2, -1, 0.5)];
   return [leg(t1, 2, 1, 0.9), leg(t1, -2, -1, 0.9)];
@@ -108,8 +108,9 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
   ],
   // a játékos: 64x64-es skin (saját terv); a karakter jobb keze a +x oldalon van
   player: [
-    { tex: 'player', px: [8, 8, 8], uv: [0, 0], p: [0, 28, 0] },
-    { tex: 'player', px: [8, 8, 8], uv: [32, 0], p: [0, 28, 0], grow: 0.5 },
+    // a fej a nyaknál (y 24) forog: a nézés irányát követi (fel-le, és a testhez képest oldalra is)
+    { tex: 'player', px: [8, 8, 8], uv: [0, 0], p: [0, 28, 0], pivot: [0, 24, 0], swing: 0 },
+    { tex: 'player', px: [8, 8, 8], uv: [32, 0], p: [0, 28, 0], pivot: [0, 24, 0], swing: 0, grow: 0.5 },
     { tex: 'player', px: [8, 12, 4], uv: [16, 16], p: [0, 18, 0] },
     { tex: 'player', px: [8, 12, 4], uv: [16, 32], p: [0, 18, 0], grow: 0.25 },
     // jobb kar (+x) és ujja, bal kar (−x) és ujja
