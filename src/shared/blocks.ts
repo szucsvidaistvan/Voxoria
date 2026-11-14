@@ -105,6 +105,8 @@ export interface BlockDef {
   conn?: Conn;
   /** ajtó: melyik fele, nyitva van-e, merre néz; ids: a 16 változat ([fél * 8 + nyitva * 4 + irány]) */
   door?: { half: 0 | 1; open: 0 | 1; dir: number; ids: number[] };
+  /** ágy: fél (0 láb, 1 fej) és irány (0 kelet, 1 dél, 2 nyugat, 3 észak: merre van a fej a láb felől); a másik fele az ellenkező irányban/irányban van */
+  bed?: { half: 0 | 1; dir: number };
   /** falra szerelhető blokk (létra, fáklya): az az irány, amerre alapállásban a fal van (0 kelet, 1 dél, 2 nyugat, 3 észak) */
   wall?: number;
   /** fali változat esetén: merre van a fal, amire a blokk fel van szerelve (0 kelet, 1 dél, 2 nyugat, 3 észak). Ha a fal eltűnik, a blokk leesik. */
@@ -292,7 +294,7 @@ const CROP_STAGES: [string, number][] = [['wheat', 8], ['carrots', 4], ['potatoe
 const CROP_KEYS = CROP_STAGES.flatMap(([c, n]) => Array.from({ length: n }, (_, i) => `${c}_stage${i}`));
 /** a termés fázisai és a nedves szántóföld: csak a növekedés hozza létre (nincsenek a választóban) */
 const FARM_KEYS = new Set([...CROP_KEYS, 'farmland_moist']);
-const LATE_SHAPES = ['chest', ...FARM_KEYS];
+const LATE_SHAPES = ['chest', ...FARM_KEYS, 'bed_foot', 'bed_head'];
 const FLIPPABLE = /(_slab|_stairs|_trapdoor)$/;
 
 function shapeDef(b: GeneratedBlock, dir: number, flip: number): BlockDef {
@@ -628,6 +630,16 @@ export function registerGenerated(pack: GeneratedPack): number[] {
       variants[v] = next++;
     }
     BLOCKS[id].variants = variants;
+    if (key === 'bed_foot' || key === 'bed_head') {
+      // ágy: két blokk (láb, fej), négy irányban; mindkét fél ugyanazt a tárgyat adja (a lábat)
+      const half = key === 'bed_head' ? 1 : 0;
+      const footId = KEY_ID.get('bed_foot')!;
+      variants.forEach((vid, dir) => {
+        BLOCKS[vid].bed = { half, dir };
+        BLOCKS[vid].name = 'Bed';
+        if (half) { BLOCKS[vid].hidden = true; BLOCKS[vid].base = footId; }
+      });
+    }
   }
   refreshLight();
 

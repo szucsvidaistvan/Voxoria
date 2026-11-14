@@ -19,7 +19,7 @@ import { bonusDrop, breakRule, breakTime, dropFor } from '../shared/survival';
 import { raycast, type RayHit } from '../shared/raycast';
 import { CH, CS, SEA_LEVEL, World } from '../shared/world';
 import { buildAtlas, TILE } from './atlas';
-import { DAY_SECONDS, START_TIME, formatClock, skyAt } from './daynight';
+import { DAY_FRACTION, DAY_SECONDS, START_TIME, formatClock, isNight, skyAt } from './daynight';
 import { createMoonTexture, createSunTexture } from './sky';
 import { createMobView, createPlayerView } from './mobview';
 import { EAT_TIME, createHandItem } from './handitem';
@@ -174,6 +174,25 @@ async function main(): Promise<void> {
   let timeOfDay = START_TIME;
   /** hányadik napnál tartunk (a hold fázisa ebből jön) */
   let dayCount = 1;
+  /** a láb→fej irány az ágynál: 0 kelet, 1 dél, 2 nyugat, 3 észak (mint a játékos nézési iránya) */
+  const BED_DIR: [number, number][] = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+  const toastEl = document.getElementById('toast') as HTMLElement;
+  let toastTimer = 0;
+  const showToast = (text: string, ms = 2600): void => {
+    toastEl.textContent = text;
+    toastEl.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => { toastEl.hidden = true; }, ms);
+  };
+  /** Alvás: csak éjjel, és csak ha nincs ellenséges mob a közelben; reggelre ugrik az idő */
+  const sleep = (): void => {
+    if (!isNight(timeOfDay)) { showToast('You can only sleep at night'); return; }
+    const near = mobs.mobs.some((m) => m.def.hostile && Math.hypot(m.x - player.pos.x, m.y - player.pos.y, m.z - player.pos.z) < 8);
+    if (near) { showToast('You cannot sleep now: there are monsters nearby'); return; }
+    if (timeOfDay >= DAY_FRACTION) dayCount++;
+    timeOfDay = START_TIME;
+    showToast('Good morning!');
+  };
   /** a lerakott tűzhelyek állapota, a helyük szerint ("x,y,z") */
   const furnaces = new Map<string, Furnace>();
   const chests = new Map<string, Chest>();
@@ -892,6 +911,19 @@ async function main(): Promise<void> {
         chests.delete(fkey(x, y, z));
       }
     }
+    // ágy: a másik fele is eltűnik (egyetlen ágyat ad)
+    const bedDef = BLOCKS[id]?.bed;
+    if (bedDef) {
+      const [bx, bz] = BED_DIR[bedDef.dir];
+      const sgn = bedDef.half === 0 ? 1 : -1;
+      const ox = x + bx * sgn, oz = z + bz * sgn;
+      const ob = BLOCKS[world.getBlock(ox, y, oz)]?.bed;
+      if (ob && ob.dir === bedDef.dir && ob.half !== bedDef.half) {
+        const oid = world.getBlock(ox, y, oz);
+        setBlockAt(ox, y, oz, AIR);
+        particles.burst(ox, y, oz, oid);
+      }
+    }
     // ajtó: a másik fele is eltűnik (egyetlen ajtót ad)
     const door = BLOCKS[id]?.door;
     if (door) {
@@ -1005,6 +1037,11 @@ async function main(): Promise<void> {
         return;
       }
     }
+    // ágy: éjszaka átalszuk az estét
+    if (BLOCKS[world.getBlock(hit.x, hit.y, hit.z)]?.bed) {
+      sleep();
+      return;
+    }
     // ajtó: nyitás és csukás
     const hitDoor = BLOCKS[world.getBlock(hit.x, hit.y, hit.z)]?.door;
     if (hitDoor) {
@@ -1058,6 +1095,23 @@ async function main(): Promise<void> {
     /** a játékos nézési iránya: 0 kelet, 1 dél, 2 nyugat, 3 észak */
     const fx0 = -Math.sin(player.yaw), fz0 = -Math.cos(player.yaw);
     const facing = Math.abs(fx0) > Math.abs(fz0) ? (fx0 > 0 ? 0 : 2) : fz0 > 0 ? 1 : 3;
+    if (def?.bed) {
+      // ágy: két blokk, a láb a célblokkon, a fej a játékos nézési irányában előtte
+      const [bx, bz] = BED_DIR[facing];
+      const hx = hit.px + bx, hz = hit.pz + bz;
+      const there = world.getBlock(hx, hit.py, hz);
+      if (!(there === AIR || isReplaceable(there))) return;
+      if (player.intersectsBlock(hit.px, hit.py, hit.pz) || player.intersectsBlock(hx, hit.py, hz)) return;
+      const headBase = blockId('bed_head');
+      const footV = def.variants?.[facing], headV = headBase === undefined ? undefined : BLOCKS[headBase].variants?.[facing];
+      if (footV === undefined || headV === undefined) return;
+      if (setBlockAt(hit.px, hit.py, hit.pz, footV) && setBlockAt(hx, hit.py, hz, headV)) {
+        refresh(hit.px, hit.pz);
+        refresh(hx, hz);
+        if (mode === 'survival') { inv.takeOne(input.hotbar); paintHotbar(); }
+      }
+      return;
+    }
     if (def?.door) {
       // ajtó: két blokk magas, a játékos nézési irányába néz
       const above = world.getBlock(hit.px, hit.py + 1, hit.pz);
@@ -1393,6 +1447,9 @@ async function main(): Promise<void> {
       teleport: (x: number, y: number, z: number) => { player.pos = { x, y, z }; stream(x, z, 2, Infinity, Infinity); },
       look: (yaw: number, pitch: number) => { player.yaw = yaw; player.pitch = pitch; },
       setBlock: (x: number, y: number, z: number, id: number) => setBlockAt(x, y, z, id),
+      getTime: () => timeOfDay, setTime: (t: number) => { timeOfDay = t; }, getDay: () => dayCount,
+      /** jobb klikk egy blokkon (használat/lerakás), mintha a játékos célozna rá */
+      useAt: (x: number, y: number, z: number) => useItem({ x, y, z, px: x, py: y + 1, pz: z } as unknown as RayHit),
     };
   }
 
