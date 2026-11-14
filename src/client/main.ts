@@ -1341,7 +1341,7 @@ async function main(): Promise<void> {
       if (settings.mobs !== 'off') {
         if (state !== 'dead') {
           const night = sky.elevation < -0.05;
-          mobs.spawnTick(dt, player.pos.x, player.pos.z, night, mode === 'survival' && settings.mobs === 'on');
+          mobs.spawnTick(dt, player.pos.x, player.pos.y, player.pos.z, night, mode === 'survival' && settings.mobs === 'on');
         }
         mobs.update(dt, makeMobCtx(sky));
       }
