@@ -33,6 +33,10 @@ export class Input {
   onView: () => void = () => {};
 
   private keys = new Set<string>();
+  /** futás: dupla koppintás előre (W vagy a joystick) tartja, amíg el nem engedi; géppen a Ctrl is */
+  private sprintLatch = false;
+  private lastFwdUp = 0;
+  private lastJoyUp = 0;
   private joy = { x: 0, y: 0 };
   private joyId: number | null = null;
   private lookId: number | null = null;
@@ -70,7 +74,15 @@ export class Input {
     return { mx, mz };
   }
 
+  /** Futni akar-e a játékos (előre mozgás közben)? */
+  wantsSprint(): boolean {
+    const fwd = this.keys.has('KeyW') || this.joy.y > 0.3;
+    if (!fwd) return false;
+    return this.sprintLatch || this.keys.has('ControlLeft') || this.keys.has('ControlRight');
+  }
+
   reset(): void {
+    this.sprintLatch = false;
     this.keys.clear();
     this.joy.x = this.joy.y = 0;
     this.joyId = this.lookId = null;
@@ -103,12 +115,14 @@ export class Input {
         return;
       }
       if (e.code === 'KeyV' && !e.repeat) this.onView();
+      if (e.code === 'KeyW' && !e.repeat && performance.now() - this.lastFwdUp < 300) this.sprintLatch = true;
       const d = /^Digit([1-9])$/.exec(e.code);
       if (d && Number(d[1]) <= this.slots) this.select(Number(d[1]) - 1);
       this.keys.add(e.code);
     });
     document.addEventListener('keyup', (e) => {
       if (e.code === 'Space') this.jump = false;
+      if (e.code === 'KeyW') { this.lastFwdUp = performance.now(); this.sprintLatch = false; }
       this.keys.delete(e.code);
     });
     document.addEventListener('mousemove', (e) => {
@@ -157,6 +171,7 @@ export class Input {
       e.preventDefault();
       const t = e.changedTouches[0];
       this.joyId = t.identifier;
+      if (performance.now() - this.lastJoyUp < 350) this.sprintLatch = true; // dupla koppintás: futás
       moveJoy(t);
     }, opts);
     joy.addEventListener('touchmove', (e) => {
@@ -168,6 +183,8 @@ export class Input {
         if (t.identifier === this.joyId) {
           this.joyId = null;
           this.joy.x = this.joy.y = 0;
+          this.sprintLatch = false;
+          this.lastJoyUp = performance.now();
           knob.style.transform = '';
         }
       }
