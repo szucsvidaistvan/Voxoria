@@ -177,6 +177,9 @@ async function main(): Promise<void> {
   /** a láb→fej irány az ágynál: 0 kelet, 1 dél, 2 nyugat, 3 észak (mint a játékos nézési iránya) */
   const BED_DIR: [number, number][] = [[1, 0], [0, 1], [-1, 0], [0, -1]];
   const toastEl = document.getElementById('toast') as HTMLElement;
+  const fadeEl = document.getElementById('sleepfade') as HTMLElement;
+  const dayTitleEl = document.getElementById('daytitle') as HTMLElement;
+  let sleepSeq: { t: number; jumped: boolean; hp: number; from: { x: number; y: number; z: number; yaw: number; pitch: number }; to: { x: number; y: number; z: number; yaw: number; pitch: number } } | null = null;
   let toastTimer = 0;
   const showToast = (text: string, ms = 2600): void => {
     toastEl.textContent = text;
@@ -185,13 +188,52 @@ async function main(): Promise<void> {
     toastTimer = window.setTimeout(() => { toastEl.hidden = true; }, ms);
   };
   /** Alvás: csak éjjel, és csak ha nincs ellenséges mob a közelben; reggelre ugrik az idő */
-  const sleep = (): void => {
+  const sleep = (bx: number, by: number, bz: number): void => {
+    if (sleepSeq) return;
     if (!isNight(timeOfDay)) { showToast('You can only sleep at night'); return; }
     const near = mobs.mobs.some((m) => m.def.hostile && Math.hypot(m.x - player.pos.x, m.y - player.pos.y, m.z - player.pos.z) < 8);
     if (near) { showToast('You cannot sleep now: there are monsters nearby'); return; }
-    if (timeOfDay >= DAY_FRACTION) dayCount++;
-    timeOfDay = START_TIME;
-    showToast('Good morning!');
+    // a fej cellája és a fekvő kamera: a párna fölött, felfelé nézve, a láb felé fordulva
+    const def = BLOCKS[world.getBlock(bx, by, bz)]?.bed;
+    if (!def) return;
+    const [dx, dz] = BED_DIR[def.dir];
+    const hx = def.half === 0 ? bx + dx : bx, hz = def.half === 0 ? bz + dz : bz;
+    sleepSeq = {
+      t: 0, jumped: false, hp: health.hp,
+      from: { x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw: player.yaw, pitch: player.pitch },
+      to: { x: hx + 0.5 - dx * 0.1, y: by + 9 / 16 + 0.22, z: hz + 0.5 - dz * 0.1, yaw: Math.atan2(dx, dz), pitch: 1.45 },
+    };
+  };
+  const smooth = (x: number) => { const c = Math.max(0, Math.min(1, x)); return c * c * (3 - 2 * c); };
+  /** Az alvás-átmenet: ráfekszik az ágyra, elsötétül, reggel lesz, kiírja a napot, majd feláll. Menet közben a játékos nem mozog. */
+  const stepSleep = (dt: number): void => {
+    const sq = sleepSeq!;
+    sq.t += dt;
+    const t = sq.t;
+    // ha megsebzik, felébred (az idő már ugorhatott)
+    if (health.dead || health.hp < sq.hp - 0.01) { sleepSeq = null; fadeEl.style.opacity = '0'; fadeEl.hidden = true; return; }
+    sq.hp = health.hp;
+    fadeEl.hidden = false;
+    const fade = t < 0.8 ? 0 : t < 1.8 ? smooth(t - 0.8) : t < 2.6 ? 1 : 1 - smooth((t - 2.6) / 1.4);
+    fadeEl.style.opacity = String(fade);
+    if (t >= 1.8 && !sq.jumped) {
+      sq.jumped = true;
+      if (timeOfDay >= DAY_FRACTION) dayCount++;
+      timeOfDay = START_TIME;
+      dayTitleEl.textContent = `Day ${dayCount}`;
+      dayTitleEl.hidden = false;
+      dayTitleEl.style.animation = 'none';
+      void dayTitleEl.offsetWidth;
+      dayTitleEl.style.animation = '';
+      window.setTimeout(() => { dayTitleEl.hidden = true; }, 3200);
+    }
+    // a kamera: odamegy az ágyhoz és lefekszik (0–1 s), fekszik, majd feláll (3,2–4,2 s)
+    const k = t < 1 ? smooth(t) : t < 3.2 ? 1 : 1 - smooth(t - 3.2);
+    let dy = sq.to.yaw - sq.from.yaw;
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    camera.position.set(sq.from.x + (sq.to.x - sq.from.x) * k, sq.from.y + (sq.to.y - sq.from.y) * k, sq.from.z + (sq.to.z - sq.from.z) * k);
+    camera.rotation.set(sq.from.pitch + (sq.to.pitch - sq.from.pitch) * k, sq.from.yaw + dy * k, 0);
+    if (t >= 4.2) { sleepSeq = null; fadeEl.style.opacity = '0'; fadeEl.hidden = true; }
   };
   /** a lerakott tűzhelyek állapota, a helyük szerint ("x,y,z") */
   const furnaces = new Map<string, Furnace>();
@@ -1051,7 +1093,7 @@ async function main(): Promise<void> {
     }
     // ágy: éjszaka átalszuk az estét
     if (BLOCKS[world.getBlock(hit.x, hit.y, hit.z)]?.bed) {
-      sleep();
+      sleep(hit.x, hit.y, hit.z);
       return;
     }
     // ajtó: nyitás és csukás
@@ -1298,13 +1340,14 @@ async function main(): Promise<void> {
 
     let cx: number, cz: number;
     if (state !== 'menu') {
+      if (sleepSeq) input.dYaw = input.dPitch = 0;
       player.yaw += input.dYaw;
       player.pitch = Math.max(-1.55, Math.min(1.55, player.pitch + input.dPitch));
       input.dYaw = input.dPitch = 0;
-      const { mx, mz } = input.getMove();
+      const { mx, mz } = sleepSeq ? { mx: 0, mz: 0 } : input.getMove();
       const wasGround = player.onGround, px0 = player.pos.x, pz0 = player.pos.z;
       player.speedMul = blocking ? 0.8 : 1;
-      player.update(dt, mx, mz, input.jump);
+      player.update(dt, mx, mz, sleepSeq ? false : input.jump);
       if (mode === 'survival') {
         // a mozgás (méterenként) és az ugrás kimerít
         health.exhaust(Math.hypot(player.pos.x - px0, player.pos.z - pz0) * 0.025);
@@ -1326,7 +1369,8 @@ async function main(): Promise<void> {
 
       camera.position.set(player.pos.x, player.pos.y + EYE, player.pos.z);
       camera.rotation.set(player.pitch, player.yaw, 0);
-      if (state === 'playing') interact(dt);
+      if (sleepSeq) stepSleep(dt);
+      if (state === 'playing' && !sleepSeq) interact(dt);
       else { mine.active = false; mineEl.classList.remove('on'); }
       // harmadik személy: a kamera a játékos mögé kerül (az interakció a szemből történt, a fenti sor után)
       walkPhase += Math.hypot(player.pos.x - px0, player.pos.z - pz0);
