@@ -108,11 +108,12 @@ export function dropFor(id: number, held: number | undefined, rand: () => number
   if (/glass/.test(key) && !/pane$/.test(key)) return null;
   // fű és páfrány: néha búzamag
   if (/^(short_grass|grass|fern|tall_grass)$/.test(key)) {
-    // átmenetileg (amíg nincs földművelés/horgászat) a fű ritkán más növényi alapanyagot is ad
-    const q = rand();
-    const pick = q < 0.125 ? 'wheat_seeds' : q < 0.15 ? 'beetroot_seeds' : q < 0.17 ? 'wheat' : q < 0.185 ? 'carrot' : q < 0.2 ? 'potato' : q < 0.21 && key === 'fern' ? 'rabbit' : q < 0.22 ? 'beetroot' : null;
-    return pick && EXTRA_ID[pick] !== undefined ? { id: EXTRA_ID[pick], n: 1 } : null;
+    // csak búzamag (12,5%); a többi növény máshonnan jön: vad murok/krumpli/cékla a világban, zombik, kakaó a dzsungelfákon
+    return rand() < 0.125 && EXTRA_ID['wheat_seeds'] !== undefined ? { id: EXTRA_ID['wheat_seeds'], n: 1 } : null;
   }
+  // kakaóhüvely: éretten 2–3 babot ad, éretlenül egyet
+  const cocoa = /^cocoa_stage(\d)$/.exec(key);
+  if (cocoa && EXTRA_ID['cocoa_beans'] !== undefined) return { id: EXTRA_ID['cocoa_beans'], n: cocoa[1] === '2' ? 2 + Math.floor(rand() * 2) : 1 };
   const crop = /^(wheat|carrots|potatoes|beetroots)_stage(\d)$/.exec(key);
   if (crop) {
     const ripe = Number(crop[2]) === (crop[1] === 'wheat' ? 7 : 3);

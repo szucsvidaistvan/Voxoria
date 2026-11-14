@@ -1,4 +1,4 @@
-import { AIR, B, blockId } from './blocks';
+import { AIR, B, BLOCKS, COCOA_LOG, blockId } from './blocks';
 import type { Chunk } from './world';
 import { CH, CS, SEA_LEVEL, fbm, lvl, hash2, valueNoise, valueNoise3 } from './noise';
 
@@ -160,6 +160,7 @@ export function placeTreeOf(wood: Wood, c: Chunk, x: number, y: number, z: numbe
     case 'jungle': {
       const trunk = 8 + Math.floor(rnd * 4);
       for (let i = 0; i < trunk; i++) put(c, x, y + i, z, log, false);
+      cocoaPods(c, x, y, z, trunk, rnd);
       const top = y + trunk;
       disc(c, x, top - 2, z, 3, leaf, true);
       disc(c, x, top - 1, z, 3, leaf, true);
@@ -232,12 +233,15 @@ export function decorate(c: Chunk, seed: number, b: Biome, x: number, z: number,
       if (r2 < 0.14) plant(c, x, y, z, 'short_grass');
       else if (r2 < 0.17) plant(c, x, y, z, pick(FLOWERS_PLAINS, r3));
       else if (r2 < 0.1715) plant(c, x, y, z, 'pumpkin');
+      else if (r2 < 0.1735) plant(c, x, y, z, 'carrots_stage3'); // vad, kifejlett növény
+      else if (r2 < 0.1755) plant(c, x, y, z, 'potatoes_stage3');
       break;
     case 'forest':
       if (r2 < 0.08) plant(c, x, y, z, 'short_grass');
       else if (r2 < 0.095) plant(c, x, y, z, pick(FLOWERS_FOREST, r3));
       else if (r2 < 0.115) plant(c, x, y, z, 'fern');
       else if (r2 < 0.118) plant(c, x, y, z, r3 < 0.5 ? 'brown_mushroom' : 'red_mushroom');
+      else if (r2 < 0.1205) plant(c, x, y, z, 'beetroots_stage3');
       break;
     case 'dark_forest':
       if (r2 < 0.04) plant(c, x, y, z, 'short_grass');
@@ -247,12 +251,14 @@ export function decorate(c: Chunk, seed: number, b: Biome, x: number, z: number,
     case 'taiga':
       if (r2 < 0.06) plant(c, x, y, z, 'fern');
       else if (r2 < 0.09) plant(c, x, y, z, 'short_grass');
+      else if (r2 < 0.092) plant(c, x, y, z, 'potatoes_stage3');
       // a fák alatt és a talaj felett hóréteg
       if (c.get(x, y, z) === AIR) plant(c, x, y, z, 'snow');
       break;
     case 'savanna':
       if (r2 < 0.2) plant(c, x, y, z, 'short_grass');
       else if (r2 < 0.205) plant(c, x, y, z, 'dandelion');
+      else if (r2 < 0.207) plant(c, x, y, z, 'carrots_stage3');
       break;
     case 'jungle':
       if (r2 < 0.1) plant(c, x, y, z, 'short_grass');
@@ -278,6 +284,21 @@ export function decorate(c: Chunk, seed: number, b: Biome, x: number, z: number,
 }
 
 /** Nád a víz mellett: a tengerszint feletti első sáv, ha a szomszéd oszlop már víz */
+/** Kakaóhüvelyek a jungle fa törzsének oldalán (különböző érettségben) */
+function cocoaPods(c: Chunk, x: number, y: number, z: number, trunk: number, rnd: number): void {
+  const base = [0, 1, 2].map((s) => G(`cocoa_stage${s}`, AIR));
+  if (base.some((id) => id === AIR)) return;
+  for (let dir = 0; dir < 4; dir++) {
+    if (hash2(x * 31 + dir, z * 17 + y, 777) > 0.45) continue; // nem minden oldalon van
+    // a rönk COCOA_LOG[dir] irányban van a hüvelytől, tehát a hüvely a törzs mellett az ellenkező oldalon áll
+    const px = x - COCOA_LOG[dir][0], pz = z - COCOA_LOG[dir][1];
+    const py = y + 2 + Math.floor(hash2(x + dir, z - dir, 4242) * Math.max(1, trunk - 5));
+    const stage = Math.min(2, Math.floor(hash2(px, pz + py, 99) * 3.4));
+    const vid = BLOCKS[base[stage]]?.variants?.[dir];
+    if (vid !== undefined && c.get(px, py, pz) === AIR) c.set(px, py, pz, vid);
+  }
+}
+
 let caneSoil: Set<number> | undefined;
 /** Amin cukornád megáll: homok, föld, fű és rokonaik */
 const CANE_SOIL = (): Set<number> =>
