@@ -388,6 +388,8 @@ export class MobManager {
       const m = this.mobs[i];
       const far = Math.hypot(m.x - ctx.px, m.z - ctx.pz);
       if (far > 80 && !m.dead) { this.mobs.splice(i, 1); continue; }
+      // a messze maradt ellenséges mobok lassan eltűnnek (nem torlaszolják el a létszámkeretet)
+      if (m.def.hostile && !m.dead && far > 40 && Math.random() < dt * 0.1) { this.mobs.splice(i, 1); continue; }
       if (!this.world.isLoaded(m.x, m.z)) continue; // betöltetlen terepen megállnak
       m.hurtT = Math.max(0, m.hurtT - dt);
 
@@ -420,7 +422,7 @@ export class MobManager {
   }
 
   /** Új mobok a játékos környékén. `night`: sötét van a felszínen (ilyenkor jönnek a szörnyek). */
-  spawnTick(dt: number, px: number, pz: number, night: boolean, hostileAllowed: boolean): void {
+  spawnTick(dt: number, px: number, py: number, pz: number, night: boolean, hostileAllowed: boolean): void {
     this.spawnT -= dt;
     if (this.spawnT > 0) return;
     const passiveN = this.count(false);
@@ -432,8 +434,11 @@ export class MobManager {
     if (hostileAllowed && this.count(true) < MOB_CAP_HOSTILE) {
       const roll = Math.random();
       const kind: MobKind = roll < 0.45 ? 'zombie' : roll < 0.75 ? 'skeleton' : 'spider';
-      if (night) this.trySpawn(px, pz, kind, 18, 40, 'surface');
-      else if (Math.random() < 0.35) this.trySpawn(px, pz, kind, 14, 30, 'cave'); // barlangokban nappal is
+      // a szörnyek a játékostól legalább 24 blokkra jönnek elő (nem a szeme előtt), és ritkán
+      if (Math.random() < 0.5) {
+        if (night) this.trySpawn(px, pz, kind, 24, 44, 'surface', py);
+        else if (Math.random() < 0.35) this.trySpawn(px, pz, kind, 24, 36, 'cave', py); // barlangokban nappal is
+      }
     }
   }
 
@@ -459,7 +464,7 @@ export class MobManager {
   }
 
   /** Egy csoport (passzív: 1–3) leszállítása a játékostól minRange..maxRange távolságra */
-  private trySpawn(px: number, pz: number, want: MobKind | 'fauna', minR: number, maxR: number, where: 'surface' | 'cave'): void {
+  private trySpawn(px: number, pz: number, want: MobKind | 'fauna', minR: number, maxR: number, where: 'surface' | 'cave', py = NaN): void {
     const w = this.world;
     const a = Math.random() * Math.PI * 2, r = minR + Math.random() * (maxR - minR);
     const x = Math.floor(px + Math.cos(a) * r), z = Math.floor(pz + Math.sin(a) * r);
@@ -469,7 +474,10 @@ export class MobManager {
     else {
       const top = w.heightAt(x, z);
       if (top < 14) return;
-      y = 4 + Math.floor(Math.random() * (top - 8));
+      // csak a játékos magasságának közelében (±16), különben a világ egész oszlopából választana
+      const lo = Math.max(4, Math.floor(py) - 16), hi = Math.min(top - 5, Math.floor(py) + 16);
+      if (!(hi > lo)) return;
+      y = lo + Math.floor(Math.random() * (hi - lo));
     }
     let kind: MobKind;
     if (want === 'fauna') {
@@ -482,6 +490,8 @@ export class MobManager {
     if (!(isSolid(below) && fluidKind(below) === 0 && w.getBlock(x, y, z) === 0 && w.getBlock(x, y + 1, z) === 0)) return;
     // barlangban csak fedett helyre (legalább néhány blokk kő van fölötte)
     if (where === 'cave' && w.heightAt(x, z) - y < 5) return;
+    // ellenséges mob nem jelenhet meg a játékos látóterében (szabad rálátás 40 blokkon belül)
+    if (MOB_DEFS[kind].hostile && !isNaN(py) && clearShot(w, px, py + 1.6, pz, x + 0.5, y + 1, z + 0.5)) return;
     // szörny csak sötétben: fedett barlangban (fa lombja alatt nem), vagy éjjel a szabadban, és nem fáklya mellett
     if (MOB_DEFS[kind].hostile && !this.dark(x, y, z, where === 'cave')) return;
     // állatok csak füvön; a felszíni szörnyek bárhol, ahol szilárd a talaj
