@@ -505,6 +505,19 @@ async function main(): Promise<void> {
     const r = raycast(world, c.x, c.y, c.z, dx / len, dy / len, dz / len, len);
     return !!r && Math.hypot(r.hx - c.x, r.hy - c.y, r.hz - c.z) < len - 0.5;
   });
+  /** az első olyan blokk távolsága, aminek van ütközési doboza (a növényeken, fáklyán, pókhálón átlát a sugár) */
+  const solidDist = (ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, max: number): number => {
+    let t0 = 0;
+    for (let i = 0; i < 12 && t0 < max; i++) {
+      const r = raycast(world, ox + dx * t0, oy + dy * t0, oz + dz * t0, dx, dy, dz, max - t0);
+      if (!r) return Infinity;
+      const d = t0 + Math.hypot(r.hx - (ox + dx * t0), r.hy - (oy + dy * t0), r.hz - (oz + dz * t0));
+      const b = BLOCKS[world.getBlock(r.x, r.y, r.z)];
+      if (!b || b.boxes?.length !== 0) return d;
+      t0 = d + 0.02;
+    }
+    return Infinity;
+  };
   const hurtEl = $('hurt'), fireEl = $('fire-overlay');
   health.onHurt = () => {
     hurtEl.classList.remove('flash');
@@ -1280,12 +1293,12 @@ async function main(): Promise<void> {
     const blockHit: RayHit | null = raycast(world, p.x, p.y, p.z, dir.x, dir.y, dir.z, 6);
     // ha egy mob közelebb van, mint a megcélzott blokk, őt célozzuk
     const mobHit = settings.mobs === 'off' ? null : mobs.pick(p.x, p.y, p.z, dir.x, dir.y, dir.z, 3.6);
-    const blockDist = blockHit ? Math.hypot(blockHit.hx - p.x, blockHit.hy - p.y, blockHit.hz - p.z) : Infinity;
+    // a mobot nem takarják a növények (ütközési doboz nélküli blokkok): az első tömör blokkig mérünk
+    const blockDist = solidDist(p.x, p.y, p.z, dir.x, dir.y, dir.z, 6);
     const mobFirst = !!mobHit && mobHit.t < blockDist;
     // célpont-keret: a keresztszálnál látható mob (nagyobb távolságból is), ha nem takarja blokk
     const lookHit = settings.mobs === 'off' ? null : mobs.pick(p.x, p.y, p.z, dir.x, dir.y, dir.z, 24);
-    const farBlock = lookHit ? raycast(world, p.x, p.y, p.z, dir.x, dir.y, dir.z, 24) : null;
-    const farDist = farBlock ? Math.hypot(farBlock.hx - p.x, farBlock.hy - p.y, farBlock.hz - p.z) : Infinity;
+    const farDist = lookHit ? solidDist(p.x, p.y, p.z, dir.x, dir.y, dir.z, 24) : Infinity;
     const targeted = lookHit && lookHit.t < farDist ? lookHit.mob : null;
     if (settings.mobs === 'off') nameplates.update([], null, camera, innerWidth, innerHeight);
     else nameplates.update(mobs.mobs, targeted, camera, innerWidth, innerHeight);
