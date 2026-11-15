@@ -12,7 +12,8 @@
     "playtest:build": "node scripts/playtest/build.mjs",
     "playtest:mob": "node scripts/playtest/mobshot.mjs",
     "playtest:water": "node scripts/playtest/water.mjs",
-    "playtest:tall": "node scripts/playtest/tall.mjs"
+    "playtest:tall": "node scripts/playtest/tall.mjs",
+    "playtest:rtc": "node scripts/playtest/rtc.mjs"
   },
   "dependencies": {
     "three": "^0.170.0"
