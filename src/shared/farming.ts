@@ -40,9 +40,18 @@ export class CropSim {
   constructor(private world: World, private set: (x: number, y: number, z: number, id: number) => void) {}
 
   update(dt: number, px: number, pz: number, radius = 3, samples = 6, rand: () => number = Math.random): void {
+    this.updateAround(dt, [{ x: px, z: pz }], radius, samples, rand);
+  }
+
+  /** Több játékos körül (multiplayer): a számláló egyszer fut, minden játékos körül külön mintavételezünk. */
+  updateAround(dt: number, points: { x: number; z: number }[], radius = 3, samples = 6, rand: () => number = Math.random): void {
     this.acc += dt;
     if (this.acc < 0.5) return;
     this.acc = 0;
+    for (const pt of points) this.tickAround(pt.x, pt.z, radius, samples, rand);
+  }
+
+  private tickAround(px: number, pz: number, radius: number, samples: number, rand: () => number): void {
     const cx0 = Math.floor(px / CS), cz0 = Math.floor(pz / CS);
     for (let dz = -radius; dz <= radius; dz++) for (let dx = -radius; dx <= radius; dx++) {
       const ox = (cx0 + dx) * CS, oz = (cz0 + dz) * CS;

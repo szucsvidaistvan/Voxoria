@@ -6,6 +6,7 @@ import {
 } from '../shared/blocks';
 import { FluidSim, isReplaceable } from '../shared/fluids';
 import { GravitySim } from '../shared/gravity';
+import { Sim } from '../shared/sim';
 import { createFallingView } from './falling';
 import { EXTRA_ID, I, ITEMS, armorPoints, isItem, itemName, toolOf } from '../shared/items';
 import { CATEGORIES, categoryOf } from '../shared/categories';
@@ -163,6 +164,7 @@ async function main(): Promise<void> {
   let crops: CropSim;
   let player: Player;
   let sim: FluidSim;
+  let simulation: Sim;
   let mobs: MobManager;
   type Mode = 'survival' | 'creative';
   let mode: Mode = 'survival';
@@ -362,13 +364,13 @@ async function main(): Promise<void> {
   const startWorld = (seed: number, save: SaveData | null, newMode: Mode = 'survival') => {
     clearWorld();
     world = new World(seed);
-    sim = new FluidSim(world, (x, _y, z) => markDirty(x, z));
-    crops = new CropSim(world, (x, y, z, id) => { setBlockAt(x, y, z, id); });
-    gravity = new GravitySim(
-      world,
-      (x, y, z) => { markDirty(x, z); sim.notify(x, y, z); },
-      (x, y, z, id) => drops.spawn(id, 1, x + 0.5, y + 0.5, z + 0.5),
-    );
+    // a fluid-szimuláció az eredeti hívásnál csak a markDirty-t kapta (nem az y-t)
+    simulation = new Sim(world, {
+      changed: (x, _y, z) => markDirty(x, z),
+      setBlock: (x, y, z, id) => { setBlockAt(x, y, z, id); },
+      drop: (x, y, z, id) => drops.spawn(id, 1, x + 0.5, y + 0.5, z + 0.5),
+    });
+    sim = simulation.fluids; crops = simulation.crops; gravity = simulation.gravity;
     mobs = new MobManager(world);
     mobView.clear();
     dirty.clear();
@@ -844,7 +846,6 @@ async function main(): Promise<void> {
   let last = performance.now();
   let angle = 0;
   let frame = 0;
-  let simAcc = 0;
   const clockEl = $('clock');
   const resumeEl = $('resume-hint');
   let clockText = '';
@@ -1470,13 +1471,9 @@ async function main(): Promise<void> {
 
     // folyadékok és tűz: állandó 20 tick/másodperc lépésekben, a menü mögött is
     if (state !== 'menu') {
-      for (let i = 0; i < world.dynamic.length; i += 3) sim.sched(world.dynamic[i], world.dynamic[i + 1], world.dynamic[i + 2], Math.floor(Math.random() * 10));
-      world.dynamic.length = 0;
-      simAcc = Math.min(simAcc + dt, 0.25);
-      while (simAcc >= 0.05) { simAcc -= 0.05; sim.update(); gravity.update(); }
-      if (state === 'playing' || state === 'inventory') crops.update(dt, player.pos.x, player.pos.z);
+      simulation.step(dt, state === 'playing' || state === 'inventory' ? [{ x: player.pos.x, z: player.pos.z }] : []);
     }
-    if (state !== 'menu') fallingView.update(gravity.fallers, simAcc / 0.05);
+    if (state !== 'menu') fallingView.update(gravity.fallers, simulation.acc / 0.05);
     flushDirty(3);
     resumeEl.hidden = !(state === 'playing' && !input.touch && !input.locked);
     if (state !== 'menu') {
