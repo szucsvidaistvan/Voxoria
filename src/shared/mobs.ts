@@ -227,15 +227,31 @@ function physics(world: World, m: Mob, dt: number): void {
 
 // ---------- AI ----------
 
-export interface MobCtx {
-  /** a játékos lábpozíciója */
-  px: number; py: number; pz: number;
-  /** támadható-e a játékos (túlélő módban igen) */
+/** Egy játékos a mobok szemszögéből (egyjátékosnál egy elem, co-opban mindenki). */
+export interface MobPlayer {
+  /** a lábpozíció */
+  x: number; y: number; z: number;
+  /** támadható-e (túlélő módban igen) */
   target: boolean;
+  hurt(dmg: number, fromX: number, fromZ: number): void;
+}
+
+export interface MobCtx {
+  players: MobPlayer[];
   /** süt a nap (a zombik égnek) */
   day: boolean;
-  hurtPlayer(dmg: number, fromX: number, fromZ: number): void;
   onDie(m: Mob): void;
+}
+
+/** A mobhoz legközelebbi támadható játékos (vagy null) és a vízszintes távolsága. */
+function nearestTarget(players: MobPlayer[], x: number, z: number): { p: MobPlayer; dist: number } | null {
+  let best: { p: MobPlayer; dist: number } | null = null;
+  for (const p of players) {
+    if (!p.target) continue;
+    const d = Math.hypot(p.x - x, p.z - z);
+    if (!best || d < best.dist) best = { p, dist: d };
+  }
+  return best;
 }
 
 const lookAt = (m: Mob, tx: number, tz: number) => { m.yaw = Math.atan2(-(tx - m.x), -(tz - m.z)); };
@@ -257,23 +273,26 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
   priv.atkCd = Math.max(0, priv.atkCd - dt);
   let speed = 0;
 
-  const dx = ctx.px - m.x, dz = ctx.pz - m.z, dy = ctx.py - m.y;
-  const dist = Math.hypot(dx, dz);
+  // a legközelebbi támadható játékos a célpont
+  const near = nearestTarget(ctx.players, m.x, m.z);
+  const pl = near?.p ?? null;
+  const dist = near?.dist ?? Infinity;
+  const dy = pl ? pl.y - m.y : 0;
 
   const aggressive = m.angry || (def.hostile && !(m.kind === 'spider' && ctx.day));
-  if (aggressive && ctx.target && dist < 24 && Math.abs(dy) < 12) {
+  if (aggressive && pl && dist < 24 && Math.abs(dy) < 12) {
     // üldözés
-    lookAt(m, ctx.px, ctx.pz);
+    lookAt(m, pl.x, pl.z);
     if (m.kind === 'skeleton') {
       // a csontváz távolról lő: 7 blokknál közelebb megáll; szabad rálátással megáll célozni, majd nyilat lő (kitérni lehet)
-      const canShoot = dist < 16 && Math.abs(dy) < 8 && clearShot(world, m.x, m.y + 1.5, m.z, ctx.px, ctx.py + 1.3, ctx.pz);
+      const canShoot = dist < 16 && Math.abs(dy) < 8 && clearShot(world, m.x, m.y + 1.5, m.z, pl.x, pl.y + 1.3, pl.z);
       if (canShoot && priv.atkCd <= 0) {
         m.aim += dt;
         speed = 0;
         if (m.aim >= 0.8) {
           m.aim = 0;
           priv.atkCd = 2;
-          fireArrow(arrows, m.x, m.y + 1.5, m.z, ctx.px, ctx.py + 1.3, ctx.pz);
+          fireArrow(arrows, m.x, m.y + 1.5, m.z, pl.x, pl.y + 1.3, pl.z);
         }
       } else {
         m.aim = 0;
@@ -283,7 +302,7 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
       speed = dist > 0.9 ? def.speed : 0;
       if (dist < 1.4 && Math.abs(dy) < 1.8 && priv.atkCd <= 0) {
         priv.atkCd = 1;
-        ctx.hurtPlayer(def.dmg ?? 3, m.x, m.z);
+        pl.hurt(def.dmg ?? 3, m.x, m.z);
       }
     }
   } else {
@@ -367,9 +386,12 @@ export class MobManager {
         a.vy -= ARROW_GRAVITY * h;
         if (isSolid(this.world.getBlock(Math.floor(a.x), Math.floor(a.y), Math.floor(a.z)))) {
           a.stuck = 0;
-        } else if (ctx.target && Math.abs(a.x - ctx.px) < 0.45 && Math.abs(a.z - ctx.pz) < 0.45 && a.y > ctx.py - 0.1 && a.y < ctx.py + 1.85) {
-          ctx.hurtPlayer(3, a.x - a.vx * 0.05, a.z - a.vz * 0.05);
-          gone = true;
+        } else {
+          const hitP = ctx.players.find((p) => p.target && Math.abs(a.x - p.x) < 0.45 && Math.abs(a.z - p.z) < 0.45 && a.y > p.y - 0.1 && a.y < p.y + 1.85);
+          if (hitP) {
+            hitP.hurt(3, a.x - a.vx * 0.05, a.z - a.vz * 0.05);
+            gone = true;
+          }
         }
       }
       if (gone || a.age > 12) this.arrows.splice(i, 1);
@@ -386,7 +408,9 @@ export class MobManager {
     this.updateArrows(dt, ctx);
     for (let i = this.mobs.length - 1; i >= 0; i--) {
       const m = this.mobs[i];
-      const far = Math.hypot(m.x - ctx.px, m.z - ctx.pz);
+      // a legközelebbi játékostól mért távolság (játékos nélkül nem tűnik el semmi)
+      let far = ctx.players.length ? Infinity : 0;
+      for (const p of ctx.players) far = Math.min(far, Math.hypot(m.x - p.x, m.z - p.z));
       if (far > 80 && !m.dead) { this.mobs.splice(i, 1); continue; }
       // a messze maradt ellenséges mobok lassan eltűnnek (nem torlaszolják el a létszámkeretet)
       if (m.def.hostile && !m.dead && far > 40 && Math.random() < dt * 0.1) { this.mobs.splice(i, 1); continue; }
@@ -422,22 +446,28 @@ export class MobManager {
   }
 
   /** Új mobok a játékos környékén. `night`: sötét van a felszínen (ilyenkor jönnek a szörnyek). */
-  spawnTick(dt: number, px: number, py: number, pz: number, night: boolean, hostileAllowed: boolean): void {
+  spawnTick(dt: number, players: { x: number; y: number; z: number }[], night: boolean, hostileAllowed: boolean): void {
+    if (!players.length) return;
     this.spawnT -= dt;
     if (this.spawnT > 0) return;
+    // a létszámkeret a játékosokkal nő (legfeljebb 4-szeresig), a spawn egy véletlen játékos körül történik
+    const scale = Math.min(4, players.length);
+    const capP = MOB_CAP_PASSIVE * scale, capH = MOB_CAP_HOSTILE * scale;
+    const pp = players[Math.floor(Math.random() * players.length)];
+    const px = pp.x, py = pp.y, pz = pp.z;
     const passiveN = this.count(false);
-    this.spawnT = passiveN < MOB_CAP_PASSIVE / 2 ? 0.4 : 2.5;
+    this.spawnT = passiveN < capP / 2 ? 0.4 : 2.5;
 
-    if (passiveN < MOB_CAP_PASSIVE) this.trySpawn(px, pz, PASSIVE_KINDS[Math.floor(Math.random() * PASSIVE_KINDS.length)], 20, 44, 'surface');
+    if (passiveN < capP) this.trySpawn(players, px, pz, PASSIVE_KINDS[Math.floor(Math.random() * PASSIVE_KINDS.length)], 20, 44, 'surface');
     // a biomhoz illő állatok (ló, farkas, jegesmedve): ritkábban, a játékostól távolabb
-    if (passiveN < MOB_CAP_PASSIVE && Math.random() < 0.3) this.trySpawn(px, pz, 'fauna', 24, 48, 'surface');
-    if (hostileAllowed && this.count(true) < MOB_CAP_HOSTILE) {
+    if (passiveN < capP && Math.random() < 0.3) this.trySpawn(players, px, pz, 'fauna', 24, 48, 'surface');
+    if (hostileAllowed && this.count(true) < capH) {
       const roll = Math.random();
       const kind: MobKind = roll < 0.45 ? 'zombie' : roll < 0.75 ? 'skeleton' : 'spider';
       // a szörnyek a játékostól legalább 24 blokkra jönnek elő (nem a szeme előtt), és ritkán
       if (Math.random() < 0.5) {
-        if (night) this.trySpawn(px, pz, kind, 24, 44, 'surface', py);
-        else if (Math.random() < 0.35) this.trySpawn(px, pz, kind, 24, 36, 'cave', py); // barlangokban nappal is
+        if (night) this.trySpawn(players, px, pz, kind, 24, 44, 'surface', py);
+        else if (Math.random() < 0.35) this.trySpawn(players, px, pz, kind, 24, 36, 'cave', py); // barlangokban nappal is
       }
     }
   }
@@ -464,7 +494,7 @@ export class MobManager {
   }
 
   /** Egy csoport (passzív: 1–3) leszállítása a játékostól minRange..maxRange távolságra */
-  private trySpawn(px: number, pz: number, want: MobKind | 'fauna', minR: number, maxR: number, where: 'surface' | 'cave', py = NaN): void {
+  private trySpawn(players: { x: number; y: number; z: number }[], px: number, pz: number, want: MobKind | 'fauna', minR: number, maxR: number, where: 'surface' | 'cave', py = NaN): void {
     const w = this.world;
     const a = Math.random() * Math.PI * 2, r = minR + Math.random() * (maxR - minR);
     const x = Math.floor(px + Math.cos(a) * r), z = Math.floor(pz + Math.sin(a) * r);
@@ -491,7 +521,9 @@ export class MobManager {
     // barlangban csak fedett helyre (legalább néhány blokk kő van fölötte)
     if (where === 'cave' && w.heightAt(x, z) - y < 5) return;
     // ellenséges mob nem jelenhet meg a játékos látóterében (szabad rálátás 40 blokkon belül)
-    if (MOB_DEFS[kind].hostile && !isNaN(py) && clearShot(w, px, py + 1.6, pz, x + 0.5, y + 1, z + 0.5)) return;
+    if (MOB_DEFS[kind].hostile && !isNaN(py) && players.some((q) => clearShot(w, q.x, q.y + 1.6, q.z, x + 0.5, y + 1, z + 0.5))) return;
+    // egyik játékoshoz sem jöhet túl közel (a többiek közelében sem)
+    if (players.some((q) => Math.hypot(q.x - (x + 0.5), q.z - (z + 0.5)) < minR * 0.85)) return;
     // szörny csak sötétben: fedett barlangban (fa lombja alatt nem), vagy éjjel a szabadban, és nem fáklya mellett
     if (MOB_DEFS[kind].hostile && !this.dark(x, y, z, where === 'cave')) return;
     // állatok csak füvön; a felszíni szörnyek bárhol, ahol szilárd a talaj
