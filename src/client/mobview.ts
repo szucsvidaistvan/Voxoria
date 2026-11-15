@@ -343,11 +343,12 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
         if (!isRightArm(l.g)) continue;
         let rx = l.g.rotation.x * 0.5 + (heldId > 0 ? 0.314 : 0) + lift; // pozitív x: a kar előre emelkedik
         let rz = p > 0 ? -Math.sin(p * Math.PI) * 0.4 : 0;
-        if (act.eat > 0) { rx += (1.75 - rx) * act.eat + Math.abs(Math.cos(act.chewPhase * 5 * Math.PI)) * 0.12 * act.eat; rz = 0; }
+        // evés: a kéz az arc elé, a szájhoz emelkedik (nem előre kinyújtva): kevésbé magasra, és befelé fordul a test közepe felé
+        if (act.eat > 0) { rx += (1.55 - rx) * act.eat + Math.abs(Math.cos(act.chewPhase * 5 * Math.PI)) * 0.1 * act.eat; rz = 0; }
         // védekező kard (MC: x −54°, y −30°): a kar a mellkas elé emelkedik, és befelé, a test közepe felé fordul
         // (YXZ sorrend: előbb emelkedik, aztán fordul a függőleges tengely körül)
         l.g.rotation.order = 'YXZ';
-        l.g.rotation.y = act.block ? 0.52 : 0;
+        l.g.rotation.y = act.block ? 0.52 : act.eat > 0 ? 0.62 * act.eat : 0;
         if (act.block) { rx = 0.94; rz = 0; }
         l.g.rotation.x = rx;
         l.g.rotation.z = rz;
