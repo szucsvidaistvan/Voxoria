@@ -37,10 +37,12 @@ export function isGravityBlock(id: number): boolean {
 const canFallInto = (id: number) => id === AIR || fluidKind(id) !== 0 || isReplaceable(id);
 
 const OFF = 1 << 20;
-const keyOf = (x: number, y: number, z: number) => ((x + OFF) * 2097152 + (z + OFF)) * 64 + y;
+/** a magasság helye a kulcsban: a világ CH (384) magas, ezért 512 (régen 64 volt: 63 fölött a kulcs elromlott) */
+const KEY_Y = 512;
+const keyOf = (x: number, y: number, z: number) => ((x + OFF) * 2097152 + (z + OFF)) * KEY_Y + y;
 const unkey = (k: number): [number, number, number] => {
-  const y = k % 64;
-  const rest = (k - y) / 64;
+  const y = k % KEY_Y;
+  const rest = (k - y) / KEY_Y;
   const zz = rest % 2097152;
   return [(rest - zz) / 2097152 - OFF, y, zz - OFF];
 };
