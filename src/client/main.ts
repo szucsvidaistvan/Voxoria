@@ -1223,19 +1223,21 @@ async function main(): Promise<void> {
   };
 
   const makeMobCtx = (sky: { elevation: number }): MobCtx => ({
-    px: player.pos.x, py: player.pos.y, pz: player.pos.z,
-    target: mode === 'survival' && !health.dead,
+    players: [{
+      x: player.pos.x, y: player.pos.y, z: player.pos.z,
+      target: mode === 'survival' && !health.dead,
+      hurt: (dmg, fx, fz) => {
+        if (mode !== 'survival' || health.dead) return;
+        // védekező kard (jobb gomb nyomva): az elölről érkező támadás sebzése és lökése a felére csökken
+        const guard = blocking && (fx - player.pos.x) * -Math.sin(player.yaw) + (fz - player.pos.z) * -Math.cos(player.yaw) > 0 ? 0.5 : 1;
+        health.damage(wearArmor(dmg * guard));
+        lastMobHit = now(); lastMobHitBy = 'slain by a monster';
+        const d = Math.hypot(player.pos.x - fx, player.pos.z - fz) || 1;
+        player.knock.x += ((player.pos.x - fx) / d) * 5 * guard;
+        player.knock.z += ((player.pos.z - fz) / d) * 5 * guard;
+      },
+    }],
     day: sky.elevation > 0.15,
-    hurtPlayer: (dmg, fx, fz) => {
-      if (mode !== 'survival' || health.dead) return;
-      // védekező kard (jobb gomb nyomva): az elölről érkező támadás sebzése és lökése a felére csökken
-      const guard = blocking && (fx - player.pos.x) * -Math.sin(player.yaw) + (fz - player.pos.z) * -Math.cos(player.yaw) > 0 ? 0.5 : 1;
-      health.damage(wearArmor(dmg * guard));
-      lastMobHit = now(); lastMobHitBy = 'slain by a monster';
-      const d = Math.hypot(player.pos.x - fx, player.pos.z - fz) || 1;
-      player.knock.x += ((player.pos.x - fx) / d) * 5 * guard;
-      player.knock.z += ((player.pos.z - fz) / d) * 5 * guard;
-    },
     onDie: onMobDie,
   });
 
@@ -1484,7 +1486,7 @@ async function main(): Promise<void> {
       if (settings.mobs !== 'off') {
         if (state !== 'dead') {
           const night = sky.elevation < -0.05;
-          mobs.spawnTick(dt, player.pos.x, player.pos.y, player.pos.z, night, mode === 'survival' && settings.mobs === 'on');
+          mobs.spawnTick(dt, [{ x: player.pos.x, y: player.pos.y, z: player.pos.z }], night, mode === 'survival' && settings.mobs === 'on');
         }
         mobs.update(dt, makeMobCtx(sky));
       }
