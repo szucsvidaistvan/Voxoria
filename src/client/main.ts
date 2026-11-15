@@ -35,7 +35,7 @@ import { createCracks, createDrops, createParticles } from './effects';
 import { createBlockIcons } from './icons';
 import { Input } from './input';
 import { buildChunkGeometry } from './mesher';
-import { EYE, Player } from './player';
+import { EYE, Player } from '../shared/player';
 import { clearSave, initSave, loadSave, loadSettings, writeSave, writeSettings, type SaveData } from './save';
 
 const SKY = 0x8fb8ff;

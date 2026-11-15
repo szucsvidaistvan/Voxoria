@@ -1,5 +1,5 @@
-import { B, BLOCKS, FLUID_LAVA, FLUID_WATER, dynamicBoxes, fluidKind, isSolid, waterKind } from '../shared/blocks';
-import type { World } from '../shared/world';
+import { B, BLOCKS, FLUID_LAVA, FLUID_WATER, dynamicBoxes, fluidKind, isSolid, waterKind } from './blocks';
+import type { World } from './world';
 
 const HALF_W = 0.3, HEIGHT = 1.8, EPS = 1e-3;
 export const EYE = 1.62;
