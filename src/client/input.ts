@@ -21,6 +21,8 @@ export class Input {
   holdTouch = false;
   hotbar = 0;
   sensitivity = 1;
+  /** a függőleges nézés megfordítása */
+  invertY = false;
   enabled = false;
   readonly touch: boolean;
 
@@ -128,7 +130,7 @@ export class Input {
     document.addEventListener('mousemove', (e) => {
       if (!this.enabled || !this.locked) return;
       this.dYaw -= e.movementX * 0.0022 * this.sensitivity;
-      this.dPitch -= e.movementY * 0.0022 * this.sensitivity;
+      this.dPitch -= e.movementY * 0.0022 * this.sensitivity * (this.invertY ? -1 : 1);
     });
     this.canvas.addEventListener('mousedown', (e) => {
       if (!this.enabled || !this.locked) return;
@@ -213,7 +215,7 @@ export class Input {
       for (const t of Array.from(e.changedTouches)) {
         if (t.identifier !== this.lookId) continue;
         this.dYaw -= (t.clientX - this.lastX) * 0.005 * this.sensitivity;
-        this.dPitch -= (t.clientY - this.lastY) * 0.005 * this.sensitivity;
+        this.dPitch -= (t.clientY - this.lastY) * 0.005 * this.sensitivity * (this.invertY ? -1 : 1);
         this.lastX = t.clientX;
         this.lastY = t.clientY;
         if (Math.hypot(t.clientX - this.lookStart.x, t.clientY - this.lookStart.y) > TAP_SLOP) this.lookStart.moved = true;
