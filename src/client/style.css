@@ -33,13 +33,16 @@ html, body {
 /* ---------- menü ---------- */
 #menu {
   position: fixed;
-  top: 0; bottom: 0; left: 0;
-  width: min(26rem, 100%);
-  padding: max(2rem, env(safe-area-inset-top)) 2rem 2rem max(2rem, env(safe-area-inset-left));
+  top: 0; bottom: 0; left: 0; right: 0;
+  margin: 0 auto;
+  width: min(27rem, 100%);
+  padding: max(1.5rem, env(safe-area-inset-top)) 1.6rem 1.5rem;
   display: flex;
   flex-direction: column;
   justify-content: flex-start; /* a hosszú panel ne csússzon ki felül: a margók középre igazítják */
-  background: rgba(14, 26, 51, 0.86);
+  text-align: center;
+  background: rgba(14, 26, 51, 0.8);
+  border-left: 4px solid var(--gold);
   border-right: 4px solid var(--gold);
   overflow-y: auto;
 }
@@ -53,7 +56,7 @@ html, body {
   color: var(--gold);
   text-shadow: 4px 4px 0 var(--night-deep);
 }
-.lead { margin: 0 0 1.8rem; color: var(--dim); font-size: 1.1rem; line-height: 1.4; }
+.lead { margin: 0 0 1.6rem; color: var(--dim); font-size: 1.1rem; line-height: 1.4; }
 
 .btn {
   display: block;
@@ -74,10 +77,6 @@ html, body {
 .btn:focus-visible,
 #menu input:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
-#settings { margin: 0.4rem 0 1rem; padding: 1rem; background: var(--night-deep); box-shadow: inset 0 0 0 2px var(--edge); }
-#settings label { display: block; margin: 0 0 0.35rem; font-size: 1rem; }
-#settings input { width: 100%; margin: 0 0 1rem; accent-color: var(--gold); }
-#settings input:last-child { margin-bottom: 0; }
 
 .hint { margin: 1.2rem 0 0; color: var(--dim); font-size: 0.95rem; line-height: 1.5; }
 
@@ -732,18 +731,47 @@ body.touch #hud-face { width: 34px; height: 34px; }
 #daytitle { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 41; pointer-events: none; color: #fff; font-size: clamp(32px, 9vw, 72px); letter-spacing: 0.08em; text-shadow: 0 3px 0 rgba(0, 0, 0, 0.6), 0 0 24px rgba(255, 220, 140, 0.5); animation: daytitle 3.2s ease both; }
 @keyframes daytitle { 0% { opacity: 0; } 22% { opacity: 1; } 68% { opacity: 1; } 100% { opacity: 0; } }
 
-/* multiplayer ablak (a főmenü fölött) */
-#mp { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: max(1rem, env(safe-area-inset-top)) 1rem 1rem; background: rgba(8, 14, 30, 0.88); -webkit-user-select: text; user-select: text; touch-action: pan-y; }
-#mp[hidden] { display: none; }
-.mp-card { width: min(30rem, 100%); margin: auto 0; padding: 1.2rem; display: flex; flex-direction: column; gap: 0.7rem; background: var(--night); border: 4px solid var(--gold); }
-.mp-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.mp-head h2 { margin: 0; font-size: 1.4rem; color: var(--gold); }
-.mp-card .btn { margin: 0; text-align: center; }
-.mp-head .btn { width: auto; font-size: 1rem; padding: 0.5rem 1rem; }
+/* ---------- ablakok a főmenü fölött (világok, beállítások, multiplayer) ---------- */
+.overlay { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: max(1rem, env(safe-area-inset-top)) 1rem 1rem; background: rgba(8, 14, 30, 0.9); -webkit-user-select: text; user-select: text; touch-action: pan-y; }
+.overlay[hidden] { display: none; }
+.ov-card, .mp-card { width: min(30rem, 100%); margin: auto 0; padding: 1.2rem; display: flex; flex-direction: column; gap: 0.7rem; background: var(--night); border: 4px solid var(--gold); }
+.ov-head, .mp-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.ov-head h2, .mp-head h2 { margin: 0; font-size: 1.4rem; color: var(--gold); }
+.ov-card .btn, .mp-card .btn { margin: 0; text-align: center; }
+.ov-head .btn, .mp-head .btn { width: auto; font-size: 1rem; padding: 0.5rem 1rem; }
+.ov-card h3 { margin: 0.6rem 0 0; font-size: 0.95rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); border-bottom: 2px solid var(--edge); padding-bottom: 0.25rem; }
+.ov-hint { margin: 0.4rem 0 0; color: var(--dim); font-size: 0.85rem; line-height: 1.5; }
+.btn.big { font-size: 1.3rem; padding: 1rem; }
+.btn.big small, .seg small { display: block; margin-top: 0.25rem; font-size: 0.8rem; color: var(--dim); }
+.btn.primary { background: var(--sky); color: #fff; font-size: 1.4rem; padding: 1rem; }
+.btn.primary small { display: block; font-size: 0.8rem; opacity: 0.85; }
+#menu .btn { text-align: center; }
+
+/* beállítások */
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.3rem 0.8rem; font-size: 1rem; }
+.row output { color: var(--gold); margin-left: auto; }
+.row input[type="range"] { flex: 1 1 100%; accent-color: var(--gold); margin: 0.2rem 0 0.3rem; }
+.row select { font: inherit; color: var(--chalk); background: var(--night-deep); border: 2px solid var(--edge); padding: 0.35rem 0.5rem; max-width: 100%; }
+.row.check { justify-content: flex-start; gap: 0.6rem; }
+.row.check input { width: 1.2rem; height: 1.2rem; accent-color: var(--gold); }
+
+/* világok listája */
+#worlds-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.world { display: flex; align-items: stretch; gap: 0.5rem; }
+.world .play { flex: 1; min-width: 0; display: block; text-align: left !important; padding: 0.7rem 0.9rem; font-size: 1.1rem; }
+.world .play b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.world .play small { display: block; margin-top: 0.2rem; font-size: 0.8rem; color: var(--dim); }
+.world .del { flex: none; width: auto; font-size: 0.85rem !important; padding: 0 0.8rem !important; }
+.world .del.sure { background: #a2352c; color: #fff; }
+.field { display: flex; flex-direction: column; gap: 0.35rem; color: var(--dim); }
+.field input[type="text"] { font: inherit; padding: 0.5rem 0.6rem; color: var(--chalk); background: var(--night-deep); border: 2px solid var(--edge); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.seg button { font: inherit; padding: 0.7rem 0.5rem; color: var(--chalk); background: var(--panel); border: 0; cursor: pointer; box-shadow: inset 0 0 0 2px var(--edge); }
+.seg button[aria-checked="true"] { background: var(--sky); box-shadow: inset 0 0 0 3px var(--gold); }
+
+/* multiplayer ablak */
 .mp-name { display: flex; align-items: center; gap: 0.6rem; color: var(--dim); }
 .mp-name input { flex: 1; min-width: 0; font: inherit; padding: 0.4rem 0.6rem; color: var(--chalk); background: var(--night-deep); border: 2px solid var(--edge); }
-.btn.big { font-size: 1.3rem; padding: 1rem; }
-.btn.big small { display: block; margin-top: 0.25rem; font-size: 0.85rem; color: var(--dim); }
 .mp-step { margin: 0.4rem 0 0; line-height: 1.4; }
 .mp-step b { color: var(--gold); }
 #mp textarea { width: 100%; font: 0.75rem/1.25 monospace; padding: 0.5rem; color: var(--chalk); background: var(--night-deep); border: 2px solid var(--edge); resize: none; word-break: break-all; -webkit-user-select: text; user-select: text; }
@@ -751,3 +779,13 @@ body.touch #hud-face { width: 34px; height: 34px; }
 .mp-status { min-height: 1.4em; margin: 0; color: var(--dim); line-height: 1.4; }
 .mp-status.ok { color: #7be07b; }
 .mp-status.err { color: #ff8a80; }
+
+/* koordináták (F3-szerű) */
+#coords { position: absolute; top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 0.2rem 0.5rem; font-size: 0.8rem; color: #fff; background: rgba(0, 0, 0, 0.45); pointer-events: none; }
+
+@media (max-height: 520px) {
+  #menu h1 { font-size: 2.2rem; margin-bottom: 0.2rem; }
+  .lead { margin-bottom: 0.8rem; font-size: 0.95rem; }
+  #menu .btn { padding: 0.55rem 1rem; font-size: 1.05rem; margin-bottom: 0.4rem; }
+  #menu .btn.primary { font-size: 1.15rem; padding: 0.6rem 1rem; }
+}

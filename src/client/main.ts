@@ -42,7 +42,8 @@ import { createBlockIcons } from './icons';
 import { Input } from './input';
 import { buildChunkGeometry } from './mesher';
 import { EYE, Player } from '../shared/player';
-import { clearSave, initSave, loadSave, loadSettings, writeSave, writeSettings, type SaveData } from './save';
+import { deleteWorld, initSave, listWorlds, loadSettings, loadWorld, newWorldId, writeSave, writeSettings, type SaveData } from './save';
+import { closeTopOverlay, initSettingsUi, initWorldsUi } from './menuui';
 
 const SKY = 0x8fb8ff;
 const SKY_DIST = 300; // a nap, a hold és a csillagok távolsága (a kamera far értéke 400)
@@ -156,12 +157,25 @@ async function main(): Promise<void> {
   const inv = new Inventory();
   const input = new Input(canvas, HOTBAR_SIZE);
   if (input.touch) document.body.classList.add('touch');
-  const settings = loadSettings({ renderDistance: input.touch ? 4 : 6, sensitivity: 1, mobs: 'on' });
+  const settings = loadSettings({
+    renderDistance: input.touch ? 4 : 6, sensitivity: 1, mobs: 'on', fov: 75, resolution: 'high', invertY: false, showClock: true, showCoords: false,
+  });
 
   let fogFar = 100;
+  let appliedRes = '';
   const applySettings = () => {
     input.sensitivity = settings.sensitivity;
+    input.invertY = settings.invertY;
     fogFar = settings.renderDistance * CS;
+    if (Math.abs(camera.fov - settings.fov) > 20) camera.fov = settings.fov; // (a futás +8°-ját a ciklus simítja)
+    document.getElementById('clock')!.hidden = !settings.showClock;
+    document.getElementById('coords')!.hidden = !settings.showCoords;
+    if (settings.resolution !== appliedRes) {
+      appliedRes = settings.resolution;
+      const dpr = window.devicePixelRatio || 1;
+      renderer.setPixelRatio(settings.resolution === 'low' ? Math.min(dpr, 1) * 0.6 : settings.resolution === 'medium' ? Math.min(dpr, 1.25) : Math.min(dpr, 2));
+      resize();
+    }
   };
 
   // ---------- világ ----------
@@ -434,10 +448,10 @@ async function main(): Promise<void> {
   };
 
   const saveGame = () => {
-    if (!started || foreignWorld) return; // vendégként a host világa nem írja felül a saját mentést
+    if (!started || foreignWorld || !current) return; // vendégként a host világa nem írja felül a saját mentést
     const p = player.pos;
-    writeSave({
-      seed: world.seed, edits: world.exportEdits(), pos: [p.x, p.y, p.z], yaw: player.yaw, pitch: player.pitch,
+    writeSave(current.id, {
+      name: current.name, created: current.created, seed: world.seed, edits: world.exportEdits(), pos: [p.x, p.y, p.z], yaw: player.yaw, pitch: player.pitch,
       time: timeOfDay, day: dayCount, furnaces: [...furnaces].map(([k, f]) => [...k.split(',').map(Number), ...f.toFlat()]), chests: [...chests].map(([k, c]) => [...k.split(',').map(Number), ...c.toFlat()]), mode, hp: health.hp, food: health.food, sat: health.saturation, inv: inv.toFlat(), arm: inv.armorFlat(),
     });
   };
@@ -485,6 +499,8 @@ async function main(): Promise<void> {
   // Vendég: a hosttól kapott seedből ugyanazt a világot generálja, a blokk-módosításokat és a mobok állapotát a host küldi.
   let server: GameServer | null = null;
   let guest: GuestClient | null = null;
+  /** a megnyitott (mentett) világ: azonosító, név, létrehozás ideje */
+  let current: { id: string; name: string; created: number } | null = null;
   /** a játékban lévő világ a hosté (vendégként): nem mentjük el */
   let foreignWorld = false;
   const hostLinks = new Set<Link>();
@@ -651,8 +667,8 @@ async function main(): Promise<void> {
     if (document.pointerLockElement) document.exitPointerLock();
     menu.hidden = false;
     hud.hidden = true;
-    const ex = loadSave();
-    startWorld(ex ? ex.seed : 20260, null);
+    current = null;
+    startWorld(listWorlds()[0]?.seed ?? 20260, null); // a menü mögötti háttérvilág
     refreshMenu();
     mpUi?.setStatus(message);
   };
@@ -760,12 +776,20 @@ async function main(): Promise<void> {
   type State = 'menu' | 'playing' | 'inventory' | 'dead';
   let state: State = 'menu';
   const menu = $('menu'), hud = $('hud');
-  const btnContinue = $('btn-continue'), btnNew = $('btn-new'), btnSettings = $('btn-settings');
-  const settingsEl = $('settings');
-  const distEl = $<HTMLInputElement>('set-dist'), distVal = $('set-dist-val'), sensEl = $<HTMLInputElement>('set-sens');
+  const btnContinue = $('btn-continue');
+  const lastWorld = () => listWorlds()[0] ?? null;
 
   const refreshMenu = () => {
-    btnContinue.hidden = !(started || loadSave());
+    const last = lastWorld();
+    btnContinue.hidden = !(started || last);
+    const name = started ? current?.name : last?.name;
+    btnContinue.replaceChildren('Continue');
+    if (name) {
+      const small = document.createElement('small');
+      small.textContent = name;
+      btnContinue.appendChild(small);
+    }
+    $('menu-sub').textContent = started && current ? `Playing: ${current.name}` : 'Build, dig and explore an endless block world.';
   };
 
   /** Telefonon: teljes képernyő és fekvő tájolás kérése (Androidon működik, iPhone-on csak a forgatás kérése látszik) */
@@ -982,13 +1006,14 @@ async function main(): Promise<void> {
 
   // a menüben az Enter folytatja a játékot (az Esc nem tudja visszaadni az egeret, az Enter igen: az már felhasználói gesztus)
   document.addEventListener('keydown', (e) => {
-    if (state === 'menu' && e.code === 'Enter' && !btnContinue.hidden && document.activeElement?.tagName !== 'BUTTON') btnContinue.click();
+    if (state === 'menu' && e.code === 'Enter' && !btnContinue.hidden && document.activeElement?.tagName !== 'BUTTON' && !document.querySelector('.overlay:not([hidden])')) btnContinue.click();
   });
   // Esc a menüben: folytatás, mint az inventory bezárásánál. Az Esc nem felhasználói gesztus, ezért az egeret
   // az Esc felengedésekor zárjuk vissza (addig a kurzorzár felszabadulását nem vesszük figyelembe).
   document.addEventListener('keydown', (e) => {
-    if (e.code !== 'Escape' || e.repeat || state !== 'menu' || !started || btnContinue.hidden) return;
-    if (!settingsEl.hidden) { settingsEl.hidden = true; btnSettings.setAttribute('aria-expanded', 'false'); e.preventDefault(); return; }
+    if (e.code !== 'Escape' || e.repeat || state !== 'menu') return;
+    if (closeTopOverlay()) { e.preventDefault(); return; } // az Esc előbb az ablakot zárja
+    if (!started || btnContinue.hidden) return;
     e.preventDefault();
     btnContinue.click();
     if (input.touch) return;
@@ -1000,50 +1025,51 @@ async function main(): Promise<void> {
     };
     document.addEventListener('keyup', relock);
   });
+  /** egy mentett világ betöltése (a játékot a hívó indítja) */
+  const loadInto = (save: SaveData) => {
+    saveGame();
+    stopNet();
+    current = { id: save.id!, name: save.name ?? 'World', created: save.created ?? save.played ?? Date.now() };
+    startWorld(save.seed, save);
+    started = true;
+    refreshMenu();
+  };
+  /** új világ létrehozása és rögtön mentése, hogy a listában is meglegyen */
+  const createInto = (name: string, newMode: Mode, seed: number) => {
+    saveGame();
+    stopNet();
+    current = { id: newWorldId(), name, created: Date.now() };
+    startWorld(seed, null, newMode);
+    started = true;
+    saveGame();
+    refreshMenu();
+  };
   btnContinue.addEventListener('click', () => {
     if (!started) {
-      stopNet();
-      const save = loadSave();
-      if (save) startWorld(save.seed, save);
-      started = true;
+      const last = lastWorld();
+      if (!last) return;
+      loadInto(last);
     }
     play();
   });
-  const newWorld = (m: Mode) => {
-    stopNet();
-    clearSave();
-    startWorld((Math.random() * 2 ** 31) | 0, null, m);
-    started = true;
-    play();
-  };
-  btnNew.addEventListener('click', () => newWorld('survival'));
-  $('btn-new-creative').addEventListener('click', () => newWorld('creative'));
-  btnSettings.addEventListener('click', () => {
-    settingsEl.hidden = !settingsEl.hidden;
-    btnSettings.setAttribute('aria-expanded', String(!settingsEl.hidden));
+  initWorldsUi({
+    list: listWorlds,
+    open: (id) => { const w = loadWorld(id); if (w) { loadInto(w); play(); } },
+    create: (name, m, seed) => { createInto(name, m, seed); play(); },
+    remove: (id) => {
+      // a törölt világ, ha éppen nyitva van, a háttérben megy tovább, de többé nem mentődik
+      if (current?.id === id) { current = null; started = false; }
+      deleteWorld(id);
+      refreshMenu();
+    },
   });
-  distEl.value = String(settings.renderDistance);
-  distVal.textContent = distEl.value;
-  sensEl.value = String(settings.sensitivity);
-  distEl.addEventListener('input', () => {
-    settings.renderDistance = Number(distEl.value);
-    distVal.textContent = distEl.value;
-    applySettings();
-    writeSettings(settings);
-  });
-  const mobsEl = $<HTMLSelectElement>('set-mobs');
-  mobsEl.value = settings.mobs;
-  mobsEl.addEventListener('change', () => {
-    settings.mobs = mobsEl.value as typeof settings.mobs;
-    writeSettings(settings);
-    mobsEl.blur();
-    // kikapcsoláskor eltűnnek a mobok (a békésnél csak a szörnyek)
-    mobs.mobs = settings.mobs === 'off' ? [] : settings.mobs === 'peaceful' ? mobs.mobs.filter((m) => !m.def.hostile) : mobs.mobs;
-  });
-  sensEl.addEventListener('input', () => {
-    settings.sensitivity = Number(sensEl.value);
-    applySettings();
-    writeSettings(settings);
+  initSettingsUi(settings, {
+    changed: (key) => {
+      applySettings();
+      writeSettings(settings);
+      // kikapcsoláskor eltűnnek a mobok (a békésnél csak a szörnyek)
+      if (key === 'mobs' && !guest) mobs.mobs = settings.mobs === 'off' ? [] : settings.mobs === 'peaceful' ? mobs.mobs.filter((m) => !m.def.hostile) : mobs.mobs;
+    },
   });
 
   $('controls').textContent = input.touch
@@ -1056,11 +1082,8 @@ async function main(): Promise<void> {
       if (foreignWorld) return false;
       if (!started) {
         // a mentett világ (vagy egy új) indul el a háttérben, a játék csak a "Start playing"-nél kezdődik
-        stopNet();
-        const save = loadSave();
-        if (save) startWorld(save.seed, save); else startWorld((Math.random() * 2 ** 31) | 0, null, 'survival');
-        started = true;
-        refreshMenu();
+        const last = lastWorld();
+        if (last) loadInto(last); else createInto('New World', 'survival', (Math.random() * 2 ** 31) | 0);
       }
       return true;
     },
@@ -1070,8 +1093,7 @@ async function main(): Promise<void> {
   });
 
   // ---------- indulás ----------
-  const existing = loadSave();
-  startWorld(existing ? existing.seed : 20260, null);
+  startWorld(lastWorld()?.seed ?? 20260, null); // háttérvilág a menü mögött
   applySettings();
   refreshMenu();
 
@@ -1086,7 +1108,7 @@ async function main(): Promise<void> {
   let last = performance.now();
   let angle = 0;
   let frame = 0;
-  const clockEl = $('clock');
+  const clockEl = $('clock'), coordsEl = $('coords');
   const resumeEl = $('resume-hint');
   let clockText = '';
 
@@ -1620,7 +1642,7 @@ async function main(): Promise<void> {
       player.speedMul = blocking ? 0.8 : 1;
       player.update(dt, mx, mz, sleepSeq ? false : input.jump, !sleepSeq && !blocking && health.food > 6 && input.wantsSprint());
       // futás közben tágabb látómező
-      const tf = player.sprinting ? 83 : 75;
+      const tf = settings.fov + (player.sprinting ? 8 : 0);
       if (Math.abs(camera.fov - tf) > 0.05) { camera.fov += (tf - camera.fov) * Math.min(1, dt * 10); camera.updateProjectionMatrix(); }
       if (mode === 'survival') {
         // a mozgás (méterenként) és az ugrás kimerít
@@ -1699,6 +1721,7 @@ async function main(): Promise<void> {
     }
     const sky = skyAt(timeOfDay, dayCount);
     if (sky.moonPhase !== moonShown) { moonShown = sky.moonPhase; moonMat.map = moonTextures[moonShown]; moonMat.needsUpdate = true; }
+    if (settings.showCoords && state !== 'menu') coordsEl.textContent = `X ${player.pos.x.toFixed(1)}  Y ${player.pos.y.toFixed(1)}  Z ${player.pos.z.toFixed(1)}`;
     const clock = `Day ${dayCount} · ${formatClock(timeOfDay)}`;
     if (clock !== clockText) { clockText = clock; clockEl.textContent = clock; }
     const underwater = state !== 'menu' && player.headUnderwater;
@@ -1802,7 +1825,7 @@ async function main(): Promise<void> {
       /** Új világ adott maggal, a menü kihagyásával (pointer lock nélkül is fut) */
       newGame: (seed: number, m: Mode = 'survival') => {
         stopNet();
-        clearSave();
+        current = null; // a tesztvilág nem kerül mentésre
         startWorld(seed, null, m);
         started = true;
         state = 'playing';

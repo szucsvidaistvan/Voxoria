@@ -21,6 +21,7 @@
   <canvas id="game"></canvas>
 
   <div id="hud" hidden>
+    <div id="coords" hidden></div>
     <div id="crosshair"></div>
     <div id="held-name" aria-live="polite"></div>
     <div id="clock" aria-hidden="true"></div>
@@ -114,11 +115,11 @@
     </div>
   </section>
 
-  <section id="mp" hidden aria-label="Play with a friend">
+  <section id="mp" class="overlay" hidden aria-label="Play with a friend">
     <div class="mp-card">
       <header class="mp-head">
         <h2>Play with a friend</h2>
-        <button id="mp-close" class="btn" type="button">Close</button>
+        <button id="mp-close" class="btn ov-close" type="button">Close</button>
       </header>
       <label class="mp-name">Your name <input id="mp-name" type="text" maxlength="16" autocomplete="off" spellcheck="false" /></label>
 
@@ -151,32 +152,72 @@
     </div>
   </section>
 
+  <section id="worlds" class="overlay" hidden aria-label="Worlds">
+    <div class="ov-card">
+      <header class="ov-head">
+        <h2 id="worlds-title">Select World</h2>
+        <button id="worlds-close" class="btn ov-close" type="button">Back</button>
+      </header>
+      <div id="worlds-list-view">
+        <div id="worlds-list"></div>
+        <p id="worlds-empty" class="ov-hint" hidden>No worlds yet. Create your first one!</p>
+        <button id="worlds-create" class="btn big" type="button">Create New World</button>
+      </div>
+      <form id="worlds-form" hidden autocomplete="off">
+        <label class="field">World name <input id="wf-name" type="text" maxlength="24" spellcheck="false" /></label>
+        <div class="field">Game mode
+          <div class="seg" id="wf-mode" role="radiogroup" aria-label="Game mode">
+            <button type="button" role="radio" data-mode="survival" aria-checked="true">Survival<small>Health, hunger, monsters</small></button>
+            <button type="button" role="radio" data-mode="creative" aria-checked="false">Creative<small>All blocks, no damage</small></button>
+          </div>
+        </div>
+        <label class="field">Seed <input id="wf-seed" type="text" maxlength="24" placeholder="Random" spellcheck="false" /></label>
+        <button id="wf-create" class="btn big" type="submit">Create World</button>
+        <button id="wf-cancel" class="btn" type="button">Cancel</button>
+      </form>
+    </div>
+  </section>
+
+  <section id="settings" class="overlay" hidden aria-label="Settings">
+    <div class="ov-card">
+      <header class="ov-head">
+        <h2>Settings</h2>
+        <button id="settings-close" class="btn ov-close" type="button">Done</button>
+      </header>
+      <h3>Video</h3>
+      <label class="row">Render distance <output id="set-dist-val"></output>
+        <input id="set-dist" type="range" min="3" max="12" step="1" /></label>
+      <label class="row">Field of view <output id="set-fov-val"></output>
+        <input id="set-fov" type="range" min="50" max="110" step="1" /></label>
+      <label class="row">Resolution
+        <select id="set-res"><option value="low">Low (fastest)</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+      <label class="row check"><input id="set-clock" type="checkbox" /> Show the clock</label>
+      <label class="row check"><input id="set-coords" type="checkbox" /> Show coordinates</label>
+      <h3>Controls</h3>
+      <label class="row">Look sensitivity <output id="set-sens-val"></output>
+        <input id="set-sens" type="range" min="0.4" max="2.5" step="0.1" /></label>
+      <label class="row check"><input id="set-invert" type="checkbox" /> Invert vertical look</label>
+      <h3>Game</h3>
+      <label class="row">Mobs
+        <select id="set-mobs">
+          <option value="on">Animals and monsters</option>
+          <option value="peaceful">Peaceful (animals only)</option>
+          <option value="off">No mobs</option>
+        </select></label>
+      <p id="controls" class="ov-hint"></p>
+      <p id="credits" class="ov-hint">Textures: Good Vibes by Acaitart (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>).</p>
+      <p id="pack-note" class="ov-hint" hidden>The texture pack is not extracted, so the game runs with plain colors. See the README.</p>
+    </div>
+  </section>
+
   <main id="menu">
     <h1>Voxoria</h1>
-    <p class="lead">Build, dig and explore an endless block world.</p>
+    <p id="menu-sub" class="lead">Build, dig and explore an endless block world.</p>
 
-    <button id="btn-continue" class="btn" type="button" hidden>Continue</button>
-    <button id="btn-new" class="btn" type="button">New World (Survival)</button>
-    <button id="btn-new-creative" class="btn" type="button">New World (Creative)</button>
-    <button id="btn-settings" class="btn" type="button" aria-expanded="false" aria-controls="settings">Settings</button>
-
+    <button id="btn-continue" class="btn primary" type="button" hidden>Continue</button>
+    <button id="btn-worlds" class="btn" type="button">Singleplayer</button>
     <button id="btn-mp" class="btn" type="button">Play with a friend</button>
-    <section id="settings" hidden>
-      <label for="set-dist">Render distance: <output id="set-dist-val"></output> chunks</label>
-      <input id="set-dist" type="range" min="3" max="10" step="1" />
-      <label for="set-sens">Look sensitivity</label>
-      <input id="set-sens" type="range" min="0.4" max="2.5" step="0.1" />
-      <label for="set-mobs">Mobs</label>
-      <select id="set-mobs">
-        <option value="on">Animals and monsters</option>
-        <option value="peaceful">Peaceful (animals only)</option>
-        <option value="off">No mobs</option>
-      </select>
-    </section>
-
-    <p id="controls" class="hint"></p>
-    <p id="credits" class="hint">Textures: Good Vibes by Acaitart (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>).</p>
-    <p id="pack-note" class="hint" hidden>The texture pack is not extracted, so the game runs with plain colors. See the README.</p>
+    <button id="btn-settings" class="btn" type="button">Settings</button>
   </main>
 
   <script type="module" src="/src/client/main.ts"></script>

@@ -4,6 +4,11 @@ const SAVE_KEY = 'kockavilag-save-v1';
 const SETTINGS_KEY = 'kockavilag-settings-v1';
 
 export interface SaveData {
+  /** a világ azonosítója és neve, létrehozása / utolsó mentése (ms) */
+  id?: string;
+  name?: string;
+  created?: number;
+  played?: number;
   /** a világ magassága a mentéskor (hiányzik: régi, 64 magas világ) */
   ch?: number;
   seed: number;
@@ -37,6 +42,15 @@ export interface SaveData {
 export interface Settings {
   renderDistance: number;
   sensitivity: number;
+  /** látómező fokban (futáskor +8) */
+  fov: number;
+  /** a kép felbontása: alacsony (gyors), közepes, magas */
+  resolution: 'low' | 'medium' | 'high';
+  /** az egér/érintés függőleges irányának megfordítása */
+  invertY: boolean;
+  showClock: boolean;
+  /** koordináták kijelzése (F3-szerű) */
+  showCoords: boolean;
   /** mobok: mind, csak békés (állatok), vagy semmi */
   mobs: 'on' | 'peaceful' | 'off';
 }
@@ -58,17 +72,19 @@ function write(key: string, value: unknown): void {
   }
 }
 
-// ---------- mentés: IndexedDB (nagy világokhoz), a régi localStorage-mentés átköltöztetésével ----------
-// A játék a mentést szinkron kérdezi (menü, indulás), ezért induláskor egyszer betöltjük a memóriába (`initSave`),
+// ---------- mentés: IndexedDB (nagy világokhoz), több világ egymás mellett ----------
+// A játék a mentéseket szinkron kérdezi (menü), ezért induláskor egyszer betöltjük őket a memóriába (`initSave`),
 // az írás pedig háttérben, összevonva történik. Ha az IndexedDB nem elérhető (pl. privát mód), marad a localStorage.
+// Egy világ = egy bejegyzés, a kulcsa a világ azonosítója. A régi egyetlen mentés ('main' hely) "My World" néven megmarad.
 
 const DB_NAME = 'voxoria';
 const STORE = 'saves';
-const SLOT = 'main';
+const LEGACY_ID = 'main';
+const FALLBACK_KEY = 'voxoria-worlds-v2';
 
-let cache: SaveData | null = null;
+const cache = new Map<string, SaveData>();
 let idb: IDBDatabase | null = null;
-let pending: { data: SaveData | null } | null = null;
+const pending = new Map<string, SaveData | null>();
 let flushing = false;
 let persistAsked = false;
 
@@ -86,24 +102,26 @@ function openDb(): Promise<IDBDatabase | null> {
   });
 }
 
-function idbGet(db: IDBDatabase): Promise<SaveData | null> {
+function idbAll(db: IDBDatabase): Promise<[string, SaveData][]> {
   return new Promise((ok) => {
     try {
-      const r = db.transaction(STORE, 'readonly').objectStore(STORE).get(SLOT);
-      r.onsuccess = () => ok((r.result as SaveData | undefined) ?? null);
-      r.onerror = () => ok(null);
+      const store = db.transaction(STORE, 'readonly').objectStore(STORE);
+      const keys = store.getAllKeys();
+      const vals = store.getAll();
+      vals.onsuccess = () => ok((keys.result as string[]).map((k, i) => [String(k), vals.result[i] as SaveData]));
+      vals.onerror = () => ok([]);
     } catch {
-      ok(null);
+      ok([]);
     }
   });
 }
 
-function idbPut(db: IDBDatabase, data: SaveData | null): Promise<boolean> {
+function idbPut(db: IDBDatabase, id: string, data: SaveData | null): Promise<boolean> {
   return new Promise((ok) => {
     try {
       const tx = db.transaction(STORE, 'readwrite');
-      if (data) tx.objectStore(STORE).put(data, SLOT);
-      else tx.objectStore(STORE).delete(SLOT);
+      if (data) tx.objectStore(STORE).put(data, id);
+      else tx.objectStore(STORE).delete(id);
       tx.oncomplete = () => ok(true);
       tx.onerror = () => ok(false);
       tx.onabort = () => ok(false);
@@ -113,44 +131,54 @@ function idbPut(db: IDBDatabase, data: SaveData | null): Promise<boolean> {
   });
 }
 
-/** Induláskor egyszer: betölti a mentést (és átköltözteti a régi localStorage-mentést). Utána a loadSave szinkron. */
+const prepare = (id: string, d: SaveData): SaveData => ({ ...d, id, name: d.name ?? 'My World', played: d.played ?? 0, created: d.created ?? d.played ?? 0 });
+
+/** Induláskor egyszer: betölti az összes világot (és átköltözteti a régi localStorage-mentést). Utána a lista szinkron. */
 export async function initSave(): Promise<void> {
   idb = await openDb();
+  if (idb) for (const [id, d] of await idbAll(idb)) if (d && typeof d === 'object') cache.set(id, prepare(id, d));
+  const fallback = read<Record<string, SaveData>>(FALLBACK_KEY);
+  if (fallback) for (const [id, d] of Object.entries(fallback)) if (!cache.has(id)) cache.set(id, prepare(id, d));
   const legacy = read<SaveData>(SAVE_KEY);
-  if (idb) {
-    cache = await idbGet(idb);
-    if (!cache && legacy) {
-      // átköltöztetés: csak akkor töröljük a régit, ha az újból visszaolvasva megvan
-      if (await idbPut(idb, legacy) && (await idbGet(idb))) {
-        cache = legacy;
-        try { localStorage.removeItem(SAVE_KEY); } catch { /* nincs teendő */ }
-      } else cache = legacy;
-    }
-  } else cache = legacy;
+  if (legacy && !cache.has(LEGACY_ID)) {
+    const d = prepare(LEGACY_ID, legacy);
+    cache.set(LEGACY_ID, d);
+    // csak akkor töröljük a régit, ha az újból visszaolvasva megvan
+    if (idb && await idbPut(idb, LEGACY_ID, d)) try { localStorage.removeItem(SAVE_KEY); } catch { /* nincs teendő */ }
+  }
 }
 
 async function flush(): Promise<void> {
   if (flushing) return;
   flushing = true;
-  while (pending) {
-    const job = pending;
-    pending = null;
-    let done = false;
-    if (idb) done = await idbPut(idb, job.data);
-    if (!done) { // nincs IndexedDB (vagy hibázott): a régi módszer
-      if (job.data) write(SAVE_KEY, job.data);
-      else { try { localStorage.removeItem(SAVE_KEY); } catch { /* nincs teendő */ } }
-    }
+  while (pending.size) {
+    const [id, data] = pending.entries().next().value as [string, SaveData | null];
+    pending.delete(id);
+    if (idb && await idbPut(idb, id, data)) continue;
+    // nincs IndexedDB (vagy hibázott): localStorage (kis világokhoz elég)
+    const all = read<Record<string, SaveData>>(FALLBACK_KEY) ?? {};
+    if (data) all[id] = data; else delete all[id];
+    write(FALLBACK_KEY, all);
   }
   flushing = false;
 }
 
-/** Más világmagasságnál készült (régi) mentés nem tölthető be: a koordináták nem stimmelnének. Marad a tárolóban, az új mentés felülírja. */
-export const loadSave = (): SaveData | null => (cache && (cache.ch ?? 64) === CH ? cache : null);
-export const writeSave = (d: SaveData): void => {
-  d = { ...d, ch: CH };
-  cache = d;
-  pending = { data: d }; // az újabb mentés felülírja a még nem írtat
+/** Más világmagasságnál készült (régi) mentés nem tölthető be: a koordináták nem stimmelnének. Marad a tárolóban. */
+const compatible = (d: SaveData) => (d.ch ?? 64) === CH;
+
+/** A betölthető világok, a legutóbb játszott elöl. */
+export const listWorlds = (): SaveData[] => [...cache.values()].filter(compatible).sort((a, b) => (b.played ?? 0) - (a.played ?? 0));
+export const loadWorld = (id: string): SaveData | null => {
+  const d = cache.get(id);
+  return d && compatible(d) ? d : null;
+};
+export const newWorldId = (): string => `w${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
+
+/** Egy világ mentése (az `id` kötelező; a `played` a mentés ideje) */
+export const writeSave = (id: string, d: SaveData): void => {
+  const data: SaveData = { ...d, id, ch: CH, played: Date.now() };
+  cache.set(id, data);
+  pending.set(id, data); // az újabb mentés felülírja a még nem írtat
   void flush();
   if (!persistAsked) {
     persistAsked = true;
@@ -158,9 +186,9 @@ export const writeSave = (d: SaveData): void => {
     try { void navigator.storage?.persist?.(); } catch { /* nincs teendő */ }
   }
 };
-export const clearSave = (): void => {
-  cache = null;
-  pending = { data: null };
+export const deleteWorld = (id: string): void => {
+  cache.delete(id);
+  pending.set(id, null);
   void flush();
 };
 
