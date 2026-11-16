@@ -27,6 +27,7 @@ Cél: **co-op**, 2–8 játékos közös világban (nem verseny): közös épít
 3. **Többjátékosos mobok** – spawn/célpont/despawn az összes játékos körül (`MobManager` a játékoslistával).
 4. **Játékos-állapot a shared-be** – `Player` fizika és az állapot-szerializáció (leltár, hp) a `src/shared`-be, hogy Node-ban is fusson.
 5. **Szerver (Node + `ws`)** – `server/`: a `Sim` futtatása, a protokoll kiszolgálása, blokk-diff és ládák mentése.
+   - ✔ 5a: átvitel-független játékszerver-logika: `src/shared/gameserver.ts` (belépés, blokkok, mobok, alvás, csevegés), teszt: `npx tsx scripts/test-gameserver.ts`. A host böngészőjében és Node-ban is ugyanez fut.
 6. **Kliens hálózati réteg** – kapcsolódás, a világ-események alkalmazása, a távoli játékosok és mobok interpolált megjelenítése, csevegés, névtáblák.
 7. **Co-op részletek** – alvás-szavazás, halál és újraéledés, közös spawn, kick/ban egyszerűen, szerverlista vagy meghívó-link.
 
