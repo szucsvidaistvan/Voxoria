@@ -1051,7 +1051,23 @@ async function main(): Promise<void> {
     : 'WASD to move, Space to jump or swim, hold left click to mine, right click to place or use (crafting table, doors, bucket, flint and steel, apple), hold right click with a sword to block (half damage from the front), V to change the view, 1–9 or scroll to choose a slot, E for the inventory, C for recipes, Esc for the menu.';
   if (input.touch) $('bag-hint').textContent = 'Tap: pick up / place. Long press: take half / place one. Drag a stack to move it. Tap outside to close.';
   $('pack-note').hidden = atlas.usingPack;
-  mpUi = initMpUi({ canHost: () => started && !foreignWorld, onGuestLink: attachGuestLink, onJoinLink: beginJoin });
+  mpUi = initMpUi({
+    ensureWorld: () => {
+      if (foreignWorld) return false;
+      if (!started) {
+        // a mentett világ (vagy egy új) indul el a háttérben, a játék csak a "Start playing"-nél kezdődik
+        stopNet();
+        const save = loadSave();
+        if (save) startWorld(save.seed, save); else startWorld((Math.random() * 2 ** 31) | 0, null, 'survival');
+        started = true;
+        refreshMenu();
+      }
+      return true;
+    },
+    onGuestLink: attachGuestLink,
+    onJoinLink: beginJoin,
+    play: () => btnContinue.click(),
+  });
 
   // ---------- indulás ----------
   const existing = loadSave();

@@ -114,6 +114,43 @@
     </div>
   </section>
 
+  <section id="mp" hidden aria-label="Play with a friend">
+    <div class="mp-card">
+      <header class="mp-head">
+        <h2>Play with a friend</h2>
+        <button id="mp-close" class="btn" type="button">Close</button>
+      </header>
+      <label class="mp-name">Your name <input id="mp-name" type="text" maxlength="16" autocomplete="off" spellcheck="false" /></label>
+
+      <div id="mp-choose">
+        <button id="mp-pick-host" class="btn big" type="button">Invite a friend<small>Your friend joins your world</small></button>
+        <button id="mp-pick-join" class="btn big" type="button">Join a friend<small>You got an invite code</small></button>
+      </div>
+
+      <div id="mp-host-view" hidden>
+        <p class="mp-step"><b>1.</b> Send this code to your friend (any chat app works).</p>
+        <textarea id="mp-invite" readonly rows="3" placeholder="Creating your invite…" spellcheck="false"></textarea>
+        <button id="mp-copy-invite" class="btn" type="button">Copy code</button>
+        <p class="mp-step"><b>2.</b> Your friend sends a reply code back. Paste it here.</p>
+        <textarea id="mp-answer" rows="3" placeholder="Reply code from your friend" spellcheck="false"></textarea>
+        <button id="mp-paste-answer" class="btn" type="button">Paste</button>
+      </div>
+
+      <div id="mp-join-view" hidden>
+        <p class="mp-step"><b>1.</b> Paste the invite code your friend sent you.</p>
+        <textarea id="mp-join-code" rows="3" placeholder="Invite code from your friend" spellcheck="false"></textarea>
+        <button id="mp-paste-invite" class="btn" type="button">Paste</button>
+        <p class="mp-step"><b>2.</b> Send this reply code back to your friend. The game starts when they connect.</p>
+        <textarea id="mp-join-answer" readonly rows="3" placeholder="Your reply code appears here" spellcheck="false"></textarea>
+        <button id="mp-copy-answer" class="btn" type="button">Copy code</button>
+      </div>
+
+      <p id="mp-status" class="mp-status" role="status" aria-live="polite"></p>
+      <button id="mp-play" class="btn big" type="button" hidden>Start playing</button>
+      <button id="mp-back" class="btn" type="button" hidden>Back</button>
+    </div>
+  </section>
+
   <main id="menu">
     <h1>Voxoria</h1>
     <p class="lead">Build, dig and explore an endless block world.</p>
@@ -123,26 +160,7 @@
     <button id="btn-new-creative" class="btn" type="button">New World (Creative)</button>
     <button id="btn-settings" class="btn" type="button" aria-expanded="false" aria-controls="settings">Settings</button>
 
-    <button id="btn-mp" class="btn" type="button" aria-expanded="false" aria-controls="mp">Multiplayer (co-op)</button>
-
-    <section id="mp" hidden>
-      <label for="mp-name">Your name</label>
-      <input id="mp-name" type="text" maxlength="16" autocomplete="off" spellcheck="false" />
-      <h2>Host: invite a friend</h2>
-      <p class="hint">Your world runs in your browser. Your friend needs the invite code, and you need their answer code (send both in any chat app).</p>
-      <button id="mp-host" class="btn" type="button">1. Create invite code</button>
-      <textarea id="mp-invite" readonly rows="3" placeholder="Invite code appears here" spellcheck="false"></textarea>
-      <button id="mp-copy-invite" class="btn" type="button">Copy invite code</button>
-      <textarea id="mp-answer" rows="3" placeholder="2. Paste your friend's answer code here" spellcheck="false"></textarea>
-      <button id="mp-accept" class="btn" type="button">3. Connect</button>
-      <h2>Join a friend</h2>
-      <textarea id="mp-join-code" rows="3" placeholder="Paste the invite code here" spellcheck="false"></textarea>
-      <button id="mp-join" class="btn" type="button">Join</button>
-      <textarea id="mp-join-answer" readonly rows="3" placeholder="Your answer code appears here" spellcheck="false"></textarea>
-      <button id="mp-copy-answer" class="btn" type="button">Copy answer code</button>
-      <p id="mp-status" class="hint" role="status" aria-live="polite"></p>
-    </section>
-
+    <button id="btn-mp" class="btn" type="button">Play with a friend</button>
     <section id="settings" hidden>
       <label for="set-dist">Render distance: <output id="set-dist-val"></output> chunks</label>
       <input id="set-dist" type="range" min="3" max="10" step="1" />
