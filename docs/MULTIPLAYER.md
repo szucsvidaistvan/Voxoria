@@ -29,6 +29,9 @@ Cél: **co-op**, 2–8 játékos közös világban (nem verseny): közös épít
 5. **Szerver (Node + `ws`)** – `server/`: a `Sim` futtatása, a protokoll kiszolgálása, blokk-diff és ládák mentése.
    - ✔ 5a: átvitel-független játékszerver-logika: `src/shared/gameserver.ts` (belépés, blokkok, mobok, alvás, csevegés), teszt: `npx tsx scripts/test-gameserver.ts`. A host böngészőjében és Node-ban is ugyanez fut.
 6. **Kliens hálózati réteg** – kapcsolódás, a világ-események alkalmazása, a távoli játékosok és mobok interpolált megjelenítése, csevegés, névtáblák.
+   - ✔ 6a: menü (Multiplayer panel: meghívó/válasz kód), host (GameServer a main ciklusban), vendég (`src/client/net/guest.ts`, a világ a seedből + a host módosításai), távoli játékosok névtáblával (`remoteplayers.ts`), mobok pillanatképből, közös alvás.
+   - Ismert hiányok: láda/tűzhely csak a hostnak, a mobok lootja a hostnál esik le, nincs csevegő-felület, a host menüjében (szünet) a játék áll, vendég mindig survival, nincs mentés vendégként.
+   - Tesztek: `npx tsx scripts/test-gameserver.ts`, `npx tsx scripts/test-guest.ts`.
 7. **Co-op részletek** – alvás-szavazás, halál és újraéledés, közös spawn, kick/ban egyszerűen, szerverlista vagy meghívó-link.
 
 ## Döntés, ami még a tiéd

@@ -58,11 +58,19 @@ ok(pa.name === 'Aladárscript' && pa.x === 2, 'az állapot átvéve, id/név nem
 
 // blokk
 a.send({ t: 'edit', edits: [{ x: 3, y: 71, z: 3, id: 7 }] });
+server.tick(0.01);
+ok(of(a.got, 'edits').every((e) => !e.edits.some((x) => x.id === 7)), 'a szerkesztő nem kap vissza saját módosítást');
 ok(world.getBlock(3, 71, 3) === 7 && of(b.got, 'edits').some((e) => e.edits.some((x) => x.id === 7)) && log.changed === 1, 'közeli szerkesztés alkalmazva és szétküldve');
+const aEdits = of(a.got, 'edits').length;
 a.send({ t: 'edit', edits: [{ x: 500, y: 71, z: 500, id: 7 }] });
-ok(world.getBlock(500, 71, 500) !== 7 && of(a.got, 'edits').length >= 2, 'távoli szerkesztés elutasítva, kliens javítva');
+ok(world.getBlock(500, 71, 500) !== 7 && of(a.got, 'edits').length === aEdits + 1, 'távoli szerkesztés elutasítva, kliens javítva');
 a.send({ t: 'edit', edits: [{ x: 2, y: 71, z: 2, id: NaN }] });
 ok(log.changed === 1, 'érvénytelen id eldobva');
+
+// a host / folyadék módosításai is szétmennek (egy üzenetben)
+world.setBlock(2, 72, 2, 9); world.setBlock(2, 73, 2, 9);
+server.tick(0.01);
+ok(of(a.got, 'edits').pop()!.edits.length === 2 && of(b.got, 'edits').pop()!.edits.length === 2, 'host-módosítások kötegelve mindenkinek');
 
 // támadás
 const m = new Mob('zombie' as never, 2, 70, 2);

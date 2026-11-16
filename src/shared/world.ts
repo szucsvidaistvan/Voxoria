@@ -38,6 +38,9 @@ export class World {
   /** [x, y, z, ...]: a most betöltött chunkokban lévő folyadékok és tűz, amiket a szimulációnak ütemezni kell */
   dynamic: number[] = [];
 
+  /** minden setBlock után hívódik (a játékszerver ebből gyűjti a szétküldendő módosításokat) */
+  onEdit?: (x: number, y: number, z: number, id: number) => void;
+
   constructor(public seed: number) {}
 
   static key(cx: number, cz: number): string {
@@ -95,6 +98,7 @@ export class World {
     const lx = x - cx * CS, lz = z - cz * CS;
     c.set(lx, y, lz, id);
     this.recordEdit(cx, cz, (y * CS + lz) * CS + lx, id);
+    this.onEdit?.(x, y, z, id);
     return true;
   }
 
