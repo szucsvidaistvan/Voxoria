@@ -16,6 +16,7 @@ const sim = new Sim(world, { changed() {}, setBlock() {}, drop() {} });
 const mobs = new MobManager(world);
 const server = new GameServer(world, sim, mobs, {
   blockChanged() {}, attack() {}, hurtHost() {}, chest() {}, morning() {}, chat() {}, presence() {}, clock: () => ({ time: 0.5, day: 3 }),
+  dropRequest() {}, pickup: () => null, drops: () => [],
 });
 server.setLocal({ x: 4, y: 70, z: 4 });
 
@@ -39,13 +40,13 @@ const g = new GuestClient(guestSide, 'Vendég', {
   welcome: (w) => { got.welcome = { seed: w.seed, day: w.day }; },
   reject: () => {}, edits: (l) => got.edits.push(...l.map((e) => e.id)),
   snapshot: (p, m) => { got.snaps++; got.mobs = m.length; got.players = p.length; },
-  hurt: () => { got.hurt++; }, morning: () => {}, chat: () => {}, closed: () => {},
+  hurt: () => { got.hurt++; }, dropAdd: () => {}, dropDel: () => {}, give: () => {}, morning: () => {}, chat: () => {}, closed: () => {},
 });
 const wait = () => new Promise((r) => setTimeout(r, 5));
 await wait();
 ok(got.welcome?.seed === 77 && got.welcome.day === 3 && g.id === id, 'vendég megkapja a welcome-ot');
 ok(got.edits.includes(5), 'a meglévő módosítás megérkezik');
-g.sendState({ x: 3, y: 70, z: 3, yaw: 0, pitch: 0, held: 0, armor: [0, 0, 0, 0], speed: 0, sprint: false, swing: false, eating: false, blocking: false });
+g.sendState({ x: 3, y: 70, z: 3, yaw: 0, pitch: 0, held: 0, armor: [0, 0, 0, 0], speed: 0, sprint: false, swing: 0, eating: false, blocking: false });
 g.sendEdit(3, 71, 3, 9);
 await wait();
 ok(world.getBlock(3, 71, 3) === 9, 'a vendég blokk-módosítása a hostnál megjelenik');

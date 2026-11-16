@@ -136,6 +136,8 @@ export function createParticles(scene: THREE.Scene, atlas: Atlas) {
 // ---------- a földön heverő tárgyak ----------
 
 interface Drop {
+  /** közös azonosító (többjátékosban a host osztja) */
+  uid: number;
   id: number;
   n: number;
   x: number; y: number; z: number;
@@ -224,22 +226,48 @@ export function createDrops(
   /** a lyukas (átjárható) blokkokon a tárgyak átesnek */
   const blocking = (id: number) => id !== AIR && isSolid(id) && !(BLOCKS[id]?.boxes && BLOCKS[id].boxes!.length === 0);
 
-  return {
+  let nextUid = 1;
+  const removeAt = (i: number): void => {
+    const d = list[i];
+    scene.remove(d.mesh);
+    list.splice(i, 1);
+    api.onRemove?.(d.uid);
+  };
+
+  const api = {
+    /** többjátékosban (host): új / eltűnt tárgy értesítése */
+    onSpawn: undefined as undefined | ((d: { uid: number; id: number; n: number; x: number; y: number; z: number; vx: number; vy: number; vz: number }) => void),
+    onRemove: undefined as undefined | ((uid: number) => void),
     get count() {
       return list.length;
     },
     spawn(id: number, n: number, x: number, y: number, z: number) {
-      if (list.length >= MAX) {
-        const old = list.shift()!;
-        scene.remove(old.mesh);
-      }
+      const d = this.add(nextUid++, id, n, x + (Math.random() - 0.5) * 0.3, y, z + (Math.random() - 0.5) * 0.3,
+        (Math.random() - 0.5) * 2.2, 2.5 + Math.random() * 1.5, (Math.random() - 0.5) * 2.2);
+      this.onSpawn?.(d);
+    },
+    /** tárgy létrehozása adott azonosítóval és sebességgel (a hosttól érkezőnél is) */
+    add(uid: number, id: number, n: number, x: number, y: number, z: number, vx: number, vy: number, vz: number) {
+      if (list.length >= MAX) removeAt(0);
       const mesh = makeMesh(id);
       scene.add(mesh);
-      list.push({
-        id, n, x: x + (Math.random() - 0.5) * 0.3, y, z: z + (Math.random() - 0.5) * 0.3,
-        vx: (Math.random() - 0.5) * 2.2, vy: 2.5 + Math.random() * 1.5, vz: (Math.random() - 0.5) * 2.2,
-        age: 0, phase: Math.random() * 6.28, landed: false, mesh, wait: 0.5,
-      });
+      const d: Drop = { uid, id, n, x, y, z, vx, vy, vz, age: 0, phase: Math.random() * 6.28, landed: false, mesh, wait: 0.5 };
+      list.push(d);
+      return d;
+    },
+    /** a tárgy eltávolítása azonosító szerint (a hoszt-oldali eltűnés); a tárgyat adja vissza */
+    take(uid: number, near?: { x: number; y: number; z: number; r: number }) {
+      const i = list.findIndex((d) => d.uid === uid);
+      if (i < 0) return null;
+      const d = list[i];
+      if (near && Math.hypot(d.x - near.x, d.y - (near.y + 0.9), d.z - near.z) > near.r) return null;
+      removeAt(i);
+      return { id: d.id, n: d.n };
+    },
+    has(uid: number) { return list.some((d) => d.uid === uid); },
+    /** a most heverő tárgyak (az újonnan belépő vendégnek) */
+    all() {
+      return list.map((d) => ({ uid: d.uid, id: d.id, n: d.n, x: d.x, y: d.y, z: d.z, vx: d.vx, vy: d.vy, vz: d.vz }));
     },
     /** A tárgyak ikonjának újrarajzolása (pl. amikor egy elem textúrája betöltődött) */
     refreshIcons() {
@@ -256,7 +284,7 @@ export function createDrops(
     /**
      * @param giveToPlayer visszaadja, hány darab NEM fért el
      */
-    update(dt: number, world: World, px: number, py: number, pz: number, giveToPlayer: (id: number, n: number) => number) {
+    update(dt: number, world: World, px: number, py: number, pz: number, giveToPlayer: (id: number, n: number, uid: number) => number) {
       for (let i = list.length - 1; i >= 0; i--) {
         const d = list[i];
         d.age += dt;
@@ -266,8 +294,7 @@ export function createDrops(
         const cell = world.getBlock(Math.floor(d.x), Math.floor(d.y), Math.floor(d.z));
         const kind = fluidKind(cell);
         if (kind === FLUID_LAVA || d.age > 300 || d.y < -10) {
-          scene.remove(d.mesh);
-          list.splice(i, 1);
+          removeAt(i);
           continue;
         }
 
@@ -283,10 +310,9 @@ export function createDrops(
           d.vx = d.vz = 0;
           d.vy = 0;
           if (dist < 0.85) {
-            const left = giveToPlayer(d.id, d.n);
+            const left = giveToPlayer(d.id, d.n, d.uid);
             if (left <= 0) {
-              scene.remove(d.mesh);
-              list.splice(i, 1);
+              removeAt(i);
               continue;
             }
             d.n = left;
@@ -319,4 +345,5 @@ export function createDrops(
       }
     },
   };
+  return api;
 }

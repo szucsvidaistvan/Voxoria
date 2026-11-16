@@ -404,7 +404,7 @@ async function main(): Promise<void> {
     simulation = new Sim(world, {
       changed: (x, _y, z) => markDirty(x, z),
       setBlock: (x, y, z, id) => { setBlockAt(x, y, z, id); },
-      drop: (x, y, z, id) => drops.spawn(id, 1, x + 0.5, y + 0.5, z + 0.5),
+      drop: (x, y, z, id) => spawnDrop(id, 1, x + 0.5, y + 0.5, z + 0.5),
     });
     sim = simulation.fluids; crops = simulation.crops; gravity = simulation.gravity;
     mobs = new MobManager(world);
@@ -506,6 +506,10 @@ async function main(): Promise<void> {
   const hostLinks = new Set<Link>();
   const remotePlayers = createRemotePlayers(scene, import.meta.env.BASE_URL, atlas, $('nameplates'));
   let mpUi: ReturnType<typeof initMpUi> | undefined;
+  /** tárgy a földre: vendégként a host hozza létre (és küldi szét), egyébként helyben */
+  const spawnDrop = (id: number, n: number, x: number, y: number, z: number): void => {
+    if (guest) guest.sendDropReq(id, n, x, y, z); else drops.spawn(id, n, x, y, z);
+  };
   let guestPlayers: PlayerState[] = [];
   const guestMobTarget = new Map<Mob, MobState>();
   const guestMobById = new Map<number, Mob>();
@@ -527,7 +531,7 @@ async function main(): Promise<void> {
     held: held()?.id ?? 0,
     armor: inv.armor.map((sl) => sl?.id ?? 0) as [number, number, number, number],
     speed: Math.hypot(player.vel.x, player.vel.z), sprint: player.sprinting,
-    swing: (hand?.swingP ?? 0) > 0, eating: (hand?.eatP ?? 0) > 0.05, blocking,
+    swing: hand?.swingP ?? 0, eating: (hand?.eatP ?? 0) > 0.05, blocking,
   });
 
   const clearGuestMobs = () => { guestMobTarget.clear(); guestMobById.clear(); guestHurtFlag.clear(); serverIdOf.clear(); };
@@ -535,6 +539,7 @@ async function main(): Promise<void> {
   const stopNet = () => {
     for (const l of hostLinks) l.close();
     hostLinks.clear();
+    drops.onSpawn = drops.onRemove = undefined;
     server?.close();
     server = null;
     const g = guest;
@@ -626,7 +631,16 @@ async function main(): Promise<void> {
         chat: (from, text) => showToast(`${from}: ${text}`),
         presence: (n, joined) => showToast(`${n} ${joined ? 'joined' : 'left'} the game`),
         clock: () => ({ time: timeOfDay, day: sleepMorning ? morningDay : dayCount }),
+        dropRequest: (item, n, x, y, z) => drops.spawn(item, n, x, y, z),
+        pickup: (from, uid) => {
+          const t = drops.take(uid, { x: from.x, y: from.y, z: from.z, r: 4 });
+          return t ? { item: t.id, n: t.n } : null;
+        },
+        drops: () => drops.all().map((d) => ({ id: d.uid, item: d.id, n: d.n, x: d.x, y: d.y, z: d.z, vx: d.vx, vy: d.vy, vz: d.vz })),
       });
+      // a földön heverő tárgyak mindenkinél ugyanazok: a host szétküldi, ami keletkezik vagy eltűnik
+      drops.onSpawn = (d) => server?.dropAdd({ id: d.uid, item: d.id, n: d.n, x: d.x, y: d.y, z: d.z, vx: d.vx, vy: d.vy, vz: d.vz });
+      drops.onRemove = (uid) => server?.dropDel(uid);
       server.setLocalName(mpUi?.name() ?? 'Host');
       server.setLocal(localState());
     }
@@ -687,6 +701,14 @@ async function main(): Promise<void> {
         if (!(sleepSeq && sleepMorning)) { timeOfDay = time; dayCount = day; } // az alvás-átmenet közben a saját időnk számít
       },
       hurt: hurtLocal,
+      dropAdd: (list) => { for (const d of list) if (!drops.has(d.id)) drops.add(d.id, d.item, d.n, d.x, d.y, d.z, d.vx, d.vy, d.vz); },
+      dropDel: (uid) => { drops.take(uid); },
+      give: (item, n) => {
+        const left = inv.add(item, n);
+        paintHotbar();
+        // nem fért el: visszadobjuk a lábunk elé
+        if (left > 0) guest?.sendDropReq(item, left, player.pos.x, player.pos.y + 1, player.pos.z);
+      },
       morning: (day) => { morningDay = day; sleepMorning = true; },
       chat: (from, text) => showToast(`${nameOf(from)}: ${text}`),
       closed: () => leaveGuest('The host disconnected.'),
@@ -1138,9 +1160,9 @@ async function main(): Promise<void> {
   /** A kibontott blokk a földre esik (a játékos felveszi, ha a közelébe ér) */
   const giveDrop = (id: number, x: number, y: number, z: number) => {
     const d = dropFor(id, held()?.id);
-    if (d) drops.spawn(d.id, d.n, x + 0.5, y + 0.5, z + 0.5);
+    if (d) spawnDrop(d.id, d.n, x + 0.5, y + 0.5, z + 0.5);
     const extra = bonusDrop(id);
-    if (extra) drops.spawn(extra.id, extra.n, x + 0.5, y + 0.5, z + 0.5);
+    if (extra) spawnDrop(extra.id, extra.n, x + 0.5, y + 0.5, z + 0.5);
   };
 
   /**
@@ -1196,7 +1218,7 @@ async function main(): Promise<void> {
       if (log || ++leafBursts % 4 === 0) particles.burst(Math.floor(lx), Math.floor(ly), Math.floor(lz), c.id);
       if (mode !== 'survival') return;
       const d = dropFor(c.id, tool);
-      if (d) drops.spawn(d.id, d.n, lx, ly, lz);
+      if (d) spawnDrop(d.id, d.n, lx, ly, lz);
     });
     return { logs: tree.logs.length };
   };
@@ -1221,7 +1243,7 @@ async function main(): Promise<void> {
     if (blockKey(id) === 'furnace') {
       const f = furnaces.get(fkey(x, y, z));
       if (f) {
-        for (const s of f.contents()) drops.spawn(s.id, s.n, x + 0.5, y + 0.5, z + 0.5);
+        for (const s of f.contents()) spawnDrop(s.id, s.n, x + 0.5, y + 0.5, z + 0.5);
         furnaces.delete(fkey(x, y, z));
       }
     }
@@ -1229,7 +1251,7 @@ async function main(): Promise<void> {
     if (blockKey(id) === 'chest') {
       const ch = chests.get(fkey(x, y, z));
       if (ch) {
-        for (const s of ch.contents()) drops.spawn(s.id, s.n, x + 0.5, y + 0.5, z + 0.5);
+        for (const s of ch.contents()) spawnDrop(s.id, s.n, x + 0.5, y + 0.5, z + 0.5);
         chests.delete(fkey(x, y, z));
       }
     }
@@ -1486,7 +1508,7 @@ async function main(): Promise<void> {
   /** A mob halála: a dropok a földre esnek (túlélőben) */
   const onMobDie = (m: Mob) => {
     if (mode !== 'survival') return;
-    for (const d of mobDrops(m.kind)) drops.spawn(d.id, d.n, m.x, m.y + 0.4, m.z);
+    for (const d of mobDrops(m.kind)) spawnDrop(d.id, d.n, m.x, m.y + 0.4, m.z);
   };
 
   /** egy mob megsebezte a (helyi) játékost */
@@ -1792,7 +1814,9 @@ async function main(): Promise<void> {
         }
       }
       particles.update(dt);
-      drops.update(dt, world, player.pos.x, player.pos.y, player.pos.z, (id, n) => {
+      drops.update(dt, world, player.pos.x, player.pos.y, player.pos.z, (id, n, uid) => {
+        // vendégként a host adja oda (és veszi el a földről): csak kérjük
+        if (guest) { guest.sendPickup(uid); return n; }
         const left = inv.add(id, n);
         if (left < n) paintHotbar();
         return left;

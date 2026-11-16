@@ -20,7 +20,8 @@ export interface PlayerState {
   /** a viselt páncél: sisak, mellvért, nadrág, csizma (0: nincs) */
   armor: [number, number, number, number];
   /** animáció: sebesség (0..1,3), futás, ütés / evés / védekezés */
-  speed: number; sprint: boolean; swing: boolean; eating: boolean; blocking: boolean;
+  speed: number; sprint: boolean; /** a lendítés fázisa 0..1 (0: nem üt) */
+  swing: number; eating: boolean; blocking: boolean;
 }
 
 /** Egy mob pillanatképe (a szerver küldi, a kliens interpolálja). */
@@ -53,7 +54,14 @@ export type ClientMsg =
   /** a játékos lefeküdt / felkelt (alvás-szavazás) */
   | { t: 'sleep'; on: boolean }
   /** láda megnyitása / tartalmának módosítása */
-  | { t: 'chest'; x: number; y: number; z: number; slots: ({ id: number; n: number } | null)[] };
+  | { t: 'chest'; x: number; y: number; z: number; slots: ({ id: number; n: number } | null)[] }
+  /** a vendég tárgyat ejtene a földre (kibányászott blokk stb.): a host hozza létre és küldi szét */
+  | { t: 'dropReq'; item: number; n: number; x: number; y: number; z: number }
+  /** a vendég fel akarja venni a földön heverő tárgyat */
+  | { t: 'pickup'; id: number };
+
+/** egy földön heverő tárgy (a host a tulajdonosa, az azonosítója közös) */
+export interface DropState { id: number; item: number; n: number; x: number; y: number; z: number; vx: number; vy: number; vz: number }
 
 // ---------- szerver → kliens ----------
 
@@ -69,6 +77,10 @@ export type ServerMsg =
   | { t: 'mobGone'; id: number }
   /** egy mob megsebezte a játékost (a kliens alkalmazza: páncél, lökés, életerő) */
   | { t: 'hurt'; dmg: number; fx: number; fz: number }
+  | { t: 'dropAdd'; drops: DropState[] }
+  | { t: 'dropDel'; id: number }
+  /** a felvett tárgy a vendég tárolójába kerül */
+  | { t: 'give'; item: number; n: number }
   | { t: 'chat'; from: PlayerId; text: string }
   | { t: 'chest'; x: number; y: number; z: number; slots: ({ id: number; n: number } | null)[] }
   /** reggel lett (mindenki aludt): a kliens lejátssza az átmenetet */

@@ -7,7 +7,7 @@
  * hookokon át kapja a világ eseményeit.
  */
 import type { MobManager, MobPlayer, Mob } from './mobs';
-import type { BlockEdit, ClientMsg, MobState, PlayerId, PlayerState, ServerMsg } from './protocol';
+import type { BlockEdit, ClientMsg, DropState, MobState, PlayerId, PlayerState, ServerMsg } from './protocol';
 import { PROTOCOL_VERSION } from './protocol';
 import { CS } from './noise';
 import type { Sim } from './sim';
@@ -43,6 +43,12 @@ export interface ServerHooks {
   chat(from: string, text: string): void;
   /** belépett / kilépett valaki */
   presence(name: string, joined: boolean): void;
+  /** egy vendég tárgyat ejt (a host létrehozza a földön; a szétküldés a `dropAdd`-on át megy) */
+  dropRequest(item: number, n: number, x: number, y: number, z: number): void;
+  /** egy vendég fel akarja venni a tárgyat: a host eltávolítja és visszaadja, mit kapott (vagy null) */
+  pickup(from: PlayerState, id: number): { item: number; n: number } | null;
+  /** a földön heverő tárgyak (az újonnan belépőnek) */
+  drops(): DropState[];
   /** az aktuális idő és nap (a pillanatképhez és a belépéshez) */
   clock(): { time: number; day: number };
 }
@@ -56,7 +62,7 @@ interface Remote {
 }
 
 const emptyState = (id: PlayerId, name: string): PlayerState => ({
-  id, name, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, held: 0, armor: [0, 0, 0, 0], speed: 0, sprint: false, swing: false, eating: false, blocking: false,
+  id, name, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, held: 0, armor: [0, 0, 0, 0], speed: 0, sprint: false, swing: 0, eating: false, blocking: false,
 });
 
 export class GameServer {
@@ -93,6 +99,11 @@ export class GameServer {
   setLocal(s: Partial<Omit<PlayerState, 'id'>>): void { Object.assign(this.local, s); }
 
   setLocalSleeping(on: boolean): void { this.localSleeping = on; this.checkMorning(); }
+
+  /** új tárgy a földön: mindenkinek */
+  dropAdd(d: DropState): void { this.broadcast({ t: 'dropAdd', drops: [d] }); }
+  /** a tárgy eltűnt (felvették, elégett, lejárt) */
+  dropDel(id: number): void { this.broadcast({ t: 'dropDel', id }); }
 
   hostChat(text: string): void { this.broadcast({ t: 'chat', from: HOST_ID, text: text.slice(0, 200) }); }
 
@@ -140,6 +151,16 @@ export class GameServer {
         this.hooks.chat(r.state.name, text);
         break;
       }
+      case 'dropReq': {
+        if (this.farFrom(r, msg.x, msg.y, msg.z) || !Number.isInteger(msg.item) || !Number.isInteger(msg.n) || msg.n < 1 || msg.n > 64) break;
+        this.hooks.dropRequest(msg.item, msg.n, msg.x, msg.y, msg.z);
+        break;
+      }
+      case 'pickup': {
+        const got = this.hooks.pickup(r.state, msg.id);
+        if (got) r.conn.send({ t: 'give', item: got.item, n: got.n });
+        break;
+      }
       case 'sleep': r.sleeping = !!msg.on; this.checkMorning(); break;
       case 'chest': {
         if (this.farFrom(r, msg.x, msg.y, msg.z)) break;
@@ -166,6 +187,8 @@ export class GameServer {
       for (let k = i; k < Math.min(flat.length, i + 4 * EDITS_PER_MSG); k += 4) edits.push({ x: flat[k], y: flat[k + 1], z: flat[k + 2], id: flat[k + 3] });
       r.conn.send({ t: 'edits', edits });
     }
+    const ds = this.hooks.drops();
+    for (let i = 0; i < ds.length; i += 100) r.conn.send({ t: 'dropAdd', drops: ds.slice(i, i + 100) });
     this.broadcast({ t: 'join', player: r.state }, true, connId);
     this.hooks.presence(clean, true);
   }

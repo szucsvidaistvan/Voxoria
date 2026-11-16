@@ -13,12 +13,15 @@ interface Entry {
   tag: HTMLElement;
   x: number; y: number; z: number; yaw: number;
   walk: number;
-  swingT: number; wasSwing: boolean;
+  /** a lendítés fázisa (a pillanatképek közt maga lépked tovább) és az utoljára kapott érték */
+  sw: number; lastSw: number;
   eat: number; chew: number;
   armor: string;
   seen: boolean;
 }
 
+/** egy lendítés ideje (mint a saját kézé) */
+const SWING_TIME = 0.3;
 const angDiff = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
 export function createRemotePlayers(scene: THREE.Scene, base: string, atlas: Atlas, tagRoot: HTMLElement) {
@@ -35,7 +38,7 @@ export function createRemotePlayers(scene: THREE.Scene, base: string, atlas: Atl
     name.textContent = s.name;
     tag.appendChild(name);
     tagRoot.appendChild(tag);
-    return { view, tag, x: s.x, y: s.y, z: s.z, yaw: s.yaw, walk: 0, swingT: 1, wasSwing: false, eat: 0, chew: 0, armor: '', seen: true };
+    return { view, tag, x: s.x, y: s.y, z: s.z, yaw: s.yaw, walk: 0, sw: 0, lastSw: 0, eat: 0, chew: 0, armor: '', seen: true };
   };
 
   const remove = (id: number) => {
@@ -62,9 +65,9 @@ export function createRemotePlayers(scene: THREE.Scene, base: string, atlas: Atl
         else { e.x += (s.x - e.x) * k; e.y += (s.y - e.y) * k; e.z += (s.z - e.z) * k; }
         e.yaw += angDiff(s.yaw, e.yaw) * k;
         e.walk += Math.hypot(e.x - px, e.z - pz);
-        if (s.swing && !e.wasSwing) e.swingT = 0;
-        e.wasSwing = s.swing;
-        e.swingT = Math.min(1, e.swingT + dt / 0.3);
+        // üléskor a pillanatkép fázisához igazodunk, két pillanatkép közt magunk léptetjük (a kéz ugyanolyan gyorsan mozog)
+        if (s.swing !== e.lastSw) { e.lastSw = s.swing; e.sw = s.swing; } else if (e.sw > 0) e.sw = Math.min(1, e.sw + dt / SWING_TIME);
+        if (s.swing === 0) e.sw = 0;
         e.eat += ((s.eating ? 1 : 0) - e.eat) * Math.min(1, dt * 10);
         if (s.eating) e.chew += dt * 2;
         const armor = s.armor.join(',');
@@ -72,7 +75,7 @@ export function createRemotePlayers(scene: THREE.Scene, base: string, atlas: Atl
         e.view.setHeld(s.held);
         e.view.visible = visible;
         e.view.set(e.x, e.y, e.z, e.yaw, e.walk, s.speed / 4, light, {
-          swing: e.swingT < 1 ? Math.sin(e.swingT * Math.PI) : 0, eat: e.eat, chewPhase: e.chew, block: s.blocking, pitch: s.pitch, sprint: s.sprint ? 1 : 0,
+          swing: e.sw, eat: e.eat, chewPhase: e.chew, block: s.blocking, pitch: s.pitch, sprint: s.sprint ? 1 : 0,
         });
         // névtábla: a fej fölött, a képernyőre vetítve
         v.set(e.x, e.y + 2.1, e.z).project(camera);
