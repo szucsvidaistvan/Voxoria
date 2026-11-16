@@ -68,7 +68,22 @@ export class GameServer {
   /** a host játékosa támadható-e (túlélő mód) */
   localTarget = true;
 
-  constructor(private world: World, private sim: Sim, private mobs: MobManager, private hooks: ServerHooks) {}
+  /** a tickig összegyűlt módosítások (a világ minden módosítása: host, folyadék, növény, vendég) */
+  private pending: { e: BlockEdit; origin: number }[] = [];
+  /** épp melyik vendég módosítását alkalmazzuk (őt nem értesítjük vissza); -1: nem vendég */
+  private origin = -1;
+
+  constructor(private world: World, private sim: Sim, private mobs: MobManager, private hooks: ServerHooks) {
+    world.onEdit = (x, y, z, id) => { this.pending.push({ e: { x, y, z, id }, origin: this.origin }); };
+  }
+
+  /** Leállítás: a világ többé nem gyűjti a módosításokat. */
+  close(): void {
+    this.world.onEdit = undefined;
+    this.pending = [];
+    this.remotes.clear();
+  }
+
 
   // ---------- a host saját játékosa ----------
 
@@ -78,11 +93,6 @@ export class GameServer {
   setLocal(s: Partial<Omit<PlayerState, 'id'>>): void { Object.assign(this.local, s); }
 
   setLocalSleeping(on: boolean): void { this.localSleeping = on; this.checkMorning(); }
-
-  /** A host saját blokk-módosítása: mindenkinek szétküldjük. */
-  hostEdit(x: number, y: number, z: number, id: number): void {
-    this.broadcast({ t: 'edits', edits: [{ x, y, z, id }] });
-  }
 
   hostChat(text: string): void { this.broadcast({ t: 'chat', from: HOST_ID, text: text.slice(0, 200) }); }
 
@@ -165,7 +175,6 @@ export class GameServer {
   }
 
   private edit(connId: number, r: Remote, edits: BlockEdit[]): void {
-    const ok: BlockEdit[] = [];
     for (const e of edits.slice(0, 64)) {
       if (![e.x, e.y, e.z, e.id].every(Number.isInteger) || e.id < 0 || e.id > 0xffff) continue;
       if (this.farFrom(r, e.x, e.y, e.z)) {
@@ -175,12 +184,25 @@ export class GameServer {
       }
       // a vendég környéke a hostnál még nem biztos, hogy be van töltve
       this.world.ensureChunk(Math.floor(e.x / CS), Math.floor(e.z / CS));
-      if (!this.world.setBlock(e.x, e.y, e.z, e.id)) continue;
+      this.origin = connId;
+      const done = this.world.setBlock(e.x, e.y, e.z, e.id);
+      this.origin = -1;
+      if (!done) continue;
       this.sim.notify(e.x, e.y, e.z);
       this.hooks.blockChanged(e.x, e.y, e.z, e.id);
-      ok.push(e);
     }
-    if (ok.length) this.broadcast({ t: 'edits', edits: ok }, true, connId);
+  }
+
+  /** A tickig összegyűlt módosítások szétküldése (egy üzenetben, vendégenként a saját módosításuk nélkül). */
+  private flushEdits(): void {
+    if (!this.pending.length) return;
+    const list = this.pending;
+    this.pending = [];
+    for (const [id, r] of this.remotes) {
+      if (!r.joined) continue;
+      const mine = list.filter((p) => p.origin !== id).map((p) => p.e);
+      for (let i = 0; i < mine.length; i += EDITS_PER_MSG) r.conn.send({ t: 'edits', edits: mine.slice(i, i + EDITS_PER_MSG) }, true);
+    }
   }
 
   private attack(r: Remote, mobId: number, damage: number): void {
@@ -220,6 +242,9 @@ export class GameServer {
     return out;
   }
 
+  /** a belépett vendégek állapota (a host ezeket rajzolja) */
+  remoteStates(): PlayerState[] { return [...this.remotes.values()].filter((r) => r.joined).map((r) => r.state); }
+
   private allPlayers(): PlayerState[] {
     return [this.local, ...[...this.remotes.values()].filter((r) => r.joined).map((r) => r.state)];
   }
@@ -233,6 +258,7 @@ export class GameServer {
 
   /** A szerver órája (a main ciklus hívja a mobok léptetése után): `SNAPSHOT_HZ`-szel pillanatképet küld. */
   tick(dt: number): void {
+    this.flushEdits();
     this.snapT += dt;
     if (this.snapT < 1 / SNAPSHOT_HZ) return;
     this.snapT = 0;

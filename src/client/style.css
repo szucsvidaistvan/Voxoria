@@ -38,11 +38,13 @@ html, body {
   padding: max(2rem, env(safe-area-inset-top)) 2rem 2rem max(2rem, env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start; /* a hosszú panel ne csússzon ki felül: a margók középre igazítják */
   background: rgba(14, 26, 51, 0.86);
   border-right: 4px solid var(--gold);
   overflow-y: auto;
 }
+#menu > :first-child { margin-top: auto; }
+#menu > :last-child { margin-bottom: auto; }
 #menu h1 {
   margin: 0 0 0.5rem;
   font-size: clamp(2.8rem, 9vw, 4.2rem);
@@ -329,7 +331,8 @@ body.touch #touch-actions { display: block; }
 .np-bar { width: 64px; height: 7px; margin: 2px auto 0; background: rgba(0, 0, 0, 0.6); box-shadow: 0 0 0 1px #000; }
 .np-fill { height: 100%; background: #3cc23c; }
 .nameplate.hostile .np-fill { background: #d8372e; }
-body.creative .nameplate { display: none; }
+body.creative .nameplate:not(.player-tag) { display: none; }
+.player-tag .np-name { color: #fff; }
 
 /* RPG-HUD: portré + életerő- és éhségsáv bal felül, oxigénsáv és páncélpont a hotbar fölött */
 #hud-stats {
@@ -728,3 +731,11 @@ body.touch #hud-face { width: 34px; height: 34px; }
 #sleepfade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 40; }
 #daytitle { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 41; pointer-events: none; color: #fff; font-size: clamp(32px, 9vw, 72px); letter-spacing: 0.08em; text-shadow: 0 3px 0 rgba(0, 0, 0, 0.6), 0 0 24px rgba(255, 220, 140, 0.5); animation: daytitle 3.2s ease both; }
 @keyframes daytitle { 0% { opacity: 0; } 22% { opacity: 1; } 68% { opacity: 1; } 100% { opacity: 0; } }
+
+/* multiplayer panel (főmenü) */
+#mp { display: flex; flex-direction: column; gap: 0.5rem; width: min(26rem, 90vw); text-align: left; }
+#mp[hidden] { display: none; }
+#mp h2 { font-size: 1.05rem; margin: 0.6rem 0 0; }
+#mp textarea, #mp input[type="text"] { width: 100%; box-sizing: border-box; font: 0.8rem/1.2 monospace; padding: 0.4rem; background: rgba(0,0,0,0.45); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; resize: vertical; }
+#mp input[type="text"] { font: 1rem sans-serif; }
+#mp .btn { width: 100%; font-size: 1rem; padding: 0.6rem 0.8rem; margin: 0; }

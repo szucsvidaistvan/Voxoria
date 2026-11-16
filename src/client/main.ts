@@ -26,7 +26,13 @@ import { createMobView, createPlayerView } from './mobview';
 import { EAT_TIME, createHandItem } from './handitem';
 import { createInventoryPreview } from './invpreview';
 import { createCollapse } from './collapse';
-import { MobManager, mobDrops, type Mob, type MobCtx } from '../shared/mobs';
+import { Mob, MobManager, mobDrops, type MobCtx, type MobKind } from '../shared/mobs';
+import { GameServer } from '../shared/gameserver';
+import type { ClientMsg, MobState, PlayerState } from '../shared/protocol';
+import { createRemotePlayers } from './remoteplayers';
+import { GuestClient } from './net/guest';
+import { initMpUi } from './net/mpui';
+import type { Link } from './net/rtc';
 import { findTree, isLogBlock } from '../shared/tree';
 import { BagUI, HOTBAR_SIZE, Inventory, SlotView, createItemPainter } from './inventory';
 import { Health, createStatBars } from './health';
@@ -200,6 +206,7 @@ async function main(): Promise<void> {
     if (!def) return;
     const [dx, dz] = BED_DIR[def.dir];
     const hx = def.half === 0 ? bx + dx : bx, hz = def.half === 0 ? bz + dz : bz;
+    sleepMorning = false;
     sleepSeq = {
       t: 0, jumped: false, hp: health.hp,
       from: { x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw: player.yaw, pitch: player.pitch },
@@ -214,14 +221,26 @@ async function main(): Promise<void> {
     const t = sq.t;
     // ha megsebzik, felébred (az idő már ugorhatott)
     if (health.dead || health.hp < sq.hp - 0.01) { sleepSeq = null; fadeEl.style.opacity = '0'; fadeEl.hidden = true; return; }
+    // többjátékosban csak akkor lesz reggel, ha mindenki alszik: addig fekszünk (ugrással fel lehet kelni)
+    if (mpActive() && !sq.jumped && !sleepMorning) {
+      if (sq.t > 1.5) sq.t = 1.5;
+      if (sq.t >= 1.4 && input.jump) { sleepSeq = null; fadeEl.style.opacity = '0'; fadeEl.hidden = true; return; }
+    }
     sq.hp = health.hp;
     fadeEl.hidden = false;
     const fade = t < 0.8 ? 0 : t < 1.8 ? smooth(t - 0.8) : t < 2.6 ? 1 : 1 - smooth((t - 2.6) / 1.4);
     fadeEl.style.opacity = String(fade);
     if (t >= 1.8 && !sq.jumped) {
       sq.jumped = true;
-      if (timeOfDay >= DAY_FRACTION) dayCount++;
-      timeOfDay = START_TIME;
+      // egyedül az idő itt ugrik; többjátékosban a host (vagy a morning üzenet) már átállította
+      if (!mpActive()) {
+        if (timeOfDay >= DAY_FRACTION) dayCount++;
+        timeOfDay = START_TIME;
+      } else {
+        timeOfDay = START_TIME;
+        dayCount = morningDay;
+      }
+      sleepMorning = false;
       dayTitleEl.textContent = `Day ${dayCount}`;
       dayTitleEl.hidden = false;
       dayTitleEl.style.animation = 'none';
@@ -336,11 +355,13 @@ async function main(): Promise<void> {
     }
   };
 
-  const unload = (px: number, pz: number, r: number) => {
+  const unload = (px: number, pz: number, r: number, others: readonly { x: number; z: number }[] = []) => {
     const ccx = Math.floor(px / CS), ccz = Math.floor(pz / CS);
     for (const [key, c] of world.chunks) {
       const dx = c.cx - ccx, dz = c.cz - ccz;
       if (dx * dx + dz * dz <= (r + 3) * (r + 3)) continue;
+      // a hostolt világban a vendégek környéke is marad (ott futnak a mobok és a folyadékok)
+      if (others.some((o) => (c.cx - Math.floor(o.x / CS)) ** 2 + (c.cz - Math.floor(o.z / CS)) ** 2 <= 36)) continue;
       dropMeshes(key);
       built.delete(key);
       world.chunks.delete(key); // a módosítások megmaradnak, újratöltéskor visszakerülnek
@@ -362,6 +383,7 @@ async function main(): Promise<void> {
   };
 
   const startWorld = (seed: number, save: SaveData | null, newMode: Mode = 'survival') => {
+    foreignWorld = false;
     clearWorld();
     world = new World(seed);
     // a fluid-szimuláció az eredeti hívásnál csak a markDirty-t kapta (nem az y-t)
@@ -412,7 +434,7 @@ async function main(): Promise<void> {
   };
 
   const saveGame = () => {
-    if (!started) return;
+    if (!started || foreignWorld) return; // vendégként a host világa nem írja felül a saját mentést
     const p = player.pos;
     writeSave({
       seed: world.seed, edits: world.exportEdits(), pos: [p.x, p.y, p.z], yaw: player.yaw, pitch: player.pitch,
@@ -457,6 +479,205 @@ async function main(): Promise<void> {
   const fallingView = createFallingView(scene, atlas, material);
   // harmadik személyű nézet (V): a játékos saját modellje a kamera előtt
   const playerView = createPlayerView(scene, import.meta.env.BASE_URL, atlas);
+
+  // ---------- többjátékos (co-op): host és vendég ----------
+  // Host: a világ és a mobok az ő böngészőjében futnak, a GameServer szolgálja ki a vendégeket (WebRTC kapcsolaton át).
+  // Vendég: a hosttól kapott seedből ugyanazt a világot generálja, a blokk-módosításokat és a mobok állapotát a host küldi.
+  let server: GameServer | null = null;
+  let guest: GuestClient | null = null;
+  /** a játékban lévő világ a hosté (vendégként): nem mentjük el */
+  let foreignWorld = false;
+  const hostLinks = new Set<Link>();
+  const remotePlayers = createRemotePlayers(scene, import.meta.env.BASE_URL, atlas, $('nameplates'));
+  let mpUi: ReturnType<typeof initMpUi> | undefined;
+  let guestPlayers: PlayerState[] = [];
+  const guestMobTarget = new Map<Mob, MobState>();
+  const guestMobById = new Map<number, Mob>();
+  const guestHurtFlag = new Set<Mob>();
+  /** vendég: a hoszt-oldali mob-azonosító (a támadáshoz) */
+  const serverIdOf = new Map<Mob, number>();
+  /** reggel lett (mindenki aludt): az alvás-átmenet most ugrik az időben */
+  let sleepMorning = false;
+  let morningDay = 1;
+  let sleepSent = false;
+  let netT = 0;
+  const mpActive = () => !!server || !!guest;
+  const angDiffM = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+  const nameOf = (id: number) => (server ? server.remoteStates() : guestPlayers).find((p) => p.id === id)?.name ?? (id === 0 ? 'Host' : `#${id}`);
+
+  /** a helyi játékos állapota a többieknek */
+  const localState = (): Omit<PlayerState, 'id' | 'name'> => ({
+    x: player.pos.x, y: player.pos.y, z: player.pos.z, yaw: player.yaw, pitch: player.pitch,
+    held: held()?.id ?? 0,
+    armor: inv.armor.map((sl) => sl?.id ?? 0) as [number, number, number, number],
+    speed: Math.hypot(player.vel.x, player.vel.z), sprint: player.sprinting,
+    swing: (hand?.swingP ?? 0) > 0, eating: (hand?.eatP ?? 0) > 0.05, blocking,
+  });
+
+  const clearGuestMobs = () => { guestMobTarget.clear(); guestMobById.clear(); guestHurtFlag.clear(); serverIdOf.clear(); };
+
+  const stopNet = () => {
+    for (const l of hostLinks) l.close();
+    hostLinks.clear();
+    server?.close();
+    server = null;
+    const g = guest;
+    guest = null;
+    g?.close();
+    remotePlayers.clear();
+    guestPlayers = [];
+    clearGuestMobs();
+    sleepSent = false;
+    sleepMorning = false;
+  };
+
+  /** a hosttól érkező blokk-módosítás (a nem betöltött chunkba csak feljegyezzük, betöltéskor érvényesül) */
+  const applyRemoteEdit = (x: number, y: number, z: number, id: number) => {
+    if (world.isLoaded(x, z)) {
+      applyingRemote = true;
+      setBlockAt(x, y, z, id);
+      applyingRemote = false;
+    } else world.importEdits([x, y, z, id]);
+  };
+
+  /** vendég: a host mobpillanatképéből a mobok létrehozása / frissítése / eltávolítása */
+  const syncGuestMobs = (list: MobState[]) => {
+    const seen = new Set<number>();
+    for (const st of list) {
+      seen.add(st.id);
+      let m = guestMobById.get(st.id);
+      if (!m) {
+        if (settings.mobs === 'off') continue;
+        m = new Mob(st.kind as MobKind, st.x, st.y, st.z);
+        m.yaw = st.yaw;
+        guestMobById.set(st.id, m);
+        serverIdOf.set(m, st.id);
+        mobs.mobs.push(m);
+      }
+      guestMobTarget.set(m, st);
+      m.hp = st.hp;
+      m.walk = st.walk;
+      m.onGround = true;
+      m.climb = !!(st.flags & 2);
+      m.angry = !!(st.flags & 8);
+      m.inWater = !!(st.flags & 16);
+      m.vx = -Math.sin(st.yaw) * st.speed;
+      m.vz = -Math.cos(st.yaw) * st.speed;
+      const hurt = !!(st.flags & 1);
+      if (hurt && !guestHurtFlag.has(m)) m.hurtT = 0.4;
+      if (hurt) guestHurtFlag.add(m); else guestHurtFlag.delete(m);
+      if ((st.flags & 4) && !m.dead) m.deadT = 0;
+    }
+    const gone = new Set<Mob>();
+    for (const [id, m] of guestMobById) {
+      if (seen.has(id)) continue;
+      gone.add(m);
+      guestMobById.delete(id);
+      serverIdOf.delete(m);
+      guestMobTarget.delete(m);
+      guestHurtFlag.delete(m);
+    }
+    if (gone.size) mobs.mobs = mobs.mobs.filter((m) => !gone.has(m));
+  };
+
+  /** vendég: a mobok simítása a legutóbbi pillanatkép felé (a pillanatképek ~12 Hz-esek) */
+  const guestMobsStep = (dt: number) => {
+    const k = 1 - Math.exp(-dt * 12);
+    for (const m of mobs.mobs) {
+      const t = guestMobTarget.get(m);
+      if (!t) continue;
+      if (Math.hypot(t.x - m.x, t.z - m.z) > 8 || Math.abs(t.y - m.y) > 8) { m.x = t.x; m.y = t.y; m.z = t.z; }
+      else { m.x += (t.x - m.x) * k; m.y += (t.y - m.y) * k; m.z += (t.z - m.z) * k; }
+      m.yaw += angDiffM(t.yaw, m.yaw) * k;
+      if (m.hurtT > 0) m.hurtT = Math.max(0, m.hurtT - dt);
+      if (m.dead) m.deadT += dt;
+    }
+  };
+
+  /** Host: egy vendég kapcsolata megnyílt */
+  const attachGuestLink = (link: Link) => {
+    if (!server) {
+      server = new GameServer(world, simulation, mobs, {
+        blockChanged: (x, _y, z) => {
+          // a vendég módosítása: újramesh, és a fény miatt a szomszéd chunkok is
+          const cx = Math.floor(x / CS), cz = Math.floor(z / CS);
+          for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) dirty.add(World.key(cx + dx, cz + dz));
+        },
+        attack: (m, dmg, from) => { if (m.hurt(dmg, from.x, from.z)) onMobDie(m); },
+        hurtHost: hurtLocal,
+        chest: () => {},
+        morning: () => { morningDay = timeOfDay >= DAY_FRACTION ? dayCount + 1 : dayCount; sleepMorning = true; },
+        chat: (from, text) => showToast(`${from}: ${text}`),
+        presence: (n, joined) => showToast(`${n} ${joined ? 'joined' : 'left'} the game`),
+        clock: () => ({ time: timeOfDay, day: sleepMorning ? morningDay : dayCount }),
+      });
+      server.setLocalName(mpUi?.name() ?? 'Host');
+      server.setLocal(localState());
+    }
+    const srv = server;
+    const id = srv.connect({ send: (m, reliable) => { if (link.open) link.send(m, reliable); } });
+    hostLinks.add(link);
+    link.onMessage((m) => { try { srv.receive(id, m as ClientMsg); } catch (e) { console.error(e); } });
+    link.onClose(() => { hostLinks.delete(link); srv.leave(id); });
+  };
+
+  /** Vendég: a host világa indul (a welcome üzenetből) */
+  const startGuestWorld = (seed: number, time: number, day: number, hostPos: PlayerState | undefined) => {
+    startWorld(seed, null, 'survival');
+    foreignWorld = true;
+    timeOfDay = time;
+    dayCount = day;
+    if (hostPos && (hostPos.x || hostPos.y || hostPos.z)) {
+      player.pos = { x: hostPos.x, y: hostPos.y, z: hostPos.z };
+      stream(hostPos.x, hostPos.z, 2, Infinity, Infinity);
+    }
+    started = true;
+    play();
+  };
+
+  /** Vendég: vissza a menübe és a saját (egyjátékos) világhoz */
+  const leaveGuest = (message: string) => {
+    if (!guest) return;
+    started = false; // a vendég-világ ne kerüljön mentésre
+    foreignWorld = false;
+    stopNet();
+    state = 'menu';
+    input.enabled = false;
+    input.reset();
+    highlight.visible = false;
+    sleepSeq = null;
+    fadeEl.hidden = true;
+    deathEl.hidden = true;
+    if (document.pointerLockElement) document.exitPointerLock();
+    menu.hidden = false;
+    hud.hidden = true;
+    const ex = loadSave();
+    startWorld(ex ? ex.seed : 20260, null);
+    refreshMenu();
+    mpUi?.setStatus(message);
+  };
+
+  /** Vendég: a kapcsolat megnyílt, belépünk a host világába */
+  const beginJoin = (link: Link, name: string) => {
+    saveGame();
+    stopNet();
+    guest = new GuestClient(link, name, {
+      welcome: (w) => startGuestWorld(w.seed, w.time, w.day, w.players.find((p) => p.id === 0) ?? w.players[0]),
+      reject: (reason) => { mpUi?.setStatus(`The host refused you: ${reason}`); stopNet(); },
+      edits: (list) => { for (const e of list) applyRemoteEdit(e.x, e.y, e.z, e.id); },
+      snapshot: (players, ms, time, day) => {
+        guestPlayers = players;
+        syncGuestMobs(ms);
+        if (!(sleepSeq && sleepMorning)) { timeOfDay = time; dayCount = day; } // az alvás-átmenet közben a saját időnk számít
+      },
+      hurt: hurtLocal,
+      morning: (day) => { morningDay = day; sleepMorning = true; },
+      chat: (from, text) => showToast(`${nameOf(from)}: ${text}`),
+      closed: () => leaveGuest('The host disconnected.'),
+    });
+    mpUi?.setStatus('Connected. Joining the world…');
+  };
+
   /** nézet (V): 0 első személy, 1 hátulról, 2 elölről */
   let viewMode: 0 | 1 | 2 = 0;
   let thirdPerson = false; // viewMode > 0
@@ -781,6 +1002,7 @@ async function main(): Promise<void> {
   });
   btnContinue.addEventListener('click', () => {
     if (!started) {
+      stopNet();
       const save = loadSave();
       if (save) startWorld(save.seed, save);
       started = true;
@@ -788,6 +1010,7 @@ async function main(): Promise<void> {
     play();
   });
   const newWorld = (m: Mode) => {
+    stopNet();
     clearSave();
     startWorld((Math.random() * 2 ** 31) | 0, null, m);
     started = true;
@@ -828,6 +1051,7 @@ async function main(): Promise<void> {
     : 'WASD to move, Space to jump or swim, hold left click to mine, right click to place or use (crafting table, doors, bucket, flint and steel, apple), hold right click with a sword to block (half damage from the front), V to change the view, 1–9 or scroll to choose a slot, E for the inventory, C for recipes, Esc for the menu.';
   if (input.touch) $('bag-hint').textContent = 'Tap: pick up / place. Long press: take half / place one. Drag a stack to move it. Tap outside to close.';
   $('pack-note').hidden = atlas.usingPack;
+  mpUi = initMpUi({ canHost: () => started && !foreignWorld, onGuestLink: attachGuestLink, onJoinLink: beginJoin });
 
   // ---------- indulás ----------
   const existing = loadSave();
@@ -854,6 +1078,8 @@ async function main(): Promise<void> {
   const mineEl = $('mine'), mineBar = $('mine-bar');
   const mine = { x: 0, y: 0, z: 0, t: 0, need: 0, active: false };
 
+  /** a hosttól érkező módosítást alkalmazzuk (nem küldjük vissza) */
+  let applyingRemote = false;
   /** Blokk átírása: újrameshelés és a folyadék/tűz szimuláció értesítése */
   const setBlockAt = (x: number, y: number, z: number, id: number): boolean => {
     const old = world.getBlock(x, y, z);
@@ -865,8 +1091,9 @@ async function main(): Promise<void> {
       const cx = Math.floor(x / CS), cz = Math.floor(z / CS);
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) dirty.add(World.key(cx + dx, cz + dz));
     }
-    sim.notify(x, y, z);
-    gravity.notify(x, y, z);
+    if (!guest) { sim.notify(x, y, z); gravity.notify(x, y, z); }
+    // vendégként a saját módosításunkat a host hajtja végre és küldi szét
+    if (guest && !applyingRemote) guest.sendEdit(x, y, z, id);
     return true;
   };
 
@@ -1128,6 +1355,7 @@ async function main(): Promise<void> {
     }
     // láda: megnyitja a tárolót
     if (blockKey(world.getBlock(hit.x, hit.y, hit.z)) === 'chest') {
+      if (guest) { showToast('Chests are host-only for now'); return; }
       const k = fkey(hit.x, hit.y, hit.z);
       let ch = chests.get(k);
       if (!ch) chests.set(k, (ch = new Chest()));
@@ -1136,6 +1364,7 @@ async function main(): Promise<void> {
     }
     // tűzhely: megnyitja az olvasztó felületet
     if (blockKey(world.getBlock(hit.x, hit.y, hit.z)) === 'furnace') {
+      if (guest) { showToast('Furnaces are host-only for now'); return; }
       const k = fkey(hit.x, hit.y, hit.z);
       let f = furnaces.get(k);
       if (!f) furnaces.set(k, (f = new Furnace()));
@@ -1222,20 +1451,24 @@ async function main(): Promise<void> {
     for (const d of mobDrops(m.kind)) drops.spawn(d.id, d.n, m.x, m.y + 0.4, m.z);
   };
 
+  /** egy mob megsebezte a (helyi) játékost */
+  const hurtLocal = (dmg: number, fx: number, fz: number): void => {
+    if (mode !== 'survival' || health.dead) return;
+    // védekező kard (jobb gomb nyomva): az elölről érkező támadás sebzése és lökése a felére csökken
+    const guard = blocking && (fx - player.pos.x) * -Math.sin(player.yaw) + (fz - player.pos.z) * -Math.cos(player.yaw) > 0 ? 0.5 : 1;
+    health.damage(wearArmor(dmg * guard));
+    lastMobHit = now(); lastMobHitBy = 'slain by a monster';
+    const d = Math.hypot(player.pos.x - fx, player.pos.z - fz) || 1;
+    player.knock.x += ((player.pos.x - fx) / d) * 5 * guard;
+    player.knock.z += ((player.pos.z - fz) / d) * 5 * guard;
+  };
+
   const makeMobCtx = (sky: { elevation: number }): MobCtx => ({
-    players: [{
+    // hostolva a vendégek is célpontok (a szerver adja a játékosok listáját)
+    players: server ? server.mobPlayers() : [{
       x: player.pos.x, y: player.pos.y, z: player.pos.z,
       target: mode === 'survival' && !health.dead,
-      hurt: (dmg, fx, fz) => {
-        if (mode !== 'survival' || health.dead) return;
-        // védekező kard (jobb gomb nyomva): az elölről érkező támadás sebzése és lökése a felére csökken
-        const guard = blocking && (fx - player.pos.x) * -Math.sin(player.yaw) + (fz - player.pos.z) * -Math.cos(player.yaw) > 0 ? 0.5 : 1;
-        health.damage(wearArmor(dmg * guard));
-        lastMobHit = now(); lastMobHitBy = 'slain by a monster';
-        const d = Math.hypot(player.pos.x - fx, player.pos.z - fz) || 1;
-        player.knock.x += ((player.pos.x - fx) / d) * 5 * guard;
-        player.knock.z += ((player.pos.z - fz) / d) * 5 * guard;
-      },
+      hurt: hurtLocal,
     }],
     day: sky.elevation > 0.15,
     onDie: onMobDie,
@@ -1249,7 +1482,12 @@ async function main(): Promise<void> {
     const tool = toolOf(held()?.id);
     let dmg = mode === 'creative' ? 999 : tool?.damage ?? 1;
     if (!player.onGround && player.vel.y < 0 && !player.inWater) dmg *= 1.5;
-    if (m.hurt(dmg, player.pos.x, player.pos.z)) onMobDie(m);
+    const sid = serverIdOf.get(m);
+    if (guest) {
+      // vendégként a host dönt a sebzésről; itt csak a villanás látszik azonnal
+      if (sid !== undefined) guest.sendAttack(sid, dmg);
+      m.hurtT = 0.4;
+    } else if (m.hurt(dmg, player.pos.x, player.pos.z)) onMobDie(m);
     if (mode === 'survival') {
       health.exhaust(0.1);
       // a kard 1, a többi eszköz 2 kopást kap egy ütéstől
@@ -1472,8 +1710,10 @@ async function main(): Promise<void> {
     stars.visible = sky.stars > 0.01 && !underwater;
 
     // folyadékok és tűz: állandó 20 tick/másodperc lépésekben, a menü mögött is
-    if (state !== 'menu') {
-      simulation.step(dt, state === 'playing' || state === 'inventory' ? [{ x: player.pos.x, z: player.pos.z }] : []);
+    if (state !== 'menu' && !guest) {
+      const pts = state === 'playing' || state === 'inventory' ? [{ x: player.pos.x, z: player.pos.z }] : [];
+      if (server) for (const p of server.remoteStates()) pts.push({ x: p.x, z: p.z });
+      simulation.step(dt, pts);
     }
     if (state !== 'menu') fallingView.update(gravity.fallers, simulation.acc / 0.05);
     flushDirty(3);
@@ -1483,13 +1723,22 @@ async function main(): Promise<void> {
       for (const f of furnaces.values()) f.update(dt);
       collapse.update(dt);
       // mobok: a szimuláció csak játék közben fut; békés módban nincsenek szörnyek, kikapcsolva semmi
-      if (settings.mobs !== 'off') {
+      if (server) { server.setLocal(localState()); server.localTarget = mode === 'survival' && !health.dead; }
+      if (mpActive()) {
+        // alvás-szavazás: a host a szerverben, a vendég üzenettel jelzi, ha fekszik
+        const want = !!sleepSeq && !sleepSeq.jumped;
+        if (want !== sleepSent) { sleepSent = want; if (server) server.setLocalSleeping(want); else guest?.sendSleep(want); }
+      }
+      if (guest) {
+        if (settings.mobs !== 'off') guestMobsStep(dt);
+      } else if (settings.mobs !== 'off') {
         if (state !== 'dead') {
           const night = sky.elevation < -0.05;
-          mobs.spawnTick(dt, [{ x: player.pos.x, y: player.pos.y, z: player.pos.z }], night, mode === 'survival' && settings.mobs === 'on');
+          mobs.spawnTick(dt, server ? server.mobPlayers() : [{ x: player.pos.x, y: player.pos.y, z: player.pos.z }], night, mode === 'survival' && settings.mobs === 'on');
         }
         mobs.update(dt, makeMobCtx(sky));
       }
+      server?.tick(dt);
       mobView.sync(mobs.mobs, sky.light, now / 1000);
       mobView.syncArrows(mobs.arrows);
       // a viselt páncél látszik a karakteren (harmadik személyű nézet)
@@ -1510,8 +1759,18 @@ async function main(): Promise<void> {
         return left;
       });
     }
+    if (mpActive()) {
+      const others = server ? server.remoteStates() : guestPlayers;
+      remotePlayers.sync(others, dt, sky.light, camera, innerWidth, innerHeight, state !== 'menu');
+      if (guest && guest.id >= 0 && state !== 'menu') {
+        netT += dt;
+        if (netT > 1 / 15) { netT = 0; guest.sendState(localState()); }
+      }
+      // hostként a vendégek környékét is generáljuk (mesh nélkül), hogy ott fussanak a mobok és a folyadékok
+      if (server) for (const p of others) stream(p.x, p.z, 2, 2, 0);
+    }
     stream(cx, cz, settings.renderDistance, 4, 2);
-    if (frame % 60 === 0) unload(cx, cz, settings.renderDistance);
+    if (frame % 60 === 0) unload(cx, cz, settings.renderDistance, server ? server.remoteStates() : []);
     renderer.render(scene, camera);
     hand?.render(renderer, camera); // a kéz a világ után, külön (a víz nem takarja el)
   };
@@ -1526,6 +1785,7 @@ async function main(): Promise<void> {
       inv, input, camera, scene, BLOCKS, blockId,
       /** Új világ adott maggal, a menü kihagyásával (pointer lock nélkül is fut) */
       newGame: (seed: number, m: Mode = 'survival') => {
+        stopNet();
         clearSave();
         startWorld(seed, null, m);
         started = true;

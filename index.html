@@ -123,6 +123,26 @@
     <button id="btn-new-creative" class="btn" type="button">New World (Creative)</button>
     <button id="btn-settings" class="btn" type="button" aria-expanded="false" aria-controls="settings">Settings</button>
 
+    <button id="btn-mp" class="btn" type="button" aria-expanded="false" aria-controls="mp">Multiplayer (co-op)</button>
+
+    <section id="mp" hidden>
+      <label for="mp-name">Your name</label>
+      <input id="mp-name" type="text" maxlength="16" autocomplete="off" spellcheck="false" />
+      <h2>Host: invite a friend</h2>
+      <p class="hint">Your world runs in your browser. Your friend needs the invite code, and you need their answer code (send both in any chat app).</p>
+      <button id="mp-host" class="btn" type="button">1. Create invite code</button>
+      <textarea id="mp-invite" readonly rows="3" placeholder="Invite code appears here" spellcheck="false"></textarea>
+      <button id="mp-copy-invite" class="btn" type="button">Copy invite code</button>
+      <textarea id="mp-answer" rows="3" placeholder="2. Paste your friend's answer code here" spellcheck="false"></textarea>
+      <button id="mp-accept" class="btn" type="button">3. Connect</button>
+      <h2>Join a friend</h2>
+      <textarea id="mp-join-code" rows="3" placeholder="Paste the invite code here" spellcheck="false"></textarea>
+      <button id="mp-join" class="btn" type="button">Join</button>
+      <textarea id="mp-join-answer" readonly rows="3" placeholder="Your answer code appears here" spellcheck="false"></textarea>
+      <button id="mp-copy-answer" class="btn" type="button">Copy answer code</button>
+      <p id="mp-status" class="hint" role="status" aria-live="polite"></p>
+    </section>
+
     <section id="settings" hidden>
       <label for="set-dist">Render distance: <output id="set-dist-val"></output> chunks</label>
       <input id="set-dist" type="range" min="3" max="10" step="1" />
