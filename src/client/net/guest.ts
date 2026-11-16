@@ -1,5 +1,5 @@
 import type { Link } from './rtc';
-import type { BlockEdit, ClientMsg, MobState, PlayerState, ServerMsg } from '../../shared/protocol';
+import type { BlockEdit, ClientMsg, DropState, MobState, PlayerState, ServerMsg } from '../../shared/protocol';
 import { PROTOCOL_VERSION } from '../../shared/protocol';
 
 /** A vendég oldali protokoll-kezelő: üzeneteket küld a hostnak, és a beérkezőket eseményekre bontja. */
@@ -11,6 +11,9 @@ export interface GuestHandlers {
   hurt(dmg: number, fx: number, fz: number): void;
   morning(day: number): void;
   chat(from: number, text: string): void;
+  dropAdd(drops: DropState[]): void;
+  dropDel(id: number): void;
+  give(item: number, n: number): void;
   closed(): void;
 }
 
@@ -36,6 +39,9 @@ export class GuestClient {
       case 'hurt': this.h.hurt(m.dmg, m.fx, m.fz); break;
       case 'morning': this.h.morning(m.day); break;
       case 'chat': this.h.chat(m.from, m.text); break;
+      case 'dropAdd': this.h.dropAdd(m.drops); break;
+      case 'dropDel': this.h.dropDel(m.id); break;
+      case 'give': this.h.give(m.item, m.n); break;
       default: break; // join / leave: a pillanatképből látszik
     }
   }
@@ -44,6 +50,8 @@ export class GuestClient {
   sendEdit(x: number, y: number, z: number, id: number): void { this.send({ t: 'edit', edits: [{ x, y, z, id }] }); }
   sendAttack(mob: number, damage: number): void { this.send({ t: 'attack', mob, damage }); }
   sendSleep(on: boolean): void { this.send({ t: 'sleep', on }); }
+  sendDropReq(item: number, n: number, x: number, y: number, z: number): void { this.send({ t: 'dropReq', item, n, x, y, z }); }
+  sendPickup(id: number): void { this.send({ t: 'pickup', id }); }
   sendChat(text: string): void { this.send({ t: 'chat', text }); }
   close(): void { this.link.close(); }
 }

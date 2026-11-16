@@ -11,7 +11,7 @@ const ok = (c: boolean, m: string) => { if (!c) { fails++; console.error('HIBA:'
 const world = new World(1234);
 const sim = new Sim(world, { changed() {}, setBlock() {}, drop() {} });
 const mobs = new MobManager(world);
-const log = { changed: 0, attacks: [] as number[], hostHurt: 0, morning: 0, chat: [] as string[], presence: [] as string[] };
+const log = { changed: 0, attacks: [] as number[], hostHurt: 0, morning: 0, chat: [] as string[], presence: [] as string[], drops: [] as string[] };
 const server = new GameServer(world, sim, mobs, {
   blockChanged: () => { log.changed++; },
   attack: (_m, d) => { log.attacks.push(d); },
@@ -21,6 +21,9 @@ const server = new GameServer(world, sim, mobs, {
   chat: (f, t) => { log.chat.push(`${f}: ${t}`); },
   presence: (n, j) => { log.presence.push(`${j ? '+' : '-'}${n}`); },
   clock: () => ({ time: 0.3, day: 2 }),
+  dropRequest: (item, n) => { log.drops.push(`${item}x${n}`); },
+  pickup: (_from, id) => (id === 7 ? { item: 3, n: 2 } : null),
+  drops: () => [{ id: 7, item: 3, n: 2, x: 0, y: 70, z: 0, vx: 0, vy: 0, vz: 0 }],
 });
 
 const mk = () => {
@@ -48,7 +51,7 @@ ok(log.presence[0] === '+Aladárscript', 'név megtisztítva');
 const b = mk();
 b.send({ t: 'hello', version: PROTOCOL_VERSION, name: 'Béla' });
 ok(of(a.got, 'join').length === 1, 'A értesül B belépéséről');
-a.send({ t: 'state', p: { id: 99, name: 'hamis', x: 2, y: 70, z: 2, yaw: 1, pitch: 0, held: 3, armor: [0, 0, 0, 0], speed: 0, sprint: false, swing: false, eating: false, blocking: false } });
+a.send({ t: 'state', p: { id: 99, name: 'hamis', x: 2, y: 70, z: 2, yaw: 1, pitch: 0, held: 3, armor: [0, 0, 0, 0], speed: 0, sprint: false, swing: 0, eating: false, blocking: false } });
 b.send({ t: 'state', p: { x: 5, y: 70, z: 5, yaw: 0, pitch: 0 } as never });
 server.tick(1);
 const snap = of(b.got, 'snapshot').pop()!;
@@ -86,6 +89,19 @@ const ps = server.mobPlayers();
 ok(ps.length === 3, 'mobPlayers: host + 2 vendég');
 ps[0].hurt(2, 0, 0); ps[1].hurt(3, 1, 1);
 ok(log.hostHurt === 1 && of(a.got, 'hurt').length === 1 && of(b.got, 'hurt').length === 0, 'hurt a megfelelő félhez');
+
+// tárgyak
+ok(of(b.got, 'dropAdd').length === 1 && of(b.got, 'dropAdd')[0].drops[0].id === 7, 'belépéskor megkapja a földön lévő tárgyakat');
+a.send({ t: 'dropReq', item: 4, n: 3, x: 3, y: 71, z: 3 });
+a.send({ t: 'dropReq', item: 4, n: 999, x: 3, y: 71, z: 3 });
+a.send({ t: 'dropReq', item: 4, n: 1, x: 900, y: 71, z: 900 });
+ok(log.drops.length === 1 && log.drops[0] === '4x3', 'dropReq: csak az érvényes és közeli jut át');
+a.send({ t: 'pickup', id: 7 });
+a.send({ t: 'pickup', id: 8 });
+ok(of(a.got, 'give').length === 1 && of(a.got, 'give')[0].n === 2, 'pickup: a felvett tárgy a vendégé');
+server.dropAdd({ id: 9, item: 1, n: 1, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 });
+server.dropDel(9);
+ok(of(b.got, 'dropAdd').length === 2 && of(b.got, 'dropDel').length === 1, 'drop új / eltűnt szétküldve');
 
 // chat
 b.send({ t: 'chat', text: 'szia' });
