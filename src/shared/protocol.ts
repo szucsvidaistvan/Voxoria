@@ -67,6 +67,8 @@ export type ServerMsg =
   /** kötegelt blokkmódosítás (a belépéskor a teljes eltérés is így érkezik) */
   | { t: 'edits'; edits: BlockEdit[] }
   | { t: 'mobGone'; id: number }
+  /** egy mob megsebezte a játékost (a kliens alkalmazza: páncél, lökés, életerő) */
+  | { t: 'hurt'; dmg: number; fx: number; fz: number }
   | { t: 'chat'; from: PlayerId; text: string }
   | { t: 'chest'; x: number; y: number; z: number; slots: ({ id: number; n: number } | null)[] }
   /** reggel lett (mindenki aludt): a kliens lejátssza az átmenetet */
