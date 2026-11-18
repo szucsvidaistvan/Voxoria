@@ -56,7 +56,7 @@ export type ClientMsg =
   /** láda megnyitása / tartalmának módosítása */
   | { t: 'chest'; x: number; y: number; z: number; slots: ({ id: number; n: number } | null)[] }
   /** a vendég tárgyat ejtene a földre (kibányászott blokk stb.): a host hozza létre és küldi szét */
-  | { t: 'dropReq'; item: number; n: number; x: number; y: number; z: number }
+  | { t: 'dropReq'; item: number; n: number; x: number; y: number; z: number; d?: number; vx?: number; vy?: number; vz?: number; wait?: number }
   /** a vendég fel akarja venni a földön heverő tárgyat */
   | { t: 'pickup'; id: number }
   /** a vendég kidöntött egy fát: a többiek is látják az összeomlás-animációt (a blokkok az `edit`-ekkel tűnnek el) */
@@ -65,7 +65,7 @@ export type ClientMsg =
 export interface FellCell { x: number; y: number; z: number; id: number }
 
 /** egy földön heverő tárgy (a host a tulajdonosa, az azonosítója közös) */
-export interface DropState { id: number; item: number; n: number; x: number; y: number; z: number; vx: number; vy: number; vz: number }
+export interface DropState { id: number; item: number; n: number; x: number; y: number; z: number; vx: number; vy: number; vz: number; d?: number; wait?: number }
 
 // ---------- szerver → kliens ----------
 
@@ -84,7 +84,7 @@ export type ServerMsg =
   | { t: 'dropAdd'; drops: DropState[] }
   | { t: 'dropDel'; id: number }
   /** a felvett tárgy a vendég tárolójába kerül */
-  | { t: 'give'; item: number; n: number }
+  | { t: 'give'; item: number; n: number; d?: number }
   | { t: 'fell'; cells: FellCell[]; ox: number; oz: number }
   | { t: 'chat'; from: PlayerId; text: string }
   | { t: 'chest'; x: number; y: number; z: number; slots: ({ id: number; n: number } | null)[] }

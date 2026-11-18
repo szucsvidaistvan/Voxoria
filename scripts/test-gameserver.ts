@@ -22,7 +22,7 @@ const server = new GameServer(world, sim, mobs, {
   chat: (f, t) => { log.chat.push(`${f}: ${t}`); },
   presence: (n, j) => { log.presence.push(`${j ? '+' : '-'}${n}`); },
   clock: () => ({ time: 0.3, day: 2 }),
-  dropRequest: (item, n) => { log.drops.push(`${item}x${n}`); },
+  dropRequest: (item, n, _x, _y, _z, o) => { log.drops.push(`${item}x${n}`); log.dropOpt = o; },
   pickup: (_from, id) => (id === 7 ? { item: 3, n: 2 } : null),
   drops: () => [{ id: 7, item: 3, n: 2, x: 0, y: 70, z: 0, vx: 0, vy: 0, vz: 0 }],
 });
@@ -97,6 +97,8 @@ a.send({ t: 'dropReq', item: 4, n: 3, x: 3, y: 71, z: 3 });
 a.send({ t: 'dropReq', item: 4, n: 999, x: 3, y: 71, z: 3 });
 a.send({ t: 'dropReq', item: 4, n: 1, x: 900, y: 71, z: 900 });
 ok(log.drops.length === 1 && log.drops[0] === '4x3', 'dropReq: csak az érvényes és közeli jut át');
+a.send({ t: 'dropReq', item: 5, n: 1, x: 3, y: 71, z: 3, vx: 99, wait: 99, d: 7 });
+ok(log.dropOpt.vx === 12 && log.dropOpt.wait === 3 && log.dropOpt.d === 7, 'dropReq: sebesség és késleltetés korlátozva, kopás átmegy');
 a.send({ t: 'pickup', id: 7 });
 a.send({ t: 'pickup', id: 8 });
 ok(of(a.got, 'give').length === 1 && of(a.got, 'give')[0].n === 2, 'pickup: a felvett tárgy a vendégé');

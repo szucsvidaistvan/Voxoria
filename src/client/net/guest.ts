@@ -13,7 +13,7 @@ export interface GuestHandlers {
   chat(from: number, text: string): void;
   dropAdd(drops: DropState[]): void;
   dropDel(id: number): void;
-  give(item: number, n: number): void;
+  give(item: number, n: number, d?: number): void;
   fell(cells: FellCell[], ox: number, oz: number): void;
   closed(): void;
 }
@@ -42,8 +42,8 @@ export class GuestClient {
       case 'chat': this.h.chat(m.from, m.text); break;
       case 'dropAdd': this.h.dropAdd(m.drops); break;
       case 'dropDel': this.h.dropDel(m.id); break;
+      case 'give': this.h.give(m.item, m.n, m.d); break;
       case 'fell': this.h.fell(m.cells, m.ox, m.oz); break;
-      case 'give': this.h.give(m.item, m.n); break;
       default: break; // join / leave: a pillanatképből látszik
     }
   }
@@ -52,7 +52,9 @@ export class GuestClient {
   sendEdit(x: number, y: number, z: number, id: number): void { this.send({ t: 'edit', edits: [{ x, y, z, id }] }); }
   sendAttack(mob: number, damage: number): void { this.send({ t: 'attack', mob, damage }); }
   sendSleep(on: boolean): void { this.send({ t: 'sleep', on }); }
-  sendDropReq(item: number, n: number, x: number, y: number, z: number): void { this.send({ t: 'dropReq', item, n, x, y, z }); }
+  sendDropReq(item: number, n: number, x: number, y: number, z: number, opt: { d?: number; vx?: number; vy?: number; vz?: number; wait?: number } = {}): void {
+    this.send({ t: 'dropReq', item, n, x, y, z, ...opt });
+  }
   sendFell(cells: FellCell[], ox: number, oz: number): void { this.send({ t: 'fell', cells, ox, oz }); }
   sendPickup(id: number): void { this.send({ t: 'pickup', id }); }
   sendChat(text: string): void { this.send({ t: 'chat', text }); }

@@ -46,9 +46,9 @@ export interface ServerHooks {
   /** belépett / kilépett valaki */
   presence(name: string, joined: boolean): void;
   /** egy vendég tárgyat ejt (a host létrehozza a földön; a szétküldés a `dropAdd`-on át megy) */
-  dropRequest(item: number, n: number, x: number, y: number, z: number): void;
+  dropRequest(item: number, n: number, x: number, y: number, z: number, opt: { d?: number; vx?: number; vy?: number; vz?: number; wait?: number }): void;
   /** egy vendég fel akarja venni a tárgyat: a host eltávolítja és visszaadja, mit kapott (vagy null) */
-  pickup(from: PlayerState, id: number): { item: number; n: number } | null;
+  pickup(from: PlayerState, id: number): { item: number; n: number; d?: number } | null;
   /** a földön heverő tárgyak (az újonnan belépőnek) */
   drops(): DropState[];
   /** az aktuális idő és nap (a pillanatképhez és a belépéshez) */
@@ -155,12 +155,16 @@ export class GameServer {
       }
       case 'dropReq': {
         if (this.farFrom(r, msg.x, msg.y, msg.z) || !Number.isInteger(msg.item) || !Number.isInteger(msg.n) || msg.n < 1 || msg.n > 64) break;
-        this.hooks.dropRequest(msg.item, msg.n, msg.x, msg.y, msg.z);
+        const lim = (v: unknown, m: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-m, Math.min(m, v)) : undefined);
+        this.hooks.dropRequest(msg.item, msg.n, msg.x, msg.y, msg.z, {
+          d: Number.isInteger(msg.d) && (msg.d as number) >= 0 ? msg.d : undefined,
+          vx: lim(msg.vx, 12), vy: lim(msg.vy, 12), vz: lim(msg.vz, 12), wait: lim(msg.wait, 3),
+        });
         break;
       }
       case 'pickup': {
         const got = this.hooks.pickup(r.state, msg.id);
-        if (got) r.conn.send({ t: 'give', item: got.item, n: got.n });
+        if (got) r.conn.send({ t: 'give', item: got.item, n: got.n, d: got.d });
         break;
       }
       case 'fell': {
