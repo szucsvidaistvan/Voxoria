@@ -11,9 +11,10 @@ const ok = (c: boolean, m: string) => { if (!c) { fails++; console.error('HIBA:'
 const world = new World(1234);
 const sim = new Sim(world, { changed() {}, setBlock() {}, drop() {} });
 const mobs = new MobManager(world);
-const log = { changed: 0, attacks: [] as number[], hostHurt: 0, morning: 0, chat: [] as string[], presence: [] as string[], drops: [] as string[] };
+const log = { changed: 0, attacks: [] as number[], hostHurt: 0, morning: 0, chat: [] as string[], presence: [] as string[], drops: [] as string[], fell: [] as number[] };
 const server = new GameServer(world, sim, mobs, {
   blockChanged: () => { log.changed++; },
+  fell: (c) => { log.fell.push(c.length); },
   attack: (_m, d) => { log.attacks.push(d); },
   hurtHost: () => { log.hostHurt++; },
   chest: () => {},
@@ -102,6 +103,18 @@ ok(of(a.got, 'give').length === 1 && of(a.got, 'give')[0].n === 2, 'pickup: a fe
 server.dropAdd({ id: 9, item: 1, n: 1, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 });
 server.dropDel(9);
 ok(of(b.got, 'dropAdd').length === 2 && of(b.got, 'dropDel').length === 1, 'drop új / eltűnt szétküldve');
+
+// fa-összeomlás: a döntőn kívül mindenki megkapja, a blokk-módosítások után
+const cells = [{ x: 3, y: 71, z: 3, id: 5 }, { x: 3, y: 72, z: 3, id: 5 }];
+const before = of(b.got, 'fell').length;
+a.send({ t: 'fell', cells, ox: 3, oz: 3 });
+a.send({ t: 'fell', cells: [], ox: 3, oz: 3 });
+a.send({ t: 'fell', cells, ox: 900, oz: 900 });
+server.tick(0.01);
+ok(of(b.got, 'fell').length === before + 1 && of(a.got, 'fell').length === 0 && log.fell.length === 1 && log.fell[0] === 2, 'fell: a többiek és a host megkapja, a döntő nem; üres / messzi eldobva');
+server.fell(cells, 3, 3);
+server.tick(0.01);
+ok(of(a.got, 'fell').length === 1 && of(b.got, 'fell').length === before + 2, 'a host fadöntése mindenkinek megy');
 
 // chat
 b.send({ t: 'chat', text: 'szia' });

@@ -15,7 +15,7 @@ world.setBlock(1, 70, 1, 5);
 const sim = new Sim(world, { changed() {}, setBlock() {}, drop() {} });
 const mobs = new MobManager(world);
 const server = new GameServer(world, sim, mobs, {
-  blockChanged() {}, attack() {}, hurtHost() {}, chest() {}, morning() {}, chat() {}, presence() {}, clock: () => ({ time: 0.5, day: 3 }),
+  blockChanged() {}, fell() {}, attack() {}, hurtHost() {}, chest() {}, morning() {}, chat() {}, presence() {}, clock: () => ({ time: 0.5, day: 3 }),
   dropRequest() {}, pickup: () => null, drops: () => [],
 });
 server.setLocal({ x: 4, y: 70, z: 4 });
