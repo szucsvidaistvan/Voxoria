@@ -33,6 +33,7 @@ import { createRemotePlayers } from './remoteplayers';
 import { GuestClient } from './net/guest';
 import { initMpUi } from './net/mpui';
 import type { Link } from './net/rtc';
+import type { DropOpts } from './effects';
 import { findTree, isLogBlock } from '../shared/tree';
 import { BagUI, HOTBAR_SIZE, Inventory, SlotView, createItemPainter } from './inventory';
 import { Health, createStatBars } from './health';
@@ -507,8 +508,16 @@ async function main(): Promise<void> {
   const remotePlayers = createRemotePlayers(scene, import.meta.env.BASE_URL, atlas, $('nameplates'));
   let mpUi: ReturnType<typeof initMpUi> | undefined;
   /** tárgy a földre: vendégként a host hozza létre (és küldi szét), egyébként helyben */
-  const spawnDrop = (id: number, n: number, x: number, y: number, z: number): void => {
-    if (guest) guest.sendDropReq(id, n, x, y, z); else drops.spawn(id, n, x, y, z);
+  const spawnDrop = (id: number, n: number, x: number, y: number, z: number, opt?: DropOpts): void => {
+    if (guest) guest.sendDropReq(id, n, x, y, z, opt); else drops.spawn(id, n, x, y, z, opt);
+  };
+  /** Tárgy eldobása a játékos elé (a nézés irányába, a felvétel pár másodpercig késik, hogy ne kapjuk vissza azonnal) */
+  const throwStack = (s: { id: number; n: number; d?: number }): void => {
+    const cp = Math.cos(player.pitch);
+    const dx = -Math.sin(player.yaw) * cp, dy = Math.sin(player.pitch), dz = -Math.cos(player.yaw) * cp;
+    spawnDrop(s.id, s.n, player.pos.x + dx * 0.5, player.pos.y + 1.4 + dy * 0.5, player.pos.z + dz * 0.5, {
+      vx: dx * 5, vy: dy * 5 + 1.5, vz: dz * 5, wait: 1.5, ...(s.d !== undefined ? { d: s.d } : {}),
+    });
   };
   let guestPlayers: PlayerState[] = [];
   const guestMobTarget = new Map<Mob, MobState>();
@@ -539,7 +548,8 @@ async function main(): Promise<void> {
   const stopNet = () => {
     for (const l of hostLinks) l.close();
     hostLinks.clear();
-    drops.onSpawn = drops.onRemove = undefined;
+    drops.onSpawn = drops.onRemove = drops.onChange = undefined;
+    drops.merge = true;
     server?.close();
     server = null;
     const g = guest;
@@ -631,15 +641,15 @@ async function main(): Promise<void> {
         chat: (from, text) => showToast(`${from}: ${text}`),
         presence: (n, joined) => showToast(`${n} ${joined ? 'joined' : 'left'} the game`),
         clock: () => ({ time: timeOfDay, day: sleepMorning ? morningDay : dayCount }),
-        dropRequest: (item, n, x, y, z) => drops.spawn(item, n, x, y, z),
+        dropRequest: (item, n, x, y, z, opt) => drops.spawn(item, n, x, y, z, opt),
         pickup: (from, uid) => {
           const t = drops.take(uid, { x: from.x, y: from.y, z: from.z, r: 4 });
-          return t ? { item: t.id, n: t.n } : null;
+          return t ? { item: t.id, n: t.n, d: t.d } : null;
         },
-        drops: () => drops.all().map((d) => ({ id: d.uid, item: d.id, n: d.n, x: d.x, y: d.y, z: d.z, vx: d.vx, vy: d.vy, vz: d.vz })),
+        drops: () => drops.all().map((d) => ({ id: d.uid, item: d.id, n: d.n, x: d.x, y: d.y, z: d.z, vx: d.vx, vy: d.vy, vz: d.vz, d: d.d, wait: d.wait })),
       });
       // a földön heverő tárgyak mindenkinél ugyanazok: a host szétküldi, ami keletkezik vagy eltűnik
-      drops.onSpawn = (d) => server?.dropAdd({ id: d.uid, item: d.id, n: d.n, x: d.x, y: d.y, z: d.z, vx: d.vx, vy: d.vy, vz: d.vz });
+      drops.onSpawn = drops.onChange = (d) => server?.dropAdd({ id: d.uid, item: d.id, n: d.n, x: d.x, y: d.y, z: d.z, vx: d.vx, vy: d.vy, vz: d.vz, d: d.d, wait: d.wait });
       drops.onRemove = (uid) => server?.dropDel(uid);
       server.setLocalName(mpUi?.name() ?? 'Host');
       server.setLocal(localState());
@@ -691,6 +701,7 @@ async function main(): Promise<void> {
   const beginJoin = (link: Link, name: string) => {
     saveGame();
     stopNet();
+    drops.merge = false; // a kupacokat a host olvasztja össze
     guest = new GuestClient(link, name, {
       welcome: (w) => startGuestWorld(w.seed, w.time, w.day, w.players.find((p) => p.id === 0) ?? w.players[0]),
       reject: (reason) => { mpUi?.setStatus(`The host refused you: ${reason}`); stopNet(); },
@@ -701,13 +712,14 @@ async function main(): Promise<void> {
         if (!(sleepSeq && sleepMorning)) { timeOfDay = time; dayCount = day; } // az alvás-átmenet közben a saját időnk számít
       },
       hurt: hurtLocal,
-      dropAdd: (list) => { for (const d of list) if (!drops.has(d.id)) drops.add(d.id, d.item, d.n, d.x, d.y, d.z, d.vx, d.vy, d.vz); },
+      // ugyanaz az azonosító újra: a host összeolvasztotta a kupacot, csak a darabszám változik
+      dropAdd: (list) => { for (const d of list) if (drops.has(d.id)) drops.setCount(d.id, d.n); else drops.add(d.id, d.item, d.n, d.x, d.y, d.z, d.vx, d.vy, d.vz, d.d, d.wait ?? 0.5); },
       dropDel: (uid) => { drops.take(uid); },
-      give: (item, n) => {
-        const left = inv.add(item, n);
+      give: (item, n, dmg) => {
+        const left = inv.add(item, n, dmg);
         paintHotbar();
         // nem fért el: visszadobjuk a lábunk elé
-        if (left > 0) guest?.sendDropReq(item, left, player.pos.x, player.pos.y + 1, player.pos.z);
+        if (left > 0) guest?.sendDropReq(item, left, player.pos.x, player.pos.y + 1, player.pos.z, dmg !== undefined ? { d: dmg } : {});
       },
       morning: (day) => { morningDay = day; sleepMorning = true; },
       chat: (from, text) => showToast(`${nameOf(from)}: ${text}`),
@@ -793,6 +805,7 @@ async function main(): Promise<void> {
   // ---------- inventory és barkácsolás ----------
   const bag = new BagUI(inv, paintStack);
   bag.onChange = paintHotbar;
+  bag.onThrow = throwStack;
 
   // ---------- menü ----------
   type State = 'menu' | 'playing' | 'inventory' | 'dead';
@@ -990,6 +1003,16 @@ async function main(): Promise<void> {
     if (e.code === 'Escape') { e.preventDefault(); closeUI(true); }
     else if (e.code === 'KeyE' && !(e.target instanceof HTMLInputElement)) closeUI();
     else if (e.code === 'KeyC' && !(e.target instanceof HTMLInputElement)) bag.toggleBook();
+  });
+  // Q: a kézben lévő tárgyból egy darab eldobása (Ctrl+Q: az egész kupac)
+  document.addEventListener('keydown', (e) => {
+    if (state !== 'playing' || e.code !== 'KeyQ' || e.repeat || e.target instanceof HTMLInputElement) return;
+    const s = held();
+    if (!s) return;
+    const n = e.ctrlKey ? s.n : 1;
+    throwStack({ id: s.id, n, ...(s.d !== undefined ? { d: s.d } : {}) });
+    if (mode === 'survival') { s.n -= n; if (s.n <= 0) inv.slots[input.hotbar] = null; }
+    paintHotbar();
   });
   // C: receptkönyv (túlélőben, játék közben)
   document.addEventListener('keydown', (e) => {
@@ -1814,10 +1837,10 @@ async function main(): Promise<void> {
         }
       }
       particles.update(dt);
-      drops.update(dt, world, player.pos.x, player.pos.y, player.pos.z, (id, n, uid) => {
+      drops.update(dt, world, player.pos.x, player.pos.y, player.pos.z, (id, n, uid, dmg) => {
         // vendégként a host adja oda (és veszi el a földről): csak kérjük
         if (guest) { guest.sendPickup(uid); return n; }
-        const left = inv.add(id, n);
+        const left = inv.add(id, n, dmg);
         if (left < n) paintHotbar();
         return left;
       });

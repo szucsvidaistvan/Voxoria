@@ -124,6 +124,10 @@ export class BagUI {
   private smelter: SmelterUI;
   private bookMode = false;
 
+  private dropBtn = document.getElementById('bag-drop')!;
+  /** a kézben lévő stackből eldobunk (a játék a világba helyezi) */
+  onThrow: (s: Stack) => void = () => {};
+
   /** a tartalom változott (a HUD hotbarját frissíteni kell) */
   onChange: () => void = () => {};
   onClose: () => void = () => {};
@@ -132,6 +136,12 @@ export class BagUI {
     this.smelter = new SmelterUI(inv, paint, () => { this.render(); this.onChange(); });
     this.book = new BookUI(inv, paint, () => { this.render(); this.onChange(); });
     document.getElementById('bag-toggle')!.addEventListener('click', () => this.toggleBook());
+    // eldobás: a Drop gomb (érintésre is), vagy a panelen kívülre kattintva / húzva (bal: az egész, jobb: egy darab)
+    this.dropBtn.addEventListener('click', () => this.throwCursor(false));
+    this.root.addEventListener('pointerdown', (e) => {
+      if (e.target === this.root && this.cursor) { e.preventDefault(); this.throwCursor(e.button === 2); }
+    });
+    this.root.addEventListener('contextmenu', (e) => { if (e.target === this.root) e.preventDefault(); });
     this.outView = new SlotView(paint, 'islot out');
     this.cursorView = new SlotView(paint, 'islot');
     this.outEl.appendChild(this.outView.el);
@@ -209,6 +219,7 @@ export class BagUI {
           // a vonszolt stack oda kerül, ahol az ujjat felengedték; ha nincs ott hely, visszamegy
           const t = this.slotAt(ev.clientX, ev.clientY);
           if (t) this.click(t.area, t.idx, 0, false);
+          else if (this.cursor && !(document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest('.bag-panel')) this.throwCursor(false); // a panelen kívül engedte el: eldobja
           if (this.cursor && !this.list(area)[idx]) {
             this.list(area)[idx] = this.cursor;
             this.cursor = null;
@@ -308,6 +319,17 @@ export class BagUI {
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', end);
     document.addEventListener('pointercancel', end);
+  }
+
+  /** A kézben lévő stack eldobása (`one`: csak egy darab) */
+  private throwCursor(one: boolean): void {
+    const c = this.cursor;
+    if (!c) return;
+    const n = one ? 1 : c.n;
+    this.onThrow({ id: c.id, n, ...(c.d !== undefined ? { d: c.d } : {}) });
+    this.cursor = c.n - n > 0 ? { ...c, n: c.n - n } : null;
+    this.render();
+    this.onChange();
   }
 
   private moveCursor(x: number, y: number): void {
@@ -450,6 +472,7 @@ export class BagUI {
       this.craftEl.parentElement!.classList.toggle('lit', f.lit);
     }
     this.cursorView.set(this.cursor);
+    this.dropBtn.hidden = !this.cursor;
     this.cursorEl.hidden = !this.cursor;
   }
 

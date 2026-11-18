@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { AIR, BLOCKS, FLUID_LAVA, fluidKind, isSolid } from '../shared/blocks';
-import { isItem } from '../shared/items';
+import { isItem, maxStack } from '../shared/items';
 import type { World } from '../shared/world';
 import { TILE, type Atlas } from './atlas';
 
@@ -148,7 +148,12 @@ interface Drop {
   mesh: THREE.Object3D;
   /** ennyi másodpercig nem vehető fel (pl. visszadobott vagy tele a tároló) */
   wait: number;
+  /** kopás (szerszámnál): a felvételkor a tárgy megtartja */
+  d?: number;
 }
+
+/** a tárgy kezdőállapotának opciói (eldobáskor sebesség és késleltetés, szerszámnál kopás) */
+export interface DropOpts { d?: number; vx?: number; vy?: number; vz?: number; wait?: number }
 
 /**
  * A kibontott blokkok és tárgyak a földre esnek, ott forognak és lebegnek, és a játékos felveszi őket,
@@ -236,22 +241,31 @@ export function createDrops(
 
   const api = {
     /** többjátékosban (host): új / eltűnt tárgy értesítése */
-    onSpawn: undefined as undefined | ((d: { uid: number; id: number; n: number; x: number; y: number; z: number; vx: number; vy: number; vz: number }) => void),
+    onSpawn: undefined as undefined | ((d: { uid: number; id: number; n: number; x: number; y: number; z: number; vx: number; vy: number; vz: number; d?: number; wait: number }) => void),
     onRemove: undefined as undefined | ((uid: number) => void),
+    /** a darabszám megváltozott (összeolvadás) */
+    onChange: undefined as undefined | ((d: { uid: number; id: number; n: number; x: number; y: number; z: number; vx: number; vy: number; vz: number; d?: number; wait: number }) => void),
+    /** a közeli azonos tárgyak összeolvasztása (többjátékosban csak a host: a vendég a host üzenetét követi) */
+    merge: true,
+    mergeT: 0,
     get count() {
       return list.length;
     },
-    spawn(id: number, n: number, x: number, y: number, z: number) {
-      const d = this.add(nextUid++, id, n, x + (Math.random() - 0.5) * 0.3, y, z + (Math.random() - 0.5) * 0.3,
-        (Math.random() - 0.5) * 2.2, 2.5 + Math.random() * 1.5, (Math.random() - 0.5) * 2.2);
-      this.onSpawn?.(d);
+    spawn(id: number, n: number, x: number, y: number, z: number, o: DropOpts = {}) {
+      const thrown = o.vx !== undefined || o.vy !== undefined || o.vz !== undefined;
+      const d = this.add(nextUid++, id, n, x + (thrown ? 0 : (Math.random() - 0.5) * 0.3), y, z + (thrown ? 0 : (Math.random() - 0.5) * 0.3),
+        o.vx ?? (Math.random() - 0.5) * 2.2, o.vy ?? 2.5 + Math.random() * 1.5, o.vz ?? (Math.random() - 0.5) * 2.2, o.d, o.wait);
+      this.onSpawn?.(this.state(d));
+    },
+    state(d: Drop) {
+      return { uid: d.uid, id: d.id, n: d.n, x: d.x, y: d.y, z: d.z, vx: d.vx, vy: d.vy, vz: d.vz, d: d.d, wait: Math.max(0, d.wait) };
     },
     /** tárgy létrehozása adott azonosítóval és sebességgel (a hosttól érkezőnél is) */
-    add(uid: number, id: number, n: number, x: number, y: number, z: number, vx: number, vy: number, vz: number) {
+    add(uid: number, id: number, n: number, x: number, y: number, z: number, vx: number, vy: number, vz: number, dmg?: number, wait = 0.5) {
       if (list.length >= MAX) removeAt(0);
       const mesh = makeMesh(id);
       scene.add(mesh);
-      const d: Drop = { uid, id, n, x, y, z, vx, vy, vz, age: 0, phase: Math.random() * 6.28, landed: false, mesh, wait: 0.5 };
+      const d: Drop = { uid, id, n, x, y, z, vx, vy, vz, age: 0, phase: Math.random() * 6.28, landed: false, mesh, wait, ...(dmg !== undefined ? { d: dmg } : {}) };
       list.push(d);
       return d;
     },
@@ -260,14 +274,16 @@ export function createDrops(
       const i = list.findIndex((d) => d.uid === uid);
       if (i < 0) return null;
       const d = list[i];
-      if (near && Math.hypot(d.x - near.x, d.y - (near.y + 0.9), d.z - near.z) > near.r) return null;
+      if (near && (d.wait > 0 || Math.hypot(d.x - near.x, d.y - (near.y + 0.9), d.z - near.z) > near.r)) return null;
       removeAt(i);
-      return { id: d.id, n: d.n };
+      return { id: d.id, n: d.n, d: d.d };
     },
     has(uid: number) { return list.some((d) => d.uid === uid); },
+    /** a host üzenete: egy létező tárgy darabszáma megváltozott (összeolvadt) */
+    setCount(uid: number, n: number) { const d = list.find((q) => q.uid === uid); if (d) d.n = n; },
     /** a most heverő tárgyak (az újonnan belépő vendégnek) */
     all() {
-      return list.map((d) => ({ uid: d.uid, id: d.id, n: d.n, x: d.x, y: d.y, z: d.z, vx: d.vx, vy: d.vy, vz: d.vz }));
+      return list.map((d) => this.state(d));
     },
     /** A tárgyak ikonjának újrarajzolása (pl. amikor egy elem textúrája betöltődött) */
     refreshIcons() {
@@ -284,7 +300,8 @@ export function createDrops(
     /**
      * @param giveToPlayer visszaadja, hány darab NEM fért el
      */
-    update(dt: number, world: World, px: number, py: number, pz: number, giveToPlayer: (id: number, n: number, uid: number) => number) {
+    update(dt: number, world: World, px: number, py: number, pz: number, giveToPlayer: (id: number, n: number, uid: number, d?: number) => number) {
+      if (this.merge && (this.mergeT -= dt) <= 0) { this.mergeT = 0.3; this.mergeNear(); }
       for (let i = list.length - 1; i >= 0; i--) {
         const d = list[i];
         d.age += dt;
@@ -310,7 +327,7 @@ export function createDrops(
           d.vx = d.vz = 0;
           d.vy = 0;
           if (dist < 0.85) {
-            const left = giveToPlayer(d.id, d.n, d.uid);
+            const left = giveToPlayer(d.id, d.n, d.uid, d.d);
             if (left <= 0) {
               removeAt(i);
               continue;
@@ -342,6 +359,26 @@ export function createDrops(
         const bob = d.landed ? Math.sin(d.age * 2.4 + d.phase) * 0.05 + 0.05 : 0;
         d.mesh.position.set(d.x, d.y + bob, d.z);
         d.mesh.rotation.y = d.age * 1.6 + d.phase;
+        // a nagyobb kupac kicsit nagyobbnak látszik
+        d.mesh.scale.setScalar(1 + Math.min(0.4, (d.n - 1) * 0.04));
+      }
+    },
+    /** A földet ért, közeli, azonos (nem szerszám) tárgyak egy kupaccá olvadnak, a teli stack erejéig. */
+    mergeNear() {
+      for (let i = 0; i < list.length; i++) {
+        const a = list[i];
+        const max = maxStack(a.id);
+        if (max <= 1 || a.d !== undefined || !a.landed || a.n >= max) continue;
+        for (let j = list.length - 1; j > i && a.n < max; j--) {
+          const b = list[j];
+          if (b.id !== a.id || b.d !== undefined || !b.landed || Math.abs(b.y - a.y) > 0.6 || Math.hypot(b.x - a.x, b.z - a.z) > 1.1) continue;
+          const move = Math.min(b.n, max - a.n);
+          a.n += move;
+          b.n -= move;
+          if (b.n <= 0) removeAt(j);
+          else this.onChange?.(this.state(b));
+          this.onChange?.(this.state(a));
+        }
       }
     },
   };
