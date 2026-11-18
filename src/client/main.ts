@@ -553,8 +553,27 @@ async function main(): Promise<void> {
   };
 
   /** a hosttól érkező blokk-módosítás (a nem betöltött chunkba csak feljegyezzük, betöltéskor érvényesül) */
+  /** más játékos fájának összeomlása: csak az animáció és a por, tárgy nincs */
+  const playFell = (cells: { x: number; y: number; z: number; id: number }[], ox: number, oz: number) => {
+    let bursts = 0;
+    collapse.start(cells, { x: ox, z: oz }, (c, lx, ly, lz) => {
+      if (isLogBlock(c.id) || ++bursts % 4 === 0) particles.burst(Math.floor(lx), Math.floor(ly), Math.floor(lz), c.id);
+    });
+  };
+
+  /** a távoli törés-szemcsék száma korlátozva (egy fa összeomlása sok blokkot visz el egyszerre) */
+  let burstT = 0, burstN = 0;
+  const remoteBurst = (x: number, y: number, z: number, id: number) => {
+    const t = performance.now();
+    if (t - burstT > 100) { burstT = t; burstN = 0; }
+    if (++burstN <= 8) particles.burst(x, y, z, id);
+  };
+
   const applyRemoteEdit = (x: number, y: number, z: number, id: number) => {
     if (world.isLoaded(x, z)) {
+      // más játékos kibányászott egy blokkot: a törés-szemcsék nálunk is látszanak
+      const old = world.getBlock(x, y, z);
+      if (id === AIR && old !== AIR) remoteBurst(x, y, z, old);
       applyingRemote = true;
       setBlockAt(x, y, z, id);
       applyingRemote = false;
@@ -619,13 +638,15 @@ async function main(): Promise<void> {
   const attachGuestLink = (link: Link) => {
     if (!server) {
       server = new GameServer(world, simulation, mobs, {
-        blockChanged: (x, _y, z) => {
+        blockChanged: (x, y, z, id, old) => {
+          if (id === AIR && old !== AIR) remoteBurst(x, y, z, old);
           // a vendég módosítása: újramesh, és a fény miatt a szomszéd chunkok is
           const cx = Math.floor(x / CS), cz = Math.floor(z / CS);
           for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) dirty.add(World.key(cx + dx, cz + dz));
         },
         attack: (m, dmg, from) => { if (m.hurt(dmg, from.x, from.z)) onMobDie(m); },
         hurtHost: hurtLocal,
+        fell: playFell,
         chest: () => {},
         morning: () => { morningDay = timeOfDay >= DAY_FRACTION ? dayCount + 1 : dayCount; sleepMorning = true; },
         chat: (from, text) => showToast(`${from}: ${text}`),
@@ -701,6 +722,7 @@ async function main(): Promise<void> {
         if (!(sleepSeq && sleepMorning)) { timeOfDay = time; dayCount = day; } // az alvás-átmenet közben a saját időnk számít
       },
       hurt: hurtLocal,
+      fell: playFell,
       dropAdd: (list) => { for (const d of list) if (!drops.has(d.id)) drops.add(d.id, d.item, d.n, d.x, d.y, d.z, d.vx, d.vy, d.vz); },
       dropDel: (uid) => { drops.take(uid); },
       give: (item, n) => {
@@ -1220,6 +1242,9 @@ async function main(): Promise<void> {
       const d = dropFor(c.id, tool);
       if (d) spawnDrop(d.id, d.n, lx, ly, lz);
     });
+    // a többi játékos is lássa az összeomlást (tárgyakat csak az ad, aki kidöntötte)
+    const fellCells = cells.map((c) => ({ x: c.x, y: c.y, z: c.z, id: c.id }));
+    if (server) server.fell(fellCells, x, z); else guest?.sendFell(fellCells, x, z);
     return { logs: tree.logs.length };
   };
 
