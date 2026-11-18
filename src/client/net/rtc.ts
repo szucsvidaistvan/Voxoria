@@ -1,9 +1,11 @@
 /**
  * Szerver nélküli kapcsolat két böngésző között (WebRTC adatcsatorna), meghívó kóddal.
  * A jelzés kézzel megy: a host készít egy meghívó kódot, a vendég beilleszti és kap egy válasz kódot,
- * azt a host beilleszti, és a kapcsolat felépül. Nincs jelzőszerver és nincs külső csomag.
+ * azt a host beilleszti, és a kapcsolat felépül. Nincs jelzőszerver és nincs külső csomag; a kód rövid (sdpcode.ts).
  * Lásd docs/MULTIPLAYER.md. Böngészős API-kat használ (RTCPeerConnection, CompressionStream).
  */
+
+import { compactSdp, expandSdp, fromCode, toCode } from './sdpcode';
 
 /** Két csatorna: megbízható (szerkezeti események: blokk, csevegés) és nem megbízható (állapot-pillanatképek). */
 export interface Link {
@@ -22,29 +24,15 @@ export interface RtcOptions {
   gatherTimeout?: number;
 }
 
-const PREFIX_INVITE = 'VXI1-';
-const PREFIX_ANSWER = 'VXA1-';
+const PREFIX_INVITE = 'VXI2-';
+const PREFIX_ANSWER = 'VXA2-';
 const DEFAULT_ICE: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 
-// ---------- kód ----------
+// ---------- kód (rövid, lásd sdpcode.ts) ----------
 
-async function pack(text: string, prefix: string): Promise<string> {
-  const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('deflate-raw'));
-  const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
-  let bin = '';
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return prefix + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function unpack(code: string, prefix: string): Promise<string> {
-  const c = code.trim().replace(/\s+/g, '');
-  if (!c.startsWith(prefix)) throw new Error(prefix === PREFIX_INVITE ? 'Ez nem meghívó kód' : 'Ez nem válasz kód');
-  const b64 = c.slice(prefix.length).replace(/-/g, '+').replace(/_/g, '/');
-  const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
-  const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-  return new Response(stream).text();
-}
+const pack = (sdp: string, prefix: string): string => toCode(compactSdp(sdp), prefix);
+const unpack = (code: string, prefix: string, role: 'offer' | 'answer'): string =>
+  expandSdp(fromCode(code, prefix, prefix === PREFIX_INVITE ? 'Ez nem meghívó kód' : 'Ez nem válasz kód'), role);
 
 // ---------- kapcsolat ----------
 
@@ -126,11 +114,11 @@ export async function createInvite(opts: RtcOptions = {}): Promise<{ code: strin
   link.attach(pc.createDataChannel('u', { ordered: false, maxRetransmits: 0 }));
   await pc.setLocalDescription(await pc.createOffer());
   await waitGathered(pc, opts.gatherTimeout ?? 4000);
-  const code = await pack(JSON.stringify({ sdp: pc.localDescription!.sdp }), PREFIX_INVITE);
+  const code = pack(pc.localDescription!.sdp, PREFIX_INVITE);
   return {
     code,
     accept: async (answerCode: string) => {
-      const { sdp } = JSON.parse(await unpack(answerCode, PREFIX_ANSWER)) as { sdp: string };
+      const sdp = unpack(answerCode, PREFIX_ANSWER, 'answer');
       await pc.setRemoteDescription({ type: 'answer', sdp });
       await link.ready();
       return link;
@@ -140,13 +128,13 @@ export async function createInvite(opts: RtcOptions = {}): Promise<{ code: strin
 
 /** A vendég beilleszti a meghívó kódot; a `answer` kódot visszaadja a hostnak, a `link` a kapcsolat felépülésekor teljesül. */
 export async function joinWithCode(inviteCode: string, opts: RtcOptions = {}): Promise<{ answer: string; link: Promise<Link> }> {
-  const { sdp } = JSON.parse(await unpack(inviteCode, PREFIX_INVITE)) as { sdp: string };
+  const sdp = unpack(inviteCode, PREFIX_INVITE, 'offer');
   const pc = new RTCPeerConnection({ iceServers: opts.iceServers ?? DEFAULT_ICE });
   const link = new RtcLink(pc);
   link.waitChannels();
   await pc.setRemoteDescription({ type: 'offer', sdp });
   await pc.setLocalDescription(await pc.createAnswer());
   await waitGathered(pc, opts.gatherTimeout ?? 4000);
-  const answer = await pack(JSON.stringify({ sdp: pc.localDescription!.sdp }), PREFIX_ANSWER);
+  const answer = pack(pc.localDescription!.sdp, PREFIX_ANSWER);
   return { answer, link: link.ready().then(() => link) };
 }
