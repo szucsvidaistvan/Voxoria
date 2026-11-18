@@ -52,14 +52,15 @@ export function mobDrops(kind: MobKind, rand: () => number = Math.random): { id:
   const out: { id: number; n: number }[] = [];
   const add = (id: number | undefined, n: number) => { if (id !== undefined && n > 0) out.push({ id, n }); };
   switch (kind) {
-    case 'pig': add(I.RAW_PORK, r(1, 3)); break;
+    case 'pig': add(I.RAW_PORK, r(1, 3)); add(EXTRA_ID.leather, r(0, 1)); break;
     case 'cow': add(I.RAW_BEEF, r(1, 3)); add(EXTRA_ID.leather, r(0, 2)); break;
     case 'chicken': add(I.RAW_CHICKEN, 1); add(EXTRA_ID.feather, r(0, 2)); add(EXTRA_ID.egg, r(0, 1)); break;
-    case 'sheep': add(blockId('white_wool'), 1); add(I.RAW_MUTTON, r(1, 2)); break;
+    case 'sheep': add(blockId('white_wool'), 1); add(I.RAW_MUTTON, r(1, 2)); add(EXTRA_ID.leather, r(0, 1)); break;
     case 'zombie': add(I.ROTTEN_FLESH, r(0, 2)); add(EXTRA_ID.carrot, r(0, 39) === 0 ? 1 : 0); add(EXTRA_ID.potato, r(0, 39) === 0 ? 1 : 0); break; // ritkán murok/krumpli is (2,5%)
     case 'spider': add(EXTRA_ID.string, r(0, 2)); break;
     case 'horse': add(EXTRA_ID.leather, r(0, 2)); break;
-    case 'polarbear': add(EXTRA_ID.cod, r(0, 2)); break;
+    case 'wolf': add(EXTRA_ID.leather, r(0, 1)); break;
+    case 'polarbear': add(EXTRA_ID.cod, r(0, 2)); add(EXTRA_ID.leather, r(1, 2)); break;
     case 'skeleton': add(EXTRA_ID.bone, r(0, 2)); add(I.GUNPOWDER, r(0, 2)); add(EXTRA_ID.string, r(0, 1)); break;
   }
   return out;
