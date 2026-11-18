@@ -55,7 +55,8 @@
     "purple_dye",
     "rose_red",
     "dandelion_yellow",
-    "cactus_green"
+    "cactus_green",
+    "fishing_rod"
   ],
   "later": {
     "why": "Általános, jogilag nem kifogásolható tárgyak, de a játék még nem tud velük mit kezdeni (nincs páncél, ajtóelem, jármű, horgászat stb.). A textúrák nincsenek bemásolva.",
@@ -68,7 +69,6 @@
       "shears",
       "bow",
       "arrow",
-      "fishing_rod",
       "saddle",
       "*_door",
       "*_boat",

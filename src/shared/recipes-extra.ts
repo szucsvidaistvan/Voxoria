@@ -69,6 +69,8 @@ export function extraRecipes(
   give({ shapeless: [b('quartz_block')] }, X.quartz, 4);
   give({ shapeless: [b('lapis_block')] }, X.lapis_lazuli, 9);
   give({ shapeless: [b('emerald_block')] }, X.emerald, 9);
+  // horgászbot: 3 bot átlósan + 2 cérna
+  give({ shape: ['  S', ' ST', 'S T'], keys: { S: I.STICK, T: X.string } }, X.fishing_rod);
   give({ shape: ['SS', 'SS'], keys: { S: X.string } }, b('white_wool'));
   give({ shape: ['WWW', 'PPP'], keys: { W: 'wool', P: 'planks' } }, 'bed_foot'); // ágy: 3 gyapjú + 3 deszka
   give({ shape: ['SS', 'SS'], keys: { S: X.snowball } }, b('snow_block'));
