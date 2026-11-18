@@ -7,7 +7,7 @@
  * hookokon át kapja a világ eseményeit.
  */
 import type { MobManager, MobPlayer, Mob } from './mobs';
-import type { BlockEdit, ClientMsg, DropState, MobState, PlayerId, PlayerState, ServerMsg } from './protocol';
+import type { BlockEdit, ClientMsg, DropState, FellCell, MobState, PlayerId, PlayerState, ServerMsg } from './protocol';
 import { PROTOCOL_VERSION } from './protocol';
 import { CS } from './noise';
 import type { Sim } from './sim';
@@ -30,7 +30,9 @@ export interface Conn {
 
 export interface ServerHooks {
   /** a világ egy blokkja megváltozott távoli játékos miatt (a host újramesheli) */
-  blockChanged(x: number, y: number, z: number, id: number): void;
+  blockChanged(x: number, y: number, z: number, id: number, old: number): void;
+  /** egy vendég fát döntött: a host is lejátssza az animációt (tárgyakat nem ad: azt a döntő vendég intézi) */
+  fell(cells: FellCell[], ox: number, oz: number): void;
   /** egy távoli játékos megütött egy mobot (a host alkalmazza a sebzést és a lökést ugyanúgy, mint a sajátnál) */
   attack(mob: Mob, damage: number, from: PlayerState): void;
   /** a mob a host játékosát sebezte */
@@ -165,6 +167,13 @@ export class GameServer {
         if (got) r.conn.send({ t: 'give', item: got.item, n: got.n, d: got.d });
         break;
       }
+      case 'fell': {
+        const cells = (Array.isArray(msg.cells) ? msg.cells : []).slice(0, 400).filter((c) => [c.x, c.y, c.z, c.id].every(Number.isInteger) && c.id >= 0 && c.id <= 0xffff);
+        if (!cells.length || !Number.isFinite(msg.ox) || !Number.isFinite(msg.oz) || this.farFrom(r, msg.ox, r.state.y, msg.oz)) break;
+        this.pendingFell.push({ cells, ox: msg.ox, oz: msg.oz, except: connId });
+        this.hooks.fell(cells, msg.ox, msg.oz);
+        break;
+      }
       case 'sleep': r.sleeping = !!msg.on; this.checkMorning(); break;
       case 'chest': {
         if (this.farFrom(r, msg.x, msg.y, msg.z)) break;
@@ -212,25 +221,35 @@ export class GameServer {
       // a vendég környéke a hostnál még nem biztos, hogy be van töltve
       this.world.ensureChunk(Math.floor(e.x / CS), Math.floor(e.z / CS));
       this.origin = connId;
+      const old = this.world.getBlock(e.x, e.y, e.z);
       const done = this.world.setBlock(e.x, e.y, e.z, e.id);
       this.origin = -1;
       if (!done) continue;
       this.sim.notify(e.x, e.y, e.z);
-      this.hooks.blockChanged(e.x, e.y, e.z, e.id);
+      this.hooks.blockChanged(e.x, e.y, e.z, e.id, old);
     }
   }
 
   /** A tickig összegyűlt módosítások szétküldése (egy üzenetben, vendégenként a saját módosításuk nélkül). */
   private flushEdits(): void {
-    if (!this.pending.length) return;
-    const list = this.pending;
-    this.pending = [];
-    for (const [id, r] of this.remotes) {
-      if (!r.joined) continue;
-      const mine = list.filter((p) => p.origin !== id).map((p) => p.e);
-      for (let i = 0; i < mine.length; i += EDITS_PER_MSG) r.conn.send({ t: 'edits', edits: mine.slice(i, i + EDITS_PER_MSG) }, true);
+    if (this.pending.length) {
+      const list = this.pending;
+      this.pending = [];
+      for (const [id, r] of this.remotes) {
+        if (!r.joined) continue;
+        const mine = list.filter((p) => p.origin !== id).map((p) => p.e);
+        for (let i = 0; i < mine.length; i += EDITS_PER_MSG) r.conn.send({ t: 'edits', edits: mine.slice(i, i + EDITS_PER_MSG) }, true);
+      }
     }
+    // az összeomlás-animáció a blokk-módosítások UTÁN megy, hogy ne látszódjon egyszerre a fa és a mozgó darabjai
+    for (const f of this.pendingFell) this.broadcast({ t: 'fell', cells: f.cells, ox: f.ox, oz: f.oz }, true, f.except);
+    this.pendingFell = [];
   }
+
+  private pendingFell: { cells: FellCell[]; ox: number; oz: number; except: number }[] = [];
+
+  /** A host kidöntött egy fát: mindenki látja az összeomlást. */
+  fell(cells: FellCell[], ox: number, oz: number): void { this.pendingFell.push({ cells, ox, oz, except: -1 }); }
 
   private attack(r: Remote, mobId: number, damage: number): void {
     const m = this.mobs.mobs.find((q) => q.id === mobId && !q.dead);

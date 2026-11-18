@@ -1,5 +1,5 @@
 import { BLOCKS } from '../shared/blocks';
-import { ARMOR_SLOTS, ITEMS, armorOf, isItem, itemName, maxStack } from '../shared/items';
+import { ARMOR_SLOTS, ITEMS, armorOf, isItem, itemName, maxStack, maxUses } from '../shared/items';
 import { matchRecipe, type Stack } from '../shared/recipes';
 import { SMELT_SECONDS, type Furnace } from '../shared/smelting';
 import { CHEST_SLOTS, type Chest } from '../shared/chest';
@@ -42,7 +42,7 @@ export class SlotView {
     }
     this.count.textContent = s && s.n > 1 && !hideCount ? String(s.n) : '';
     // tartósságcsík: csak a megkopott eszközön látszik, zöldtől pirosig
-    const max = s ? ITEMS[s.id]?.tool?.durability : undefined;
+    const max = s ? maxUses(s.id) : undefined;
     if (max && s!.d) {
       const f = Math.max(0, 1 - s!.d! / max);
       this.bar.hidden = false;

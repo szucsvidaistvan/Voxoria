@@ -1,5 +1,5 @@
 import type { Link } from './rtc';
-import type { BlockEdit, ClientMsg, DropState, MobState, PlayerState, ServerMsg } from '../../shared/protocol';
+import type { BlockEdit, ClientMsg, DropState, FellCell, MobState, PlayerState, ServerMsg } from '../../shared/protocol';
 import { PROTOCOL_VERSION } from '../../shared/protocol';
 
 /** A vendég oldali protokoll-kezelő: üzeneteket küld a hostnak, és a beérkezőket eseményekre bontja. */
@@ -14,6 +14,7 @@ export interface GuestHandlers {
   dropAdd(drops: DropState[]): void;
   dropDel(id: number): void;
   give(item: number, n: number, d?: number): void;
+  fell(cells: FellCell[], ox: number, oz: number): void;
   closed(): void;
 }
 
@@ -42,6 +43,7 @@ export class GuestClient {
       case 'dropAdd': this.h.dropAdd(m.drops); break;
       case 'dropDel': this.h.dropDel(m.id); break;
       case 'give': this.h.give(m.item, m.n, m.d); break;
+      case 'fell': this.h.fell(m.cells, m.ox, m.oz); break;
       default: break; // join / leave: a pillanatképből látszik
     }
   }
@@ -53,6 +55,7 @@ export class GuestClient {
   sendDropReq(item: number, n: number, x: number, y: number, z: number, opt: { d?: number; vx?: number; vy?: number; vz?: number; wait?: number } = {}): void {
     this.send({ t: 'dropReq', item, n, x, y, z, ...opt });
   }
+  sendFell(cells: FellCell[], ox: number, oz: number): void { this.send({ t: 'fell', cells, ox, oz }); }
   sendPickup(id: number): void { this.send({ t: 'pickup', id }); }
   sendChat(text: string): void { this.send({ t: 'chat', text }); }
   close(): void { this.link.close(); }

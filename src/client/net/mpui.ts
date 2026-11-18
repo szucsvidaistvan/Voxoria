@@ -95,7 +95,7 @@ export function initMpUi(hooks: MpUiHooks): { setStatus(text: string): void; nam
   // a válaszkód beillesztésekor azonnal csatlakozunk (nincs külön gomb)
   answerEl.addEventListener('input', async () => {
     const code = answerEl.value.trim();
-    if (!hosting || !pending || !code.startsWith('VXA1-')) return;
+    if (!hosting || !pending || !code.startsWith('VXA2-')) return;
     const p = pending, my = epoch;
     pending = null;
     setStatus('Connecting…');
@@ -121,7 +121,7 @@ export function initMpUi(hooks: MpUiHooks): { setStatus(text: string): void; nam
   });
   joinCodeEl.addEventListener('input', async () => {
     const code = joinCodeEl.value.trim();
-    if (joining || !code.startsWith('VXI1-')) return;
+    if (joining || !code.startsWith('VXI2-')) return;
     joining = true;
     const my = ++epoch;
     setStatus('Preparing your reply code…');

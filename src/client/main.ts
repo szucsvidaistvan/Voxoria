@@ -8,7 +8,8 @@ import { FluidSim, isReplaceable } from '../shared/fluids';
 import { GravitySim } from '../shared/gravity';
 import { Sim } from '../shared/sim';
 import { createFallingView } from './falling';
-import { EXTRA_ID, I, ITEMS, armorPoints, isItem, itemName, toolOf } from '../shared/items';
+import { EXTRA_ID, I, ITEMS, armorPoints, isItem, itemName, maxUses, toolOf } from '../shared/items';
+import { Fishing } from '../shared/fishing';
 import { CATEGORIES, categoryOf } from '../shared/categories';
 import { initRecipes } from '../shared/recipes';
 import { CropSim, SEED_CROP, isFarmland, isTillable } from '../shared/farming';
@@ -563,8 +564,27 @@ async function main(): Promise<void> {
   };
 
   /** a hosttól érkező blokk-módosítás (a nem betöltött chunkba csak feljegyezzük, betöltéskor érvényesül) */
+  /** más játékos fájának összeomlása: csak az animáció és a por, tárgy nincs */
+  const playFell = (cells: { x: number; y: number; z: number; id: number }[], ox: number, oz: number) => {
+    let bursts = 0;
+    collapse.start(cells, { x: ox, z: oz }, (c, lx, ly, lz) => {
+      if (isLogBlock(c.id) || ++bursts % 4 === 0) particles.burst(Math.floor(lx), Math.floor(ly), Math.floor(lz), c.id);
+    });
+  };
+
+  /** a távoli törés-szemcsék száma korlátozva (egy fa összeomlása sok blokkot visz el egyszerre) */
+  let burstT = 0, burstN = 0;
+  const remoteBurst = (x: number, y: number, z: number, id: number) => {
+    const t = performance.now();
+    if (t - burstT > 100) { burstT = t; burstN = 0; }
+    if (++burstN <= 8) particles.burst(x, y, z, id);
+  };
+
   const applyRemoteEdit = (x: number, y: number, z: number, id: number) => {
     if (world.isLoaded(x, z)) {
+      // más játékos kibányászott egy blokkot: a törés-szemcsék nálunk is látszanak
+      const old = world.getBlock(x, y, z);
+      if (id === AIR && old !== AIR) remoteBurst(x, y, z, old);
       applyingRemote = true;
       setBlockAt(x, y, z, id);
       applyingRemote = false;
@@ -629,13 +649,15 @@ async function main(): Promise<void> {
   const attachGuestLink = (link: Link) => {
     if (!server) {
       server = new GameServer(world, simulation, mobs, {
-        blockChanged: (x, _y, z) => {
+        blockChanged: (x, y, z, id, old) => {
+          if (id === AIR && old !== AIR) remoteBurst(x, y, z, old);
           // a vendég módosítása: újramesh, és a fény miatt a szomszéd chunkok is
           const cx = Math.floor(x / CS), cz = Math.floor(z / CS);
           for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) dirty.add(World.key(cx + dx, cz + dz));
         },
         attack: (m, dmg, from) => { if (m.hurt(dmg, from.x, from.z)) onMobDie(m); },
         hurtHost: hurtLocal,
+        fell: playFell,
         chest: () => {},
         morning: () => { morningDay = timeOfDay >= DAY_FRACTION ? dayCount + 1 : dayCount; sleepMorning = true; },
         chat: (from, text) => showToast(`${from}: ${text}`),
@@ -712,6 +734,7 @@ async function main(): Promise<void> {
         if (!(sleepSeq && sleepMorning)) { timeOfDay = time; dayCount = day; } // az alvás-átmenet közben a saját időnk számít
       },
       hurt: hurtLocal,
+      fell: playFell,
       // ugyanaz az azonosító újra: a host összeolvasztotta a kupacot, csak a darabszám változik
       dropAdd: (list) => { for (const d of list) if (drops.has(d.id)) drops.setCount(d.id, d.n); else drops.add(d.id, d.item, d.n, d.x, d.y, d.z, d.vx, d.vy, d.vz, d.d, d.wait ?? 0.5); },
       dropDel: (uid) => { drops.take(uid); },
@@ -1212,10 +1235,10 @@ async function main(): Promise<void> {
   const wearHeld = (amount: number) => {
     if (mode !== 'survival') return;
     const st = held();
-    const t = toolOf(st?.id);
-    if (!st || !t) return;
+    const max = maxUses(st?.id);
+    if (!st || !max) return;
     st.d = (st.d ?? 0) + amount;
-    if (st.d >= t.durability) {
+    if (st.d >= max) {
       inv.slots[input.hotbar] = null;
       particles.burst(Math.floor(player.pos.x), Math.floor(player.pos.y) + 1, Math.floor(player.pos.z), B.PLANKS);
     }
@@ -1243,6 +1266,9 @@ async function main(): Promise<void> {
       const d = dropFor(c.id, tool);
       if (d) spawnDrop(d.id, d.n, lx, ly, lz);
     });
+    // a többi játékos is lássa az összeomlást (tárgyakat csak az ad, aki kidöntötte)
+    const fellCells = cells.map((c) => ({ x: c.x, y: c.y, z: c.z, id: c.id }));
+    if (server) server.fell(fellCells, x, z); else guest?.sendFell(fellCells, x, z);
     return { logs: tree.logs.length };
   };
 
@@ -1341,11 +1367,62 @@ async function main(): Promise<void> {
     paintHotbar();
   };
 
+  // --- horgászat: a bója csak a saját képernyőn látszik, a zsákmány viszont közös (spawnDrop) ---
+  const fishing = new Fishing();
+  const bobber = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.16), new THREE.MeshBasicMaterial({ color: 0xe03030 }));
+  const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+  const fishLine = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xffffff }));
+  fishLine.frustumCulled = false;
+  bobber.visible = fishLine.visible = false;
+  scene.add(bobber, fishLine);
+  const stopFishing = (): void => { fishing.cancel(); bobber.visible = fishLine.visible = false; };
+  const useRod = (): void => {
+    if (fishing.active) {
+      const caught = fishing.reel();
+      stopFishing();
+      if (caught) {
+        const d = new THREE.Vector3(); camera.getWorldDirection(d);
+        const p = camera.position;
+        spawnDrop(caught.id, caught.n, p.x + d.x * 1.2, p.y - 0.4, p.z + d.z * 1.2);
+        showToast(`Caught: ${itemName(caught.id)}`, 1800);
+        wearHeld(1);
+      }
+      return;
+    }
+    const d = new THREE.Vector3(); camera.getWorldDirection(d);
+    const p = camera.position;
+    const fh = raycast(world, p.x, p.y, p.z, d.x, d.y, d.z, 14, true);
+    if (!fh || fluidKind(world.getBlock(fh.x, fh.y, fh.z)) !== FLUID_WATER) { showToast('Cast onto water', 1500); return; }
+    fishing.cast(fh.x + 0.5, fh.y + 0.85, fh.z + 0.5);
+    bobber.visible = fishLine.visible = true;
+  };
+  const updateFishing = (dt: number): void => {
+    if (!fishing.active) return;
+    const p = camera.position;
+    const dx = fishing.x - p.x, dz = fishing.z - p.z;
+    if (held()?.id !== EXTRA_ID.fishing_rod || dx * dx + dz * dz > 24 * 24 ||
+      fluidKind(world.getBlock(Math.floor(fishing.x), Math.floor(fishing.y - 0.1), Math.floor(fishing.z))) !== FLUID_WATER) {
+      stopFishing(); return;
+    }
+    const ev = fishing.update(dt);
+    if (ev === 'bite') showToast('Something bit! Right-click to reel in', 1400);
+    // kapáskor a bója lemerül és remeg
+    const dip = fishing.bite > 0 ? -0.18 + Math.sin(performance.now() / 40) * 0.04 : Math.sin(performance.now() / 600) * 0.02;
+    bobber.position.set(fishing.x, fishing.y + dip, fishing.z);
+    const d = new THREE.Vector3(); camera.getWorldDirection(d);
+    const pos = lineGeo.attributes.position as THREE.BufferAttribute;
+    pos.setXYZ(0, p.x + d.x * 0.5, p.y - 0.35, p.z + d.z * 0.5);
+    pos.setXYZ(1, bobber.position.x, bobber.position.y, bobber.position.z);
+    pos.needsUpdate = true;
+  };
+
   const useItem = (hit: RayHit | null) => {
     const st = held();
     const p = camera.position;
     const id = st?.id ?? 0;
 
+    // horgászbot: vízre dobva várni kell a kapásra, kapáskor újra használva behúzza a zsákmányt
+    if (id === EXTRA_ID.fishing_rod) { useRod(); return; }
     // üres vödör: folyadék forrás felvétele
     if (id === I.BUCKET) {
       const fh = raycast(world, p.x, p.y, p.z, dir.x, dir.y, dir.z, 6, true);
@@ -1686,6 +1763,7 @@ async function main(): Promise<void> {
       const wasGround = player.onGround, px0 = player.pos.x, pz0 = player.pos.z;
       player.speedMul = blocking ? 0.8 : 1;
       player.update(dt, mx, mz, sleepSeq ? false : input.jump, !sleepSeq && !blocking && health.food > 6 && input.wantsSprint());
+      updateFishing(dt);
       // futás közben tágabb látómező
       const tf = settings.fov + (player.sprinting ? 8 : 0);
       if (Math.abs(camera.fov - tf) > 0.05) { camera.fov += (tf - camera.fov) * Math.min(1, dt * 10); camera.updateProjectionMatrix(); }

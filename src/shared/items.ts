@@ -13,6 +13,8 @@ export interface ItemDef {
   /** eszköz: típus, szint (1 fa, 2 kő, 3 vas, 4 gyémánt), és a bontás sebessége */
   tool?: { type: ToolType; tier: number; speed: number; /** ennyi használat után törik el */ durability: number; /** sebzés támadáskor (fél szívben) */ damage: number };
   /** páncél: melyik helyre vehető fel (0 sisak, 1 mellvért, 2 nadrág, 3 csizma), mennyi védelmet ad, és ennyi sebzés után törik el */
+  /** nem eszköz, de kopik: ennyi használat után törik el (pl. horgászbot) */
+  uses?: number;
   armor?: { slot: number; defense: number; material: string; durability: number };
   /** étel: ennyi éhséget tölt vissza (fél húscomb) és ennyi telítettséget ad */
   food?: { hunger: number; sat: number };
@@ -72,6 +74,7 @@ const EXTRA: [string, string, [number, number]?, number?][] = [
   ['cyan_dye', 'Cyan Dye'], ['gray_dye', 'Gray Dye'], ['light_blue_dye', 'Light Blue Dye'], ['light_gray_dye', 'Light Gray Dye'],
   ['lime_dye', 'Lime Dye'], ['magenta_dye', 'Magenta Dye'], ['orange_dye', 'Orange Dye'], ['pink_dye', 'Pink Dye'],
   ['purple_dye', 'Purple Dye'], ['rose_red', 'Red Dye'], ['dandelion_yellow', 'Yellow Dye'], ['cactus_green', 'Green Dye'],
+  ['fishing_rod', 'Fishing Rod', undefined, 1],
 ];
 /** EXTRA_ID[kulcs]: a tárgy azonosítója (ITEM_BASE + 100-tól, a fenti sorrendben) */
 export const EXTRA_ID: Record<string, number> = {};
@@ -80,6 +83,8 @@ EXTRA.forEach(([key, name, food, stack], i) => {
   EXTRA_ID[key] = id;
   ITEMS[id] = { name, tex: key, stack: stack ?? 64, ...(food ? { food: { hunger: food[0], sat: food[1] } } : {}), color: '#a0a0a0' };
 });
+
+ITEMS[EXTRA_ID.fishing_rod].uses = 64;
 
 // eszközök: 5 anyag x 4 típus
 const MATERIALS = [
@@ -136,3 +141,6 @@ export const maxStack = (id: number): number => {
   return s === 64 ? STACK_MAX : s;
 };
 export const toolOf = (id: number | undefined): ItemDef['tool'] => (id === undefined ? undefined : ITEMS[id]?.tool);
+
+/** Hány használat után törik el a tárgy (eszköz vagy horgászbot); nincs érték: nem kopik */
+export const maxUses = (id: number | undefined): number | undefined => (id === undefined ? undefined : ITEMS[id]?.tool?.durability ?? ITEMS[id]?.uses);
