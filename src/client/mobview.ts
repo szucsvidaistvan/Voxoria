@@ -91,7 +91,9 @@ function buildView(kind: string, scene: THREE.Scene, base: string): View {
         const pv = pivot ?? p;
         const g = new THREE.Group();
         g.position.set(...pv);
-        if (parent) g.position.sub(parent.position); // a szülő csomópont rendszerében (a szülő forgása a gyereket is viszi)
+        const abs = (parent?.userData.abs as V3 | undefined) ?? [0, 0, 0];
+        g.userData.abs = pv;
+        g.position.set(pv[0] - abs[0], pv[1] - abs[1], pv[2] - abs[2]); // a szülő csomópont rendszerében (a szülő forgása a gyereket is viszi)
         mesh.position.set(p[0] - pv[0], p[1] - pv[1], p[2] - pv[2]);
         g.add(mesh);
         (parent ?? root).add(g);
@@ -107,11 +109,11 @@ function buildView(kind: string, scene: THREE.Scene, base: string): View {
     };
     let bow: THREE.Mesh | undefined;
     const k = 1 / 16;
-    let prevG: THREE.Group | undefined;
+    const groups: (THREE.Group | undefined)[] = [];
     for (const part of TEXTURED[kind] ?? []) {
       const mesh = new THREE.Mesh(texturedGeo(part), material(part.tex));
-      const g = attach(mesh, part.p.map((x) => x * k) as V3, part.pivot?.map((x) => x * k) as V3 | undefined, part.tilt, part.swing, part.flap, part.aim, part, part.child ? prevG : undefined);
-      prevG = g;
+      const g = attach(mesh, part.p.map((x) => x * k) as V3, part.pivot?.map((x) => x * k) as V3 | undefined, part.tilt, part.swing, part.flap, part.aim, part, part.child ? groups[groups.length - (part.child === true ? 1 : part.child)] : undefined);
+      groups.push(g);
       // a csontváz jobb keze (az egyetlen 1.55-ös célzó kar) tartja az íjat
       if (kind === 'skeleton' && g && part.aim === 1.55) {
         const geo = new THREE.PlaneGeometry(0.8, 0.8);

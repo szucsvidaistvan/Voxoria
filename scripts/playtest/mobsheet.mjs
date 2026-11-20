@@ -20,7 +20,7 @@ for (let i = 0; i < specs.length; i++) {
     m.noAI = true; m.yaw = s.yaw; if (s.v !== undefined) m.variant = s.v;
     return m.def.h;
   }, [s, X, Y, Z]);
-  const d = Math.min(7, 1.9 + h * 1.5);
+  const d = Math.min(10, 2.6 + h * 2.6);
   await t.teleport(X + 0.5 + d, Y + 1 + h / 2 - 1.62 + 0.0, Z + 0.5); await t.look(1.5708, 0); await t.settle(1800);
   const f = `.playtest-shots/_s${i}.png`; files.push(f);
   await t.page.screenshot({ path: f, clip: { x: 100, y: 60, width: 600, height: 400 } });

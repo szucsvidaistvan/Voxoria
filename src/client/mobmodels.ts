@@ -33,7 +33,8 @@ export interface TPart {
   /** járáskor ennyit emelkedik a rész a lendítés közben (z körül, radián); a pók lábához */
   lift?: number;
   /** az előző rész csomópontjához kapcsolódik (a forgáspontja az előző rész forgáspontjához képest van), így együtt mozognak: a pók lábának második szakasza */
-  child?: boolean;
+  /** a szülő a korábbi részek egyike (true vagy 1: az előző, 2: az az előtti...), a szülő forgása a gyereket is viszi */
+  child?: boolean | number;
   /** célzáskor ez a dőlés az x tengely körül (a csontváz íjat tartó karja) */
   aim?: number;
 }
@@ -82,6 +83,25 @@ function spiderLeg(side: 1 | -1, z: number, fan: number, wag: number): TPart[] {
   return [
     { tex: 'spider', px: [l1, 2, 2], uv: [18, 0], p: [px0 + side * l1 / 2, y0, z], pivot: [px0, y0, z], rz: side * up, ry: fan, wag, lift: 0.5 },
     { tex: 'spider', px: [l2, 2, 2], uv: [18, 0], p: [px0 + side * (l1 + l2 / 2), y0, z], pivot: [px0 + side * l1, y0, z], rz: -side * (down + up), child: true },
+  ];
+}
+
+/** A ló (64x64): a fej a nyak gyereke (a két 30°-os dőlés összeadódik: a fej lefelé néz), a fülek a fej gyerekei.
+ *  A szamár és az öszvér ugyanez, hosszú, kifelé dőlő fülekkel. */
+function horseParts(tex: TexName, longEars: boolean): TPart[] {
+  const T = -0.5236;
+  const ear = (x: number): TPart => longEars
+    ? { tex, px: [2, 7, 1], uv: [0, 12], p: [x * 2, 35.5, -4.5], pivot: [0, 17, -8], tilt: T, rz: -x * 0.26, child: 2 }
+    : { tex, px: [2, 3, 1], uv: [19, 16], p: [x * 0.5, 33.5, -4.5], pivot: [0, 17, -8], tilt: T, rz: -x * 0.087, child: 2 };
+  return [
+    { tex, px: [10, 10, 22], uv: [0, 32], p: [0, 16, 0] },
+    { tex, px: [3, 14, 4], uv: [42, 36], p: [0, 13, 11], pivot: [0, 20, 11], tilt: T },
+    { tex, px: [2, 16, 2], uv: [56, 36], p: [0, 25, -3], pivot: [0, 17, -8], tilt: T },
+    { tex, px: [4, 12, 7], uv: [0, 35], p: [0, 22, -7.5], pivot: [0, 17, -8], tilt: T },
+    { tex, px: [6, 5, 7], uv: [0, 13], p: [0, 30.5, -7.5], pivot: [0, 28, -11], tilt: T, child: true },
+    { tex, px: [4, 5, 5], uv: [0, 25], p: [0, 30.5, -13.5], pivot: [0, 28, -11], tilt: T, child: true },
+    ear(1), { ...ear(-1), child: 3 },
+    ...legs4(tex, [4, 11, 4], [48, 21], 3, 11, -9, 9),
   ];
 }
 
@@ -172,24 +192,13 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     // elöl a közepes (12), hátul a legnagyobb (14): fej < közepes < nagy. Mindkét törzs alja 8-on van: a láb textúrájának felső 2 px-e átlátszó, ezért a törzsnek pontosan ott kell kezdődnie
     { tex: 'polarbear', px: [12, 12, 10], uv: [39, 0], p: [0, 13, -4], rot: true },
     { tex: 'polarbear', px: [14, 14, 11], uv: [0, 19], p: [0, 13.5, 7.5], rot: true },
-    { tex: 'polarbear', px: [4, 10, 4], uv: [50, 40], p: [-4.5, 5, 9], pivot: [-4.5, 10, 9], swing: 1 },
-    { tex: 'polarbear', px: [4, 10, 4], uv: [50, 40], p: [4.5, 5, 9], pivot: [4.5, 10, 9], swing: -1 },
-    { tex: 'polarbear', px: [4, 10, 6], uv: [50, 0], p: [-4.5, 5, -7], pivot: [-4.5, 10, -7], swing: -1 },
-    { tex: 'polarbear', px: [4, 10, 6], uv: [50, 0], p: [4.5, 5, -7], pivot: [4.5, 10, -7], swing: 1 },
+    { tex: 'polarbear', px: [4, 10, 8], uv: [50, 22], p: [-4.5, 5, 9], pivot: [-4.5, 10, 9], swing: 1 },
+    { tex: 'polarbear', px: [4, 10, 8], uv: [50, 22], p: [4.5, 5, 9], pivot: [4.5, 10, 9], swing: -1 },
+    { tex: 'polarbear', px: [4, 10, 6], uv: [50, 40], p: [-4.5, 5, -7], pivot: [-4.5, 10, -7], swing: -1 },
+    { tex: 'polarbear', px: [4, 10, 6], uv: [50, 40], p: [4.5, 5, -7], pivot: [4.5, 10, -7], swing: 1 },
   ],
   // a ló (64x64): hosszú törzs, vastag, előre-felfelé dőlő nyak, lefelé hajló hosszú fej, két függőleges fül, rövid sörény
-  horse: [
-    { tex: 'horse', px: [10, 10, 24], uv: [0, 32], p: [0, 16.5, 0] },
-    // a minecrafti ló modellje szerint (ModelHorse): nyak, fej, pofa, fülek és sörény egy közös forgáspont körül, 30°-ban előre dőlve
-    { tex: 'horse', px: [4, 14, 8], uv: [0, 35], p: [0, 22.8, -10], pivot: [0, 20, -12], tilt: -0.5236 },
-    { tex: 'horse', px: [2, 16, 4], uv: [56, 36], p: [0, 23, -5], pivot: [0, 20, -12], tilt: -0.5236 },
-    { tex: 'horse', px: [6, 5, 7], uv: [0, 13], p: [0, 28.5, -10.5], pivot: [0, 20, -12], tilt: -0.5236 },
-    { tex: 'horse', px: [4, 5, 5], uv: [0, 25], p: [0, 28.5, -16.5], pivot: [0, 20, -12], tilt: -0.5236 },
-    { tex: 'horse', px: [2, 3, 1], uv: [19, 16], p: [-1.55, 31.5, -7.5], pivot: [0, 20, -12], tilt: -0.5236 },
-    { tex: 'horse', px: [2, 3, 1], uv: [19, 16], p: [1.55, 31.5, -7.5], pivot: [0, 20, -12], tilt: -0.5236 },
-    { tex: 'horse', px: [3, 14, 4], uv: [42, 36], p: [0, 14, 14], pivot: [0, 21, 12], tilt: -0.5236 },
-    ...legs4('horse', [4, 11, 4], [48, 21], 3, 11, -9, 9),
-  ],
+  horse: horseParts('horse', false),
   chicken: [
     { tex: 'chicken', px: [4, 6, 3], uv: [0, 0], p: [0, 12, -4.5] },
     { tex: 'chicken', px: [4, 2, 2], uv: [14, 0], p: [0, 12, -7] },
@@ -205,15 +214,15 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'rabbit_brown', px: [6, 5, 10], uv: [0, 0], p: [0, 4.5, 3], pivot: [0, 5, 8], tilt: 0.35 },
     { tex: 'rabbit_brown', px: [5, 4, 5], uv: [32, 0], p: [0, 10, -3.5] },
     { tex: 'rabbit_brown', px: [1, 1, 1], uv: [32, 9], p: [0, 10, -6] },
-    { tex: 'rabbit_brown', px: [2, 5, 1], uv: [52, 0], p: [-1.5, 14.5, -1.5] },
-    { tex: 'rabbit_brown', px: [2, 5, 1], uv: [58, 0], p: [1.5, 14.5, -1.5] },
-    { tex: 'rabbit_brown', px: [3, 3, 2], uv: [52, 6], p: [0, 4, 8] },
-    { tex: 'rabbit_brown', px: [2, 7, 2], uv: [8, 15], p: [3, 3.5, -1], pivot: [3, 7, -1], swing: 1 },
-    { tex: 'rabbit_brown', px: [2, 7, 2], uv: [0, 15], p: [-3, 3.5, -1], pivot: [-3, 7, -1], swing: -1 },
-    { tex: 'rabbit_brown', px: [2, 4, 5], uv: [30, 15], p: [3, 4.5, 6.2], pivot: [3, 6.5, 3.7], swing: -1 },
-    { tex: 'rabbit_brown', px: [2, 1, 7], uv: [26, 24], p: [3, 0.5, 3.5], pivot: [3, 6.5, 3.7], swing: -1 },
-    { tex: 'rabbit_brown', px: [2, 4, 5], uv: [16, 15], p: [-3, 4.5, 6.2], pivot: [-3, 6.5, 3.7], swing: 1 },
-    { tex: 'rabbit_brown', px: [2, 1, 7], uv: [8, 24], p: [-3, 0.5, 3.5], pivot: [-3, 6.5, 3.7], swing: 1 },
+    { tex: 'rabbit_brown', px: [2, 5, 1], uv: [58, 0], p: [-1.5, 14.5, -1.5] },
+    { tex: 'rabbit_brown', px: [2, 5, 1], uv: [52, 0], p: [1.5, 14.5, -1.5] },
+    { tex: 'rabbit_brown', px: [3, 3, 2], uv: [52, 6], p: [0, 4, 8], pivot: [0, 4, 7], tilt: 0.35 },
+    { tex: 'rabbit_brown', px: [2, 7, 2], uv: [8, 15], p: [3, 3.5, -1], pivot: [3, 7, -1], tilt: 0.17, swing: 1 },
+    { tex: 'rabbit_brown', px: [2, 7, 2], uv: [0, 15], p: [-3, 3.5, -1], pivot: [-3, 7, -1], tilt: 0.17, swing: -1 },
+    { tex: 'rabbit_brown', px: [2, 4, 5], uv: [16, 15], p: [3, 4.5, 6.2], pivot: [3, 6.5, 3.7], tilt: 0.35, swing: -1 },
+    { tex: 'rabbit_brown', px: [2, 1, 7], uv: [8, 24], p: [3, 0.5, 3.5], pivot: [3, 6.5, 3.7], swing: -1 },
+    { tex: 'rabbit_brown', px: [2, 4, 5], uv: [30, 15], p: [-3, 4.5, 6.2], pivot: [-3, 6.5, 3.7], tilt: 0.35, swing: 1 },
+    { tex: 'rabbit_brown', px: [2, 1, 7], uv: [26, 24], p: [-3, 0.5, 3.5], pivot: [-3, 6.5, 3.7], swing: 1 },
   ],
   // a macska (64x32): fekvő törzs, két részes farok
   cat: [
@@ -237,16 +246,17 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'parrot_blue', px: [1, 5, 3], uv: [19, 8], p: [-1.5, 4.56, -2.76], pivot: [-1.5, 7.06, -2.76], flap: 1 },
     { tex: 'parrot_blue', px: [2, 3, 2], uv: [2, 2], p: [0, 8.31, -2.76] },
     { tex: 'parrot_blue', px: [2, 1, 4], uv: [10, 0], p: [0, 10.3, -3.76] },
-    { tex: 'parrot_blue', px: [1, 2, 1], uv: [11, 7], p: [0, 8.5, -4.3] },
-    { tex: 'parrot_blue', px: [1, 2, 1], uv: [14, 18], p: [1, 1, -1.05], pivot: [1, 2, -1.05], swing: 1 },
-    { tex: 'parrot_blue', px: [1, 2, 1], uv: [14, 18], p: [-1, 1, -1.05], pivot: [-1, 2, -1.05], swing: -1 },
+    { tex: 'parrot_blue', px: [1, 2, 1], uv: [11, 7], p: [0, 8.8, -4.2] },
+    { tex: 'parrot_blue', px: [1, 2, 1], uv: [16, 7], p: [0, 8.95, -5.2] },
+    { tex: 'parrot_blue', px: [1, 2, 1], uv: [14, 18], p: [1, 0.5, -1], pivot: [1, 1, -1], swing: 1 },
+    { tex: 'parrot_blue', px: [1, 2, 1], uv: [14, 18], p: [-1, 0.5, -1], pivot: [-1, 1, -1], swing: -1 },
   ],
   // a láma (128x64): hosszú nyak, kis fej, két fül, magas lábak
   llama: [
     { tex: 'llama_brown', px: [4, 4, 9], uv: [0, 0], p: [0, 29, -11.5] },
     { tex: 'llama_brown', px: [8, 18, 6], uv: [0, 14], p: [0, 24, -9] },
-    { tex: 'llama_brown', px: [2, 2, 2], uv: [17, 0], p: [-3, 32, -11] },
-    { tex: 'llama_brown', px: [2, 2, 2], uv: [17, 0], p: [3, 32, -11] },
+    { tex: 'llama_brown', px: [3, 3, 2], uv: [17, 0], p: [-2.5, 34.5, -9] },
+    { tex: 'llama_brown', px: [3, 3, 2], uv: [17, 0], p: [2.5, 34.5, -9] },
     { tex: 'llama_brown', px: [12, 18, 10], uv: [29, 0], p: [0, 17, 1], rot: true },
     ...legs4('llama_brown', [4, 14, 4], [29, 29], 3.5, 14, -5, 6),
   ],
@@ -261,17 +271,8 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'turtle', px: [13, 1, 5], uv: [27, 24], p: [11.5, 2.5, -3.5] },
   ],
 };
-// a szamár és az öszvér: a ló testrészei, a saját skinjükkel, nagy fülekkel
-const horseBody = (tex: TexName): TPart[] => TEXTURED.horse!
-  .filter((q) => !(q.px[0] === 2 && q.px[1] === 3)) // a ló rövid fülei nem kellenek
-  .map((q) => ({ ...q, tex }));
-for (const t of ['donkey', 'mule'] as const) {
-  TEXTURED[t] = [
-    ...horseBody(t),
-    { tex: t, px: [2, 7, 1], uv: [0, 12], p: [-1.9, 34, -7.5], pivot: [0, 20, -12], tilt: -0.5236 },
-    { tex: t, px: [2, 7, 1], uv: [0, 12], p: [1.9, 34, -7.5], pivot: [0, 20, -12], tilt: -0.5236 },
-  ];
-}
+TEXTURED.donkey = horseParts('donkey', true);
+TEXTURED.mule = horseParts('mule', true);
 
 /** A modell mérete a ló modelljéhez képest (a szamár és az öszvér kisebb) */
 export const MODEL_SCALE: Partial<Record<string, number>> = { donkey: 0.88, mule: 0.94 };
