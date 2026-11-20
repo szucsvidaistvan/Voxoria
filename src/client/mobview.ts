@@ -5,7 +5,7 @@ import { ITEMS, isItem } from '../shared/items';
 import type { Atlas } from './atlas';
 import { buildCubeGeo } from './blockgeo';
 import { extrudeItem, itemImage } from './itemgeo';
-import { TEXTURED, armorParts, partGeom, type TPart, type TexName } from './mobmodels';
+import { MODEL_SCALE, TEXTURED, VARIANT_SKINS, armorParts, partGeom, type TPart, type TexName } from './mobmodels';
 
 /**
  * A mobok megjelenítése: a háziállatok a Good Vibes csomag lény-skinjeivel textúrázott dobozmodellek (mobmodels.ts),
@@ -181,9 +181,13 @@ export function createMobView(scene: THREE.Scene, base: string = import.meta.env
       for (const m of mobs) {
         alive.add(m.id);
         let v = views.get(m.id);
-        if (!v) { v = build(m.kind); views.set(m.id, v); }
+        if (!v) { v = build(m.kind); views.set(m.id, v); const sc = MODEL_SCALE[m.kind]; if (sc) v.root.scale.setScalar(sc); }
         if (m.kind === 'wolf') v.mats[0].map = skin(baseUrl, m.angry ? 'wolf_angry' : 'wolf');
-        v.root.position.set(m.x, m.y, m.z);
+        const vs = VARIANT_SKINS[m.kind];
+        if (vs) v.mats[0].map = skin(baseUrl, vs[m.variant % vs.length] as TexName);
+        // a nyúl ugrál: járás közben a lépés ritmusában felpattan
+        const hop = m.kind === 'rabbit' && m.onGround ? Math.abs(Math.sin(m.walk * 3.2)) * 0.2 * Math.min(1, Math.hypot(m.vx, m.vz) / 1.5) : 0;
+        v.root.position.set(m.x, m.y + hop, m.z);
         v.root.rotation.y = m.yaw;
 
         // járás: a lábak a megtett úttal lendülnek, a szárnyak csapkodnak, ha a csirke a levegőben van

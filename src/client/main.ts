@@ -612,6 +612,7 @@ async function main(): Promise<void> {
       m.climb = !!(st.flags & 2);
       m.angry = !!(st.flags & 8);
       m.inWater = !!(st.flags & 16);
+      m.variant = st.flags >> 8;
       m.vx = -Math.sin(st.yaw) * st.speed;
       m.vz = -Math.cos(st.yaw) * st.speed;
       const hurt = !!(st.flags & 1);

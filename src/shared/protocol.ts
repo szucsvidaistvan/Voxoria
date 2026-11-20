@@ -33,7 +33,7 @@ export interface MobState {
   /** a járás fázisa és sebessége az animációhoz */
   walk: number; speed: number;
   hp: number;
-  /** mobfüggő extra jelzők (pl. mászik, célzik, sebzés-villanás) */
+  /** mobfüggő extra jelzők (pl. mászik, célzik, sebzés-villanás); a 8. bittől felfelé a megjelenés (variant) */
   flags: number;
 }
 

@@ -298,7 +298,7 @@ export class GameServer {
   private mobState(m: Mob): MobState {
     return {
       id: m.id, kind: m.kind, x: m.x, y: m.y, z: m.z, yaw: m.yaw, walk: m.walk, speed: Math.hypot(m.vx, m.vz), hp: m.hp,
-      flags: (m.hurtT > 0 ? 1 : 0) | (m.climb ? 2 : 0) | (m.dead ? 4 : 0) | (m.angry ? 8 : 0) | (m.inWater ? 16 : 0),
+      flags: (m.hurtT > 0 ? 1 : 0) | (m.climb ? 2 : 0) | (m.dead ? 4 : 0) | (m.angry ? 8 : 0) | (m.inWater ? 16 : 0) | (m.variant << 8),
     };
   }
 

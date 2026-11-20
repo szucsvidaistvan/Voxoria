@@ -5,7 +5,8 @@ import { boxGeom, type BoxGeom } from './boxuv';
  * A koordináták pixelben: y felfelé a láb alatti talajtól, az előre a −z, a doboz a közepével van megadva.
  */
 export type ArmorTex = `armor_${'leather' | 'iron' | 'golden' | 'diamond'}_${1 | 2}`;
-export type TexName = 'pig' | 'cow' | 'sheep' | 'sheep_fur' | 'chicken' | 'player' | 'skeleton' | 'zombie' | 'wolf' | 'wolf_angry' | 'spider' | 'polarbear' | 'horse' | ArmorTex;
+export type TexName = 'pig' | 'cow' | 'sheep' | 'sheep_fur' | 'chicken' | 'player' | 'skeleton' | 'zombie' | 'wolf' | 'wolf_angry' | 'spider' | 'polarbear' | 'horse'
+  | 'rabbit_brown' | 'cat_ocelot' | 'parrot_blue' | 'llama_brown' | 'donkey' | 'mule' | 'turtle' | ArmorTex;
 
 export interface TPart {
   tex: TexName;
@@ -41,6 +42,7 @@ export interface TPart {
 export const TEX_SIZE = {
   pig: [64, 32], cow: [64, 32], sheep: [64, 32], sheep_fur: [64, 32], chicken: [64, 32], player: [64, 64], skeleton: [64, 32], zombie: [64, 64],
   wolf: [64, 32], wolf_angry: [64, 32], spider: [64, 32], polarbear: [128, 64], horse: [64, 64],
+  rabbit_brown: [64, 32], cat_ocelot: [64, 32], parrot_blue: [32, 32], llama_brown: [128, 64], donkey: [64, 64], mule: [64, 64], turtle: [128, 64],
 } as Record<TexName, [number, number]>;
 for (const m of ['leather', 'iron', 'golden', 'diamond']) for (const l of [1, 2]) TEX_SIZE[`armor_${m}_${l}` as ArmorTex] = [64, 32];
 
@@ -198,6 +200,90 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'chicken', px: [1, 4, 6], uv: [24, 13], p: [-3.5, 9, 0], pivot: [-3.5, 11, 0], flap: 1 },
     { tex: 'chicken', px: [1, 4, 6], uv: [24, 13], p: [3.5, 9, 0], pivot: [3.5, 11, 0], flap: -1 },
   ],
+  // a nyúl (64x32): kis test, hosszú fülek, a hátsó láb (comb + lábfej) egy csuklón lendül
+  rabbit: [
+    { tex: 'rabbit_brown', px: [6, 5, 10], uv: [0, 0], p: [0, 4.5, 3], pivot: [0, 5, 8], tilt: 0.35 },
+    { tex: 'rabbit_brown', px: [5, 4, 5], uv: [32, 0], p: [0, 10, -3.5] },
+    { tex: 'rabbit_brown', px: [1, 1, 1], uv: [32, 9], p: [0, 10, -6] },
+    { tex: 'rabbit_brown', px: [2, 5, 1], uv: [58, 0], p: [-1.5, 14.5, -1.5] },
+    { tex: 'rabbit_brown', px: [2, 5, 1], uv: [52, 0], p: [1.5, 14.5, -1.5] },
+    { tex: 'rabbit_brown', px: [3, 3, 2], uv: [52, 6], p: [0, 4, 8], pivot: [0, 4, 7], tilt: 0.35 },
+    { tex: 'rabbit_brown', px: [2, 7, 2], uv: [8, 15], p: [3, 3.5, -1], pivot: [3, 7, -1], tilt: 0.17, swing: 1 },
+    { tex: 'rabbit_brown', px: [2, 7, 2], uv: [0, 15], p: [-3, 3.5, -1], pivot: [-3, 7, -1], tilt: 0.17, swing: -1 },
+    { tex: 'rabbit_brown', px: [2, 4, 5], uv: [16, 15], p: [3, 4.5, 6.2], pivot: [3, 6.5, 3.7], tilt: 0.35, swing: -1 },
+    { tex: 'rabbit_brown', px: [2, 1, 7], uv: [8, 24], p: [3, 0.5, 3.5], pivot: [3, 6.5, 3.7], swing: -1 },
+    { tex: 'rabbit_brown', px: [2, 4, 5], uv: [30, 15], p: [-3, 4.5, 6.2], pivot: [-3, 6.5, 3.7], tilt: 0.35, swing: 1 },
+    { tex: 'rabbit_brown', px: [2, 1, 7], uv: [26, 24], p: [-3, 0.5, 3.5], pivot: [-3, 6.5, 3.7], swing: 1 },
+  ],
+  // a macska (64x32): fekvő törzs, két részes farok
+  cat: [
+    { tex: 'cat_ocelot', px: [5, 4, 5], uv: [0, 0], p: [0, 9, -9.5] },
+    { tex: 'cat_ocelot', px: [3, 2, 2], uv: [0, 24], p: [0, 8, -12] },
+    { tex: 'cat_ocelot', px: [1, 1, 2], uv: [0, 10], p: [-1.5, 11.5, -8] },
+    { tex: 'cat_ocelot', px: [1, 1, 2], uv: [6, 10], p: [1.5, 11.5, -8] },
+    { tex: 'cat_ocelot', px: [4, 16, 6], uv: [20, 0], p: [0, 7, 1], rot: true },
+    { tex: 'cat_ocelot', px: [1, 8, 1], uv: [0, 15], p: [0, 5, 8.5], pivot: [0, 9, 8], tilt: -0.9 },
+    { tex: 'cat_ocelot', px: [1, 8, 1], uv: [4, 15], p: [0, 0, 14.3], pivot: [0, 4, 14.3], tilt: -1.3 },
+    { tex: 'cat_ocelot', px: [2, 6, 2], uv: [8, 13], p: [1.1, 3, 7], pivot: [1.1, 6, 7], swing: 1 },
+    { tex: 'cat_ocelot', px: [2, 6, 2], uv: [8, 13], p: [-1.1, 3, 7], pivot: [-1.1, 6, 7], swing: -1 },
+    { tex: 'cat_ocelot', px: [2, 10, 2], uv: [40, 0], p: [1.2, 4.9, -4], pivot: [1.2, 9.9, -4], swing: -1 },
+    { tex: 'cat_ocelot', px: [2, 10, 2], uv: [40, 0], p: [-1.2, 4.9, -4], pivot: [-1.2, 9.9, -4], swing: 1 },
+  ],
+  // a papagáj (32x32): kicsi, dőlt test, farok, két szárny, láb
+  parrot: [
+    { tex: 'parrot_blue', px: [3, 6, 3], uv: [2, 8], p: [0, 4.5, -3], pivot: [0, 7.5, -3], tilt: -0.4937 },
+    { tex: 'parrot_blue', px: [3, 4, 1], uv: [22, 1], p: [0, 1.93, 0.66], pivot: [0, 2.93, 1.16], tilt: -1.015 },
+    { tex: 'parrot_blue', px: [1, 5, 3], uv: [19, 8], p: [1.5, 4.56, -2.76], pivot: [1.5, 7.06, -2.76], flap: -1 },
+    { tex: 'parrot_blue', px: [1, 5, 3], uv: [19, 8], p: [-1.5, 4.56, -2.76], pivot: [-1.5, 7.06, -2.76], flap: 1 },
+    { tex: 'parrot_blue', px: [2, 3, 2], uv: [2, 2], p: [0, 8.31, -2.76] },
+    { tex: 'parrot_blue', px: [2, 1, 4], uv: [10, 0], p: [0, 10.3, -3.76] },
+    { tex: 'parrot_blue', px: [1, 2, 1], uv: [11, 7], p: [0, 8.8, -4.2] },
+    { tex: 'parrot_blue', px: [1, 2, 1], uv: [16, 7], p: [0, 8.95, -5.2] },
+    { tex: 'parrot_blue', px: [1, 2, 1], uv: [14, 18], p: [1, 0.5, -1], pivot: [1, 1, -1], swing: 1 },
+    { tex: 'parrot_blue', px: [1, 2, 1], uv: [14, 18], p: [-1, 0.5, -1], pivot: [-1, 1, -1], swing: -1 },
+  ],
+  // a láma (128x64): hosszú nyak, kis fej, két fül, magas lábak
+  llama: [
+    { tex: 'llama_brown', px: [4, 4, 9], uv: [0, 0], p: [0, 29, -11.5] },
+    { tex: 'llama_brown', px: [8, 18, 6], uv: [0, 14], p: [0, 24, -9] },
+    { tex: 'llama_brown', px: [3, 3, 2], uv: [17, 0], p: [-2.5, 34.5, -9] },
+    { tex: 'llama_brown', px: [3, 3, 2], uv: [17, 0], p: [2.5, 34.5, -9] },
+    { tex: 'llama_brown', px: [12, 18, 10], uv: [29, 0], p: [0, 17, 1], rot: true },
+    ...legs4('llama_brown', [4, 14, 4], [29, 29], 3.5, 14, -5, 6),
+  ],
+  // a teknős (128x64): lapos pajzs, hasi lemez, négy uszony
+  turtle: [
+    { tex: 'turtle', px: [6, 5, 6], uv: [3, 0], p: [0, 3.5, -10] },
+    { tex: 'turtle', px: [19, 20, 6], uv: [7, 37], p: [0, 6, 3], rot: true },
+    { tex: 'turtle', px: [11, 18, 3], uv: [31, 1], p: [0, 1.5, 2], rot: true },
+    { tex: 'turtle', px: [4, 1, 10], uv: [1, 23], p: [-3.5, 1.5, 16] },
+    { tex: 'turtle', px: [4, 1, 10], uv: [1, 12], p: [3.5, 1.5, 16] },
+    { tex: 'turtle', px: [13, 1, 5], uv: [27, 30], p: [-11.5, 2.5, -3.5] },
+    { tex: 'turtle', px: [13, 1, 5], uv: [27, 24], p: [11.5, 2.5, -3.5] },
+  ],
+};
+// a szamár és az öszvér: a ló testrészei, a saját skinjükkel, nagy fülekkel
+const horseBody = (tex: TexName): TPart[] => TEXTURED.horse!
+  .filter((q) => !(q.px[0] === 2 && q.px[1] === 3)) // a ló rövid fülei nem kellenek
+  .map((q) => ({ ...q, tex }));
+for (const t of ['donkey', 'mule'] as const) {
+  TEXTURED[t] = [
+    ...horseBody(t),
+    { tex: t, px: [2, 7, 1], uv: [0, 12], p: [-1.9, 34, -7.5], pivot: [0, 20, -12], tilt: -0.5236 },
+    { tex: t, px: [2, 7, 1], uv: [0, 12], p: [1.9, 34, -7.5], pivot: [0, 20, -12], tilt: -0.5236 },
+  ];
+}
+
+/** A modell mérete a ló modelljéhez képest (a szamár és az öszvér kisebb) */
+export const MODEL_SCALE: Partial<Record<string, number>> = { donkey: 0.88, mule: 0.94 };
+
+/** Az azonos modell több skinje: a Mob.variant választ közülük (az első rész textúrája helyére kerül) */
+export const VARIANT_SKINS: Partial<Record<string, string[]>> = {
+  horse: ['horse', 'horse_brown', 'horse_chestnut', 'horse_creamy', 'horse_darkbrown', 'horse_gray', 'horse_black', 'horse_white'],
+  rabbit: ['rabbit_brown', 'rabbit_white', 'rabbit_black', 'rabbit_gold', 'rabbit_salt', 'rabbit_white_splotched', 'rabbit_toast'],
+  cat: ['cat_ocelot', 'cat_black', 'cat_red', 'cat_siamese'],
+  parrot: ['parrot_blue', 'parrot_green', 'parrot_grey', 'parrot_red_blue', 'parrot_yellow_blue'],
+  llama: ['llama_brown', 'llama_gray', 'llama_white'],
 };
 
 /** Egy rész geometriája (a doboz közepén a nullpont, blokk egységben) */
