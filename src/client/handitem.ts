@@ -110,7 +110,13 @@ export function createHandItem(paint: (c: HTMLCanvasElement, id: number) => void
         k = 'none';
         const name = ITEMS[id]?.tex;
         const img = name ? itemImage(base, name, () => { dirty = true; }) : null;
-        if (img && img.width > 0) { flat.geometry = extrudeItem(img, 1.0); k = 'flat'; }
+        if (img && img.width > 0) {
+          flat.geometry = extrudeItem(img, 1.0); k = 'flat';
+          // a horgászbotot a hossztengelye (a kép átlója) körül megfordítjuk: így a markolat van a tenyérben, a zsinór pedig
+          // a bot hegyénél, kívül lóg (különben a zsinór-oldal esik a kézhez, és a kéz mintha a damilt fogná)
+          flat.rotation.set(0, -135 * D2R, 25 * D2R);
+          if (name === 'fishing_rod') flat.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 1, 0).normalize(), Math.PI));
+        }
       } else if (def && !def.parts && !def.conn && !def.door) {
         cube.geometry = buildCubeGeo(atlas, id);
         k = 'cube';
