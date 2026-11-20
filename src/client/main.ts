@@ -1416,7 +1416,7 @@ async function main(): Promise<void> {
     const d = new THREE.Vector3(); camera.getWorldDirection(d);
     const a = new THREE.Vector3();
     // első személyben a kéz külön rétegen rajzolódik, ezért a hegyet a kamerához képest becsüljük: jobbra lent, előre
-    if (!(thirdPerson && playerView.rodTip(a))) { camera.updateMatrixWorld(); a.set(0.9, -0.55, -0.8).applyMatrix4(camera.matrixWorld); }
+    if (!(thirdPerson && playerView.rodTip(a))) { camera.updateMatrixWorld(); a.set(0.55, -0.03, -0.8).applyMatrix4(camera.matrixWorld); }
     const b = bobber.position;
     const sag = Math.min(1.5, a.distanceTo(b) * 0.1);
     const pos = lineGeo.attributes.position as THREE.BufferAttribute;
