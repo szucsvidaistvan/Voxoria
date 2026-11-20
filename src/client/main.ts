@@ -755,6 +755,7 @@ async function main(): Promise<void> {
   /** nézet (V): 0 első személy, 1 hátulról, 2 elölről */
   let viewMode: 0 | 1 | 2 = 0;
   let thirdPerson = false; // viewMode > 0
+  let dbgCam: number[] | null = null; // csak a tesztekhez: rögzített kamera (x, y, z, célpont x, y, z)
   let shownArmor = '';
   let invPreview: ReturnType<typeof createInventoryPreview> | null = null;
   let mouseX = 0, mouseY = 0;
@@ -1371,7 +1372,8 @@ async function main(): Promise<void> {
   // --- horgászat: a bója csak a saját képernyőn látszik, a zsákmány viszont közös (spawnDrop) ---
   const fishing = new Fishing();
   const bobber = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.16), new THREE.MeshBasicMaterial({ color: 0xe03030 }));
-  const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+  const LINE_PTS = 16;
+  const lineGeo = new THREE.BufferGeometry().setFromPoints(Array.from({ length: LINE_PTS }, () => new THREE.Vector3()));
   const fishLine = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xffffff }));
   fishLine.frustumCulled = false;
   bobber.visible = fishLine.visible = false;
@@ -1410,10 +1412,18 @@ async function main(): Promise<void> {
     // kapáskor a bója lemerül és remeg
     const dip = fishing.bite > 0 ? -0.18 + Math.sin(performance.now() / 40) * 0.04 : Math.sin(performance.now() / 600) * 0.02;
     bobber.position.set(fishing.x, fishing.y + dip, fishing.z);
+    // a zsinór a bot hegyétől (harmadik személyben a karakter kezében, elsőben a kézben) a bójáig ível, lógva
     const d = new THREE.Vector3(); camera.getWorldDirection(d);
+    const a = new THREE.Vector3();
+    // első személyben a kéz külön rétegen rajzolódik, ezért a hegyet a kamerához képest becsüljük: jobbra lent, előre
+    if (!(thirdPerson && playerView.rodTip(a))) { camera.updateMatrixWorld(); a.set(0.9, -0.55, -0.8).applyMatrix4(camera.matrixWorld); }
+    const b = bobber.position;
+    const sag = Math.min(1.5, a.distanceTo(b) * 0.1);
     const pos = lineGeo.attributes.position as THREE.BufferAttribute;
-    pos.setXYZ(0, p.x + d.x * 0.5, p.y - 0.35, p.z + d.z * 0.5);
-    pos.setXYZ(1, bobber.position.x, bobber.position.y, bobber.position.z);
+    for (let i = 0; i < LINE_PTS; i++) {
+      const t = i / (LINE_PTS - 1);
+      pos.setXYZ(i, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t - sag * 4 * t * (1 - t), a.z + (b.z - a.z) * t);
+    }
     pos.needsUpdate = true;
   };
 
@@ -1936,6 +1946,7 @@ async function main(): Promise<void> {
     }
     stream(cx, cz, settings.renderDistance, 4, 2);
     if (frame % 60 === 0) unload(cx, cz, settings.renderDistance, server ? server.remoteStates() : []);
+    if (dbgCam) { camera.position.set(dbgCam[0], dbgCam[1], dbgCam[2]); camera.lookAt(dbgCam[3], dbgCam[4], dbgCam[5]); }
     renderer.render(scene, camera);
     hand?.render(renderer, camera); // a kéz a világ után, külön (a víz nem takarja el)
   };
@@ -1965,6 +1976,10 @@ async function main(): Promise<void> {
       setBlock: (x: number, y: number, z: number, id: number) => setBlockAt(x, y, z, id),
       getTime: () => timeOfDay, setTime: (t: number) => { timeOfDay = t; }, getDay: () => dayCount,
       /** jobb klikk egy blokkon (használat/lerakás), mintha a játékos célozna rá */
+      get playerView() { return playerView; },
+      setCam: (c: number[] | null) => { dbgCam = c; },
+      setView: (m: 0 | 1 | 2) => { viewMode = m; thirdPerson = m > 0; },
+      EXTRA_ID,
       useAt: (x: number, y: number, z: number) => useItem({ x, y, z, px: x, py: y + 1, pz: z } as unknown as RayHit),
     };
   }
