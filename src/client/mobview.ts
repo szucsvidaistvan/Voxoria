@@ -275,6 +275,10 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
     .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), (-55 * Math.PI) / 180));
   heldFlat.position.set(0.0625, -0.6875, 0.09375);
   const heldQuat = heldFlat.quaternion.clone();
+  // a horgászbot: ugyanúgy áll, a hegye előre-fel néz, de a lap a hossztengelye (a kép átlója) körül 180°-kal megfordul,
+  // így a lap elülső oldala látszik, és a zsinór íve a bot alatt lóg (különben tükrözöttnek, fordítottnak látszik)
+  const rodQuat = heldQuat.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 1, 0).normalize(), Math.PI));
+  const isRod = () => ITEMS[heldId]?.tex === 'fishing_rod';
   const heldPos = heldFlat.position.clone();
   const blockWorldQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), (105 * Math.PI) / 180);
   const armInv = new THREE.Quaternion();
@@ -314,6 +318,14 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
     set visible(on: boolean) { v.root.visible = on; },
     /** a kézben lévő tárgy (0: üres kéz) */
     setHeld(id: number): void { heldId = id; },
+    /** a kézben tartott horgászbot hegye a világban (a zsinór innen indul); false, ha nincs bot a kézben */
+    rodTip(out: THREE.Vector3): boolean {
+      if (!isRod() || !heldFlat.visible) return false;
+      v.root.updateMatrixWorld(true);
+      out.set(0.24, 0.35, 0);
+      heldFlat.localToWorld(out);
+      return true;
+    },
     /**
      * @param walk a megtett út fázisa (nő járás közben), @param speed 0..1 a járás üteme, @param light a napszak színe (RGB)
      * @param act az ütés fázisa (0..1, 0: nincs), az evés előrehaladása (0..1) és a rágás fázisa
@@ -365,8 +377,9 @@ export function createPlayerView(scene: THREE.Scene, base: string = import.meta.
           // a kéz a markolatot fogja: a lap a penge irányába (fölfelé, befelé) tolva
           heldFlat.position.copy(grip).applyQuaternion(blockWorldQ).applyQuaternion(armInv).add(heldPos);
         } else {
-          heldFlat.quaternion.copy(heldQuat);
-          heldFlat.position.copy(grip).applyQuaternion(heldQuat).add(heldPos);
+          const hq = isRod() ? rodQuat : heldQuat;
+          heldFlat.quaternion.copy(hq);
+          heldFlat.position.copy(grip).applyQuaternion(hq).add(heldPos);
         }
       }
       refreshHeld();
