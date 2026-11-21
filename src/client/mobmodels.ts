@@ -6,7 +6,7 @@ import { boxGeom, type BoxGeom } from './boxuv';
  */
 export type ArmorTex = `armor_${'leather' | 'iron' | 'golden' | 'diamond'}_${1 | 2}`;
 export type TexName = 'pig' | 'cow' | 'sheep' | 'sheep_fur' | 'chicken' | 'player' | 'skeleton' | 'zombie' | 'wolf' | 'wolf_angry' | 'spider' | 'polarbear' | 'horse'
-  | 'rabbit_brown' | 'cat_ocelot' | 'parrot_blue' | 'llama_brown' | 'donkey' | 'mule' | 'turtle' | 'bat' | 'squid' | ArmorTex;
+  | 'rabbit_brown' | 'cat_ocelot' | 'parrot_blue' | 'llama_brown' | 'donkey' | 'mule' | 'turtle' | 'bat' | 'squid' | 'husk' | 'drowned' | 'tarantula' | 'ghost' | 'slime' | ArmorTex;
 
 export interface TPart {
   tex: TexName;
@@ -43,6 +43,7 @@ export const TEX_SIZE = {
   pig: [64, 32], cow: [64, 32], sheep: [64, 32], sheep_fur: [64, 32], chicken: [64, 32], player: [64, 64], skeleton: [64, 32], zombie: [64, 64],
   wolf: [64, 32], wolf_angry: [64, 32], spider: [64, 32], polarbear: [128, 64], horse: [64, 64],
   rabbit_brown: [64, 32], cat_ocelot: [64, 32], parrot_blue: [32, 32], llama_brown: [128, 64], donkey: [64, 64], mule: [64, 64], turtle: [128, 64], bat: [64, 64], squid: [64, 32],
+  husk: [64, 64], drowned: [64, 64], tarantula: [64, 32], ghost: [64, 64], slime: [64, 32],
 } as Record<TexName, [number, number]>;
 for (const m of ['leather', 'iron', 'golden', 'diamond']) for (const l of [1, 2]) TEX_SIZE[`armor_${m}_${l}` as ArmorTex] = [64, 32];
 
@@ -280,7 +281,29 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
       return { tex: 'squid', px: [2, 18, 2], uv: [48, 0], p: [Math.cos(a) * 5, 9, Math.sin(a) * 5], pivot: [Math.cos(a) * 5, 18, Math.sin(a) * 5], swing: i % 2 ? 1.5 : -1.5 };
     }),
   ],
+  // a szellem (64x64): lapos test, fej, két szárny (vállon csapkodnak, a végük a gyerekük), farok
+  ghost: [
+    { tex: 'ghost', px: [5, 3, 9], uv: [0, 8], p: [0, 8, -3.5] },
+    { tex: 'ghost', px: [5, 3, 5], uv: [0, 0], p: [0, 8.5, -10.5] },
+    { tex: 'ghost', px: [6, 2, 9], uv: [23, 12], p: [5.5, 9, -3.5], pivot: [2.5, 9, -3.5], flap: 0.7 },
+    { tex: 'ghost', px: [13, 1, 9], uv: [16, 24], p: [14.5, 9, -3.5], pivot: [8, 9, -3.5], flap: 0.5, child: true },
+    { tex: 'ghost', px: [6, 2, 9], uv: [23, 12], p: [-5.5, 9, -3.5], pivot: [-2.5, 9, -3.5], flap: -0.7 },
+    { tex: 'ghost', px: [13, 1, 9], uv: [16, 24], p: [-14.5, 9, -3.5], pivot: [-8, 9, -3.5], flap: -0.5, child: true },
+    { tex: 'ghost', px: [3, 2, 6], uv: [3, 20], p: [0, 8, 4] },
+    { tex: 'ghost', px: [1, 1, 6], uv: [4, 29], p: [0, 8, 10] },
+  ],
+  // a nyálka (64x32): belső mag (a külső burok az áttetsző pixelek miatt itt tömör lenne), két szem, száj
+  slime: [
+    { tex: 'slime', px: [6, 6, 6], uv: [0, 16], p: [0, 4, 0] },
+    { tex: 'slime', px: [2, 2, 2], uv: [32, 0], p: [-2.3, 3, -2.5] },
+    { tex: 'slime', px: [2, 2, 2], uv: [32, 4], p: [2.3, 3, -2.5] },
+    { tex: 'slime', px: [1, 1, 1], uv: [32, 8], p: [0.5, 5.5, -3] },
+  ],
 };
+// a husk és a fulladt a zombi teste más skinnel; a tarantula a pók teste a barlangi pók skinjével; a kis nyálka a nyálka kicsiben
+for (const t of ['husk', 'drowned'] as const) TEXTURED[t] = TEXTURED.zombie!.map((q) => ({ ...q, tex: t }));
+TEXTURED.tarantula = TEXTURED.spider!.map((q) => ({ ...q, tex: 'tarantula' as TexName }));
+TEXTURED.slimelet = TEXTURED.slime;
 // a szamár és az öszvér: a ló testrészei, a saját skinjükkel, nagy fülekkel
 const horseBody = (tex: TexName): TPart[] => TEXTURED.horse!
   .filter((q) => !(q.px[0] === 2 && q.px[1] === 3)) // a ló rövid fülei nem kellenek
@@ -294,7 +317,10 @@ for (const t of ['donkey', 'mule'] as const) {
 }
 
 /** A modell mérete a ló modelljéhez képest (a szamár és az öszvér kisebb) */
-export const MODEL_SCALE: Partial<Record<string, number>> = { donkey: 0.88, mule: 0.94, bat: 0.3, squid: 0.5 };
+export const MODEL_SCALE: Partial<Record<string, number>> = { donkey: 0.88, mule: 0.94, bat: 0.3, squid: 0.5, ghost: 0.7, slime: 2.1, slimelet: 1.05, tarantula: 0.6 };
+
+/** Színezés: a szürke (színezésre szánt) skinek szorzószíne */
+export const TINT: Partial<Record<string, number>> = { tarantula: 0x4fb0a8 };
 
 /** Az azonos modell több skinje: a Mob.variant választ közülük (az első rész textúrája helyére kerül) */
 export const VARIANT_SKINS: Partial<Record<string, string[]>> = {
