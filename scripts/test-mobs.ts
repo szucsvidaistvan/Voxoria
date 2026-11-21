@@ -1,5 +1,7 @@
 /** Új állatok: változatok, drop, pillanatkép-jelzők. `npx tsx scripts/test-mobs.ts` */
-import { MOB_DEFS, Mob, mobDrops, type MobKind } from '../src/shared/mobs';
+import { MOB_DEFS, Mob, MobManager, mobDrops, type MobKind } from '../src/shared/mobs';
+import { World } from '../src/shared/world';
+import { B } from '../src/shared/blocks';
 import { EXTRA_ID } from '../src/shared/items';
 
 let fails = 0;
@@ -21,4 +23,34 @@ for (const k of ['llama', 'donkey', 'mule', 'rabbit'] as MobKind[]) ok(leather(k
 ok(mobDrops('parrot', () => 0).some((d) => d.id === EXTRA_ID.feather), 'a papagáj tollat ejt');
 ok(mobDrops('cat', () => 0.99).some((d) => d.id === EXTRA_ID.string), 'a macska cérnát ejt');
 ok(mobDrops('rabbit', () => 0.99).some((d) => d.id === EXTRA_ID.rabbit), 'a nyúl nyúlhúst ejt');
+
+// ---- lebegő mobok: denevér (levegőben), polip (vízben) ----
+{
+  const w = new World(1);
+  for (let cx = -2; cx <= 2; cx++) for (let cz = -2; cz <= 2; cz++) w.ensureChunk(cx, cz);
+  // sík kő padló y=100 alatt, fölötte 10 magas üres „barlang"; egy 6 mély víztartály
+  for (let x = -20; x < 20; x++) for (let z = -20; z < 20; z++) {
+    for (let y = 90; y <= 120; y++) w.setBlock(x, y, z, y < 100 ? B.STONE : y > 110 ? B.STONE : 0);
+  }
+  for (let x = -6; x <= 6; x++) for (let z = -6; z <= 6; z++) for (let y = 100; y < 105; y++) w.setBlock(x, y, z, y === 100 ? B.STONE : 9);
+  const mm = new MobManager(w);
+  const ctx = { players: [], day: true, onDie: () => {} };
+  const bat = mm.spawn('bat', 12.5, 105, 12.5), squid = mm.spawn('squid', 0.5, 102, 0.5);
+  let minBy = 999, maxBy = -999, minSy = 999, maxSy = -999, sqOut = 0;
+  for (let i = 0; i < 60 * 30; i++) {
+    mm.update(1 / 60, ctx);
+    minBy = Math.min(minBy, bat.y); maxBy = Math.max(maxBy, bat.y);
+    minSy = Math.min(minSy, squid.y); maxSy = Math.max(maxSy, squid.y);
+    if (!squid.inWater) sqOut++;
+  }
+  ok(!bat.dead && minBy > 100 && maxBy < 111, `a denevér a levegőben marad (${minBy.toFixed(1)}..${maxBy.toFixed(1)})`);
+  ok(Math.abs(bat.x - 12.5) + Math.abs(bat.z - 12.5) > 0.5, 'a denevér mozog');
+  ok(!squid.dead && minSy >= 100.9 && maxSy < 105 && sqOut < 30, `a polip a vízben marad (${minSy.toFixed(1)}..${maxSy.toFixed(1)}, kint: ${sqOut} tick)`);
+  ok(Math.abs(squid.x) <= 7 && Math.abs(squid.z) <= 7, 'a polip nem hagyja el a tartályt');
+  // szárazon a polip elpusztul
+  const dry = mm.spawn('squid', 12.5, 101, 12.5);
+  for (let i = 0; i < 60 * 8; i++) mm.update(1 / 60, ctx);
+  ok(dry.hp < dry.def.hp, 'a szárazra vetett polip sérül');
+  ok(mm.count(false) === 0, 'a lebegő mobok nem számítanak a szárazföldi állatok közé');
+}
 if (fails) { console.error(fails, 'hiba'); process.exit(1); }

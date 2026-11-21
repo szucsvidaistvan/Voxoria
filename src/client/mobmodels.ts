@@ -6,7 +6,7 @@ import { boxGeom, type BoxGeom } from './boxuv';
  */
 export type ArmorTex = `armor_${'leather' | 'iron' | 'golden' | 'diamond'}_${1 | 2}`;
 export type TexName = 'pig' | 'cow' | 'sheep' | 'sheep_fur' | 'chicken' | 'player' | 'skeleton' | 'zombie' | 'wolf' | 'wolf_angry' | 'spider' | 'polarbear' | 'horse'
-  | 'rabbit_brown' | 'cat_ocelot' | 'parrot_blue' | 'llama_brown' | 'donkey' | 'mule' | 'turtle' | ArmorTex;
+  | 'rabbit_brown' | 'cat_ocelot' | 'parrot_blue' | 'llama_brown' | 'donkey' | 'mule' | 'turtle' | 'bat' | 'squid' | ArmorTex;
 
 export interface TPart {
   tex: TexName;
@@ -42,7 +42,7 @@ export interface TPart {
 export const TEX_SIZE = {
   pig: [64, 32], cow: [64, 32], sheep: [64, 32], sheep_fur: [64, 32], chicken: [64, 32], player: [64, 64], skeleton: [64, 32], zombie: [64, 64],
   wolf: [64, 32], wolf_angry: [64, 32], spider: [64, 32], polarbear: [128, 64], horse: [64, 64],
-  rabbit_brown: [64, 32], cat_ocelot: [64, 32], parrot_blue: [32, 32], llama_brown: [128, 64], donkey: [64, 64], mule: [64, 64], turtle: [128, 64],
+  rabbit_brown: [64, 32], cat_ocelot: [64, 32], parrot_blue: [32, 32], llama_brown: [128, 64], donkey: [64, 64], mule: [64, 64], turtle: [128, 64], bat: [64, 64], squid: [64, 32],
 } as Record<TexName, [number, number]>;
 for (const m of ['leather', 'iron', 'golden', 'diamond']) for (const l of [1, 2]) TEX_SIZE[`armor_${m}_${l}` as ArmorTex] = [64, 32];
 
@@ -261,6 +261,25 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'turtle', px: [13, 1, 5], uv: [27, 30], p: [-11.5, 2.5, -3.5] },
     { tex: 'turtle', px: [13, 1, 5], uv: [27, 24], p: [11.5, 2.5, -3.5] },
   ],
+  // a denevér (64x64): vízszintes törzs, két lapos szárny (a vállukon csapkodnak), a végük a szárny gyereke
+  bat: [
+    { tex: 'bat', px: [6, 12, 6], uv: [0, 16], p: [0, 8, 2], rot: true },
+    { tex: 'bat', px: [6, 6, 6], uv: [0, 0], p: [0, 9, -6] },
+    { tex: 'bat', px: [3, 4, 1], uv: [24, 0], p: [-2, 14, -7] },
+    { tex: 'bat', px: [3, 4, 1], uv: [24, 0], p: [2, 14, -7] },
+    { tex: 'bat', px: [10, 16, 1], uv: [42, 0], p: [8, 10, 2], pivot: [3, 10, 2], flap: 1, rot: true },
+    { tex: 'bat', px: [8, 12, 1], uv: [24, 16], p: [17, 10, 3], pivot: [13, 10, 2], flap: 0.6, rot: true, child: true },
+    { tex: 'bat', px: [10, 16, 1], uv: [42, 0], p: [-8, 10, 2], pivot: [-3, 10, 2], flap: -1, rot: true },
+    { tex: 'bat', px: [8, 12, 1], uv: [24, 16], p: [-17, 10, 3], pivot: [-13, 10, 2], flap: -0.6, rot: true, child: true },
+  ],
+  // a polip/tintahal (64x32): álló test, nyolc csáp a gyűrűn, kis ellentétes lengéssel
+  squid: [
+    { tex: 'squid', px: [12, 16, 12], uv: [0, 0], p: [0, 26, 0] },
+    ...Array.from({ length: 8 }, (_, i): TPart => {
+      const a = (i / 8) * Math.PI * 2;
+      return { tex: 'squid', px: [2, 18, 2], uv: [48, 0], p: [Math.cos(a) * 5, 9, Math.sin(a) * 5], pivot: [Math.cos(a) * 5, 18, Math.sin(a) * 5], swing: i % 2 ? 1.5 : -1.5 };
+    }),
+  ],
 };
 // a szamár és az öszvér: a ló testrészei, a saját skinjükkel, nagy fülekkel
 const horseBody = (tex: TexName): TPart[] => TEXTURED.horse!
@@ -275,7 +294,7 @@ for (const t of ['donkey', 'mule'] as const) {
 }
 
 /** A modell mérete a ló modelljéhez képest (a szamár és az öszvér kisebb) */
-export const MODEL_SCALE: Partial<Record<string, number>> = { donkey: 0.88, mule: 0.94 };
+export const MODEL_SCALE: Partial<Record<string, number>> = { donkey: 0.88, mule: 0.94, bat: 0.3, squid: 0.5 };
 
 /** Az azonos modell több skinje: a Mob.variant választ közülük (az első rész textúrája helyére kerül) */
 export const VARIANT_SKINS: Partial<Record<string, string[]>> = {
