@@ -1,5 +1,6 @@
 import { BLOCKS, B, FLUID_LAVA, FLUID_WATER, LIGHT, blockId, dynamicBoxes, fluidKind, isOpaque, isSolid } from './blocks';
 import { EXTRA_ID, I } from './items';
+import { SEA_LEVEL } from './noise';
 import { CH, type World } from './world';
 import { biomeAt } from './worldgen';
 
@@ -9,7 +10,7 @@ import { biomeAt } from './worldgen';
  */
 
 export type MobKind = 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'skeleton' | 'wolf' | 'polarbear' | 'horse' | 'spider'
-  | 'rabbit' | 'cat' | 'parrot' | 'llama' | 'donkey' | 'mule' | 'turtle';
+  | 'rabbit' | 'cat' | 'parrot' | 'llama' | 'donkey' | 'mule' | 'turtle' | 'bat' | 'squid';
 
 export interface MobDef {
   name: string;
@@ -27,6 +28,10 @@ export interface MobDef {
   dmg?: number;
   /** hány megjelenés (skin) közül sorsol a mob; a változat a Mob.variant */
   variants?: number;
+  /** repülő: nem hat rá a gravitáció, a magasságát maga tartja (denevér) */
+  fly?: boolean;
+  /** vízi: csak vízben él, ott lebeg; szárazon fuldoklik (polip) */
+  swim?: boolean;
 }
 
 export const MOB_DEFS: Record<MobKind, MobDef> = {
@@ -47,9 +52,14 @@ export const MOB_DEFS: Record<MobKind, MobDef> = {
   donkey: { name: 'Donkey', hostile: false, hp: 20, speed: 2.0, hw: 0.6, h: 1.45 },
   mule: { name: 'Mule', hostile: false, hp: 24, speed: 2.1, hw: 0.6, h: 1.5 },
   turtle: { name: 'Turtle', hostile: false, hp: 6, speed: 0.7, hw: 0.5, h: 0.45 },
+  bat: { name: 'Bat', hostile: false, hp: 6, speed: 3, hw: 0.25, h: 0.6, fly: true },
+  squid: { name: 'Squid', hostile: false, hp: 10, speed: 1.2, hw: 0.45, h: 0.95, swim: true },
 };
 // a lóból több színváltozat van
 MOB_DEFS.horse.variants = 8;
+
+/** Lebegő mobok (denevér, polip): saját létszámkerettel, nem számítanak a szárazföldi állatok közé */
+export const isFloater = (d: MobDef): boolean => !!(d.fly || d.swim);
 
 export const PASSIVE_KINDS: MobKind[] = ['pig', 'cow', 'sheep', 'chicken'];
 
@@ -144,6 +154,8 @@ export class Mob {
   aim = 0;
   /** melyik megjelenés (skin) a def.variants közül */
   variant = 0;
+  /** lebegő mobnál a kívánt magasság (a ténylegesen tartott y) */
+  wy = 0;
 
   constructor(readonly kind: MobKind, x: number, y: number, z: number) {
     this.def = MOB_DEFS[kind];
@@ -221,7 +233,11 @@ function physics(world: World, m: Mob, dt: number): void {
   const hh = Math.min(dt, 0.1) / steps;
   let wall = false;
   for (let i = 0; i < steps; i++) {
-    if (m.inWater) m.vy = Math.max(m.vy - 6 * hh, -2) + (m.vy < 1.2 ? 14 * hh : 0); // lassan feljön a felszínre
+    if (m.def.fly) m.vy += (m.wy - m.vy) * Math.min(1, hh * 4);
+    else if (m.def.swim) {
+      if (m.inWater) m.vy += (m.wy - m.vy) * Math.min(1, hh * 3);
+      else m.vy = Math.max(m.vy - GRAVITY * hh, -50); // szárazon leesik
+    } else if (m.inWater) m.vy = Math.max(m.vy - 6 * hh, -2) + (m.vy < 1.2 ? 14 * hh : 0); // lassan feljön a felszínre
     else if (m.climb) m.vy = CLIMB; // a pók a falon felmászik (a gravitáció nem húzza vissza)
     else m.vy = Math.max(m.vy - GRAVITY * hh, m.kind === 'chicken' || m.kind === 'parrot' ? -2.2 : -50);
     const nx = m.x + m.vx * hh;
@@ -242,6 +258,7 @@ function physics(world: World, m: Mob, dt: number): void {
   // a pók a fal felé haladva mászik (a következő lépésben nincs gravitáció), mások ugranak
   m.climb = m.kind === 'spider' && wall && want;
   if (wall && want && m.onGround && !m.climb) m.vy = JUMP;
+  if (m.def.swim && !m.inWater && m.onGround) m.hp -= 2 * dt; // a partra vetett polip lassan elpusztul
   if (m.y < -20) m.hp = 0; // kiesett a világból
   m.walk += Math.hypot(m.vx, m.vz, m.climb ? m.vy : 0) * dt * 1.6;
 }
@@ -300,6 +317,8 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
   const dist = near?.dist ?? Infinity;
   const dy = pl ? pl.y - m.y : 0;
 
+  if (isFloater(def)) { floatStep(world, m, dt, pl, dist); return; }
+
   const aggressive = m.angry || (def.hostile && !(m.kind === 'spider' && ctx.day));
   if (aggressive && pl && dist < 24 && Math.abs(dy) < 12) {
     // üldözés
@@ -354,6 +373,46 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
   } else { priv.wx = 0; priv.wz = 0; }
 }
 
+/** Lebegő mobok (denevér, polip) AI-ja: lassan kószál, közben magasságot vált; sebzéskor menekül. A kívánt irányt és magasságot (wx, wz, wy) adja. */
+function floatStep(world: World, m: Mob, dt: number, pl: MobPlayer | null, dist: number): void {
+  const def = m.def;
+  const swim = !!def.swim;
+  if (m.panicT > 0) {
+    m.panicT -= dt;
+    m.yaw = m.panicYaw;
+  } else {
+    m.wanderT -= dt;
+    if (m.wanderT <= 0) {
+      m.wanderT = 1 + Math.random() * 3;
+      m.idle = !swim && Math.random() < 0.15;
+      m.yaw = Math.random() * Math.PI * 2;
+      // a denevér a játékos közelében kering, a polip lassan fel-le úszik
+      if (!swim && pl && dist > 14) m.yaw = Math.atan2(-(pl.x - m.x), -(pl.z - m.z)) + (Math.random() - 0.5);
+      m.wy = (Math.random() - 0.5) * (swim ? 1.2 : 3.5);
+    }
+  }
+  const sp = def.speed * (m.panicT > 0 ? 1.6 : swim ? 0.7 : 0.8);
+  const [fx, fz] = forward(m.yaw);
+  // a következő cellában szabad-e a hely (denevér: levegő, polip: víz)? Ha nem, új irányt választ
+  const nx = Math.floor(m.x + fx * 0.9), nz = Math.floor(m.z + fz * 0.9), ny = Math.floor(m.y + def.h * 0.5);
+  const nb = world.getBlock(nx, ny, nz);
+  const blocked = swim ? fluidKind(nb) !== FLUID_WATER : isSolid(nb);
+  if (blocked) { m.wanderT = 0; m.wx = 0; m.wz = 0; return; }
+  m.wx = m.idle ? 0 : fx * sp;
+  m.wz = m.idle ? 0 : fz * sp;
+  if (swim) {
+    // ne hagyja el a vizet: ha a feje fölött már nincs víz, süllyed; ha az alatta lévő szilárd, emelkedik
+    const above = world.getBlock(Math.floor(m.x), Math.floor(m.y + def.h + 0.6), Math.floor(m.z));
+    if (fluidKind(above) !== FLUID_WATER && m.wy > 0) m.wy = -0.4;
+  } else {
+    // a denevér nem megy a padló/plafon közelébe: pár blokk szabad tér kell fölötte és alatta
+    const up = world.getBlock(Math.floor(m.x), Math.floor(m.y + def.h + 1), Math.floor(m.z));
+    const dn = world.getBlock(Math.floor(m.x), Math.floor(m.y - 1), Math.floor(m.z));
+    if (isSolid(up) && m.wy > 0) m.wy = -1;
+    if (isSolid(dn) && m.wy < 0) m.wy = 1;
+  }
+}
+
 /** Van-e a mob előtt 3 blokknál mélyebb lyuk vagy víz/láva? */
 function dropAhead(world: World, m: Mob, fx: number, fz: number): boolean {
   const x = Math.floor(m.x + fx * 0.9), z = Math.floor(m.z + fz * 0.9);
@@ -382,7 +441,14 @@ export class MobManager {
 
   count(hostile: boolean): number {
     let n = 0;
-    for (const m of this.mobs) if (m.def.hostile === hostile && !m.dead) n++;
+    for (const m of this.mobs) if (m.def.hostile === hostile && !m.dead && !isFloater(m.def)) n++;
+    return n;
+  }
+
+  /** Hány élő mob van ebből a fajtából? */
+  countKind(kind: MobKind): number {
+    let n = 0;
+    for (const m of this.mobs) if (m.kind === kind && !m.dead) n++;
     return n;
   }
 
@@ -482,6 +548,9 @@ export class MobManager {
     if (passiveN < capP) this.trySpawn(players, px, pz, PASSIVE_KINDS[Math.floor(Math.random() * PASSIVE_KINDS.length)], 20, 44, 'surface');
     // a biomhoz illő állatok (ló, farkas, jegesmedve): ritkábban, a játékostól távolabb
     if (passiveN < capP && Math.random() < 0.3) this.trySpawn(players, px, pz, 'fauna', 24, 48, 'surface');
+    // denevér a barlangokban, polip a tengerben (saját létszámkerettel)
+    if (this.countKind('bat') < 4 * scale && Math.random() < 0.25) this.trySpawn(players, px, pz, 'bat', 20, 36, 'cave', py);
+    if (this.countKind('squid') < 5 * scale && Math.random() < 0.3) this.trySpawn(players, px, pz, 'squid', 16, 40, 'water');
     if (hostileAllowed && this.count(true) < capH) {
       const roll = Math.random();
       const kind: MobKind = roll < 0.45 ? 'zombie' : roll < 0.75 ? 'skeleton' : 'spider';
@@ -515,14 +584,19 @@ export class MobManager {
   }
 
   /** Egy csoport (passzív: 1–3) leszállítása a játékostól minRange..maxRange távolságra */
-  private trySpawn(players: { x: number; y: number; z: number }[], px: number, pz: number, want: MobKind | 'fauna', minR: number, maxR: number, where: 'surface' | 'cave', py = NaN): void {
+  private trySpawn(players: { x: number; y: number; z: number }[], px: number, pz: number, want: MobKind | 'fauna', minR: number, maxR: number, where: 'surface' | 'cave' | 'water', py = NaN): void {
     const w = this.world;
     const a = Math.random() * Math.PI * 2, r = minR + Math.random() * (maxR - minR);
     const x = Math.floor(px + Math.cos(a) * r), z = Math.floor(pz + Math.sin(a) * r);
     if (!w.isLoaded(x, z)) return;
     let y: number;
     if (where === 'surface') y = w.heightAt(x, z) + 1;
-    else {
+    else if (where === 'water') {
+      // tengerben: a talaj a tengerszint alatt, a polip a vízoszlop közepén
+      const floor = w.heightAt(x, z);
+      if (floor > SEA_LEVEL - 4) return;
+      y = floor + 2 + Math.floor(Math.random() * (SEA_LEVEL - floor - 3));
+    } else {
       const top = w.heightAt(x, z);
       if (top < 14) return;
       // csak a játékos magasságának közelében (±16), különben a világ egész oszlopából választana
@@ -537,6 +611,25 @@ export class MobManager {
       kind = list[Math.floor(Math.random() * list.length)];
       if ((kind === 'polarbear' || kind === 'mule') && Math.random() < 0.6) return; // ritka
     } else kind = want;
+    if (where === 'water') {
+      if (fluidKind(w.getBlock(x, y, z)) !== FLUID_WATER || fluidKind(w.getBlock(x, y + 1, z)) !== FLUID_WATER) return;
+      if (players.some((q) => Math.hypot(q.x - (x + 0.5), q.z - (z + 0.5)) < minR * 0.85)) return;
+      for (let i = 0; i < 1 + Math.floor(Math.random() * 2); i++) {
+        const sx = x + 0.5 + (Math.random() - 0.5) * 3, sz = z + 0.5 + (Math.random() - 0.5) * 3;
+        if (!boxBlocked(w, sx, y, sz, MOB_DEFS[kind].hw, MOB_DEFS[kind].h)) this.spawn(kind, sx, y, sz).wy = 0;
+      }
+      return;
+    }
+    if (kind === 'bat') {
+      // a denevér a barlang üres terében lebeg (nem kell talaj)
+      if (w.getBlock(x, y, z) !== 0 || w.getBlock(x, y + 1, z) !== 0 || w.heightAt(x, z) - y < 5) return;
+      if (players.some((q) => Math.hypot(q.x - (x + 0.5), q.z - (z + 0.5)) < minR * 0.85)) return;
+      for (let i = 0; i < 1 + Math.floor(Math.random() * 3); i++) {
+        const sx = x + 0.5 + (Math.random() - 0.5) * 2, sz = z + 0.5 + (Math.random() - 0.5) * 2;
+        if (!boxBlocked(w, sx, y, sz, MOB_DEFS.bat.hw, MOB_DEFS.bat.h)) this.spawn('bat', sx, y, sz);
+      }
+      return;
+    }
     const below = w.getBlock(x, y - 1, z);
     if (!(isSolid(below) && fluidKind(below) === 0 && w.getBlock(x, y, z) === 0 && w.getBlock(x, y + 1, z) === 0)) return;
     // barlangban csak fedett helyre (legalább néhány blokk kő van fölötte)

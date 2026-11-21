@@ -17,10 +17,10 @@ for (let i = 0; i < specs.length; i++) {
     const v = window.__voxoria;
     for (const m of [...v.mobs.mobs]) v.mobs.mobs.splice(v.mobs.mobs.indexOf(m), 1);
     const m = v.mobs.spawn(s.k, X + 0.5, Y + 1, Z + 0.5);
-    m.noAI = true; m.yaw = s.yaw; if (s.v !== undefined) m.variant = s.v;
+    m.noAI = true; m.wanderT = 1e9; m.idle = true; m.hp = 999; m.yaw = s.yaw; if (s.v !== undefined) m.variant = s.v;
     return m.def.h;
   }, [s, X, Y, Z]);
-  const d = Math.min(10, 2.6 + h * 2.6);
+  const d = Number(process.env.DIST) || Math.min(10, 2.6 + h * 2.6);
   await t.teleport(X + 0.5 + d, Y + 1 + h / 2 - 1.62 + 0.0, Z + 0.5); await t.look(1.5708, 0); await t.settle(1800);
   const f = `.playtest-shots/_s${i}.png`; files.push(f);
   await t.page.screenshot({ path: f, clip: { x: 100, y: 60, width: 600, height: 400 } });
