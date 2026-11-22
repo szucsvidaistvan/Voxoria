@@ -36,6 +36,10 @@ export interface TPart {
   child?: boolean;
   /** célzáskor ez a dőlés az x tengely körül (a csontváz íjat tartó karja) */
   aim?: number;
+  /** egyedi animáció: polipcsáp (tent), teknős mellső (fflip) és hátsó (hflip) uszonya */
+  anim?: 'tent' | 'fflip' | 'hflip';
+  /** az oldala (+1: x>0, −1: x<0) az uszonyokhoz */
+  side?: 1 | -1;
 }
 
 /** A textúrák mérete pixelben */
@@ -43,8 +47,8 @@ export const TEX_SIZE = {
   pig: [64, 32], cow: [64, 32], sheep: [64, 32], sheep_fur: [64, 32], chicken: [64, 32], player: [64, 64], skeleton: [64, 32], zombie: [64, 64],
   wolf: [64, 32], wolf_angry: [64, 32], spider: [64, 32], polarbear: [128, 64], horse: [64, 64],
   rabbit_brown: [64, 32], cat_ocelot: [64, 32], parrot_blue: [32, 32], llama_brown: [128, 64], donkey: [64, 64], mule: [64, 64], turtle: [128, 64], bat: [64, 64], squid: [64, 32],
-  fish_cod: [32, 32], fish_salmon: [32, 32], fish_puffer: [32, 32],
   husk: [64, 64], drowned: [64, 64], tarantula: [64, 32], ghost: [64, 64], slime: [64, 32],
+  fish_cod: [32, 32], fish_salmon: [32, 32], fish_puffer: [32, 32],
 } as Record<TexName, [number, number]>;
 for (const m of ['leather', 'iron', 'golden', 'diamond']) for (const l of [1, 2]) TEX_SIZE[`armor_${m}_${l}` as ArmorTex] = [64, 32];
 
@@ -258,10 +262,10 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'turtle', px: [6, 5, 6], uv: [3, 0], p: [0, 3.5, -10] },
     { tex: 'turtle', px: [19, 20, 6], uv: [7, 37], p: [0, 6, 3], rot: true },
     { tex: 'turtle', px: [11, 18, 3], uv: [31, 1], p: [0, 1.5, 2], rot: true },
-    { tex: 'turtle', px: [4, 1, 10], uv: [1, 23], p: [-3.5, 1.5, 16] },
-    { tex: 'turtle', px: [4, 1, 10], uv: [1, 12], p: [3.5, 1.5, 16] },
-    { tex: 'turtle', px: [13, 1, 5], uv: [27, 30], p: [-11.5, 2.5, -3.5] },
-    { tex: 'turtle', px: [13, 1, 5], uv: [27, 24], p: [11.5, 2.5, -3.5] },
+    { tex: 'turtle', px: [4, 1, 10], uv: [1, 23], p: [-3.5, 1.5, 16], pivot: [-3.5, 1.5, 11], anim: 'hflip', side: -1 },
+    { tex: 'turtle', px: [4, 1, 10], uv: [1, 12], p: [3.5, 1.5, 16], pivot: [3.5, 1.5, 11], anim: 'hflip', side: 1 },
+    { tex: 'turtle', px: [13, 1, 5], uv: [27, 30], p: [-11.5, 2.5, -3.5], pivot: [-5, 2.5, -3.5], anim: 'fflip', side: -1 },
+    { tex: 'turtle', px: [13, 1, 5], uv: [27, 24], p: [11.5, 2.5, -3.5], pivot: [5, 2.5, -3.5], anim: 'fflip', side: 1 },
   ],
   // a denevér (64x64): vízszintes törzs, két lapos szárny (a vállukon csapkodnak), a végük a szárny gyereke
   bat: [
@@ -305,12 +309,12 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'fish_puffer', px: [1, 1, 2], uv: [25, 0], p: [2, 0.5, -0.5], pivot: [1.5, 0.5, -0.5], flap: 0.5 },
     { tex: 'fish_puffer', px: [1, 1, 2], uv: [25, 0], p: [-2, 0.5, -0.5], pivot: [-1.5, 0.5, -0.5], flap: -0.5 },
   ],
-  // a polip/tintahal (64x32): álló test, nyolc csáp a gyűrűn, kis ellentétes lengéssel
+  // a polip/tintahal (64x32): álló test, nyolc csáp a gyűrűn; a csápok együtt nyílnak (a lüktetés fázisából)
   squid: [
     { tex: 'squid', px: [12, 16, 12], uv: [0, 0], p: [0, 26, 0] },
     ...Array.from({ length: 8 }, (_, i): TPart => {
       const a = (i / 8) * Math.PI * 2;
-      return { tex: 'squid', px: [2, 18, 2], uv: [48, 0], p: [Math.cos(a) * 5, 9, Math.sin(a) * 5], pivot: [Math.cos(a) * 5, 18, Math.sin(a) * 5], swing: i % 2 ? 1.5 : -1.5 };
+      return { tex: 'squid', px: [2, 18, 2], uv: [48, 0], p: [Math.cos(a) * 5, 9, Math.sin(a) * 5], pivot: [Math.cos(a) * 5, 18, Math.sin(a) * 5], ry: -(a + Math.PI / 2), anim: 'tent' };
     }),
   ],
   // a szellem (64x64): lapos test, fej, két szárny (vállon csapkodnak, a végük a gyerekük), farok
