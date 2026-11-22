@@ -52,5 +52,27 @@ ok(mobDrops('rabbit', () => 0.99).some((d) => d.id === EXTRA_ID.rabbit), 'a nyú
   for (let i = 0; i < 60 * 8; i++) mm.update(1 / 60, ctx);
   ok(dry.hp < dry.def.hp, 'a szárazra vetett polip sérül');
   ok(mm.count(false) === 0, 'a lebegő mobok nem számítanak a szárazföldi állatok közé');
+  // halak: kószálnak a vízben, a csalihoz úsznak, a játékos elől menekülnek, szárazon elpusztulnak; a halak nem szárazföldi állatok
+  {
+    const fishes = [mm.spawn('cod', -4, 102, -4), mm.spawn('salmon', 4, 102, 4), mm.spawn('pufferfish', -4, 102, 4)];
+    ok(MOB_DEFS.cod.fish && MOB_DEFS.salmon.fish && MOB_DEFS.pufferfish.fish, 'a halak fish jelzésűek');
+    for (let i = 0; i < 60 * 20; i++) mm.update(1 / 60, ctx);
+    ok(fishes.every((f) => !f.dead && f.inWater), 'a halak a vízben maradnak');
+    ok(fishes.some((f) => Math.hypot(f.x + (f.kind === 'salmon' ? -4 : f.kind === 'cod' ? 4 : 4), f.z) > 1), 'a halak mozognak');
+    const lure = { x: 0.5, y: 103.2, z: 0.5 };
+    const c2 = { ...ctx, lure };
+    for (let i = 0; i < 60 * 25; i++) mm.update(1 / 60, c2);
+    ok(fishes.every((f) => Math.hypot(f.x - lure.x, f.z - lure.z) < 1.5), `a halak a csalihoz úsznak (${fishes.map((f) => Math.hypot(f.x - lure.x, f.z - lure.z).toFixed(1)).join(', ')})`);
+    // a játékos elől elúsznak
+    const f0 = fishes[0];
+    f0.x = 0; f0.z = 0; f0.y = 102;
+    const near = { players: [{ x: 1, y: 102, z: 0, target: true, hurt: () => {} }], day: true, onDie: () => {} };
+    let d0 = 0;
+    for (let i = 0; i < 60 * 3; i++) { mm.update(1 / 60, near); d0 = Math.max(d0, Math.hypot(f0.x - 1, f0.z)); }
+    ok(d0 > 2.5, `a hal elmenekül a játékos elől (${d0.toFixed(1)} blokk)`);
+    ok(mobDrops('cod', () => 0).some((d) => d.n > 0) && mobDrops('salmon', () => 0).length === 1, 'a halak ejtenek (hal)');
+    ok(mm.count(false) === 0 && mm.countFish() >= 3, 'a halak nem számítanak a szárazföldi állatok közé');
+    for (const f of fishes) mm.mobs.splice(mm.mobs.indexOf(f), 1);
+  }
 }
 if (fails) { console.error(fails, 'hiba'); process.exit(1); }

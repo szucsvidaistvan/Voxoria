@@ -19,6 +19,19 @@ const c = f.reel();
 ok(!!c && c.n === 1 && !f.active, 'kapáskor behúzva zsákmány');
 f.cast(0, 0, 0); f.update(11);
 ok(f.update(BITE_WINDOW + 0.1) === 'miss' && f.active && f.wait > 0, 'ha nem húzza be, a hal elúszik, a horgászat folytatódik');
+// valódi hal mód: csak akkor kap, ha van hal a csalinál; hal nélkül csak a tartalék idő után
+f.cast(0, 0, 0);
+ok(f.update(14.9, null) === null && f.bite === 0, 'hal nélkül nincs kapás (valódi hal mód)');
+ok(f.update(0.5, 7) === 'bite' && f.hooked === 7, 'a csalinál lévő hal kap (az azonosítója megvan)');
+const c2 = f.reel();
+ok(!!c2 && c2.fish === 7 && !f.active, 'behúzáskor a kapó hal azonosítóját adja');
+f.cast(0, 0, 0);
+for (let t = 0; t < 29; t++) f.update(1, null);
+ok(f.bite === 0, 'tartalék idő előtt nincs kapás hal nélkül');
+let fb = null as ReturnType<typeof f.update>;
+for (let t = 0; t < 5 && fb !== 'bite'; t++) fb = f.update(1, null);
+ok(fb === 'bite' && f.hooked === null, 'tartalék idő után hal nélkül is kap (általános zsákmány)');
+ok(f.reel()?.fish === null, 'a tartalék kapásnál nincs hal azonosító');
 // eloszlás
 let cod = 0, salmon = 0, junk = 0, i = 0;
 const seq = () => ((i++ * 0.6180339887) % 1);
