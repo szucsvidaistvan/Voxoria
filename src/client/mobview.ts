@@ -5,7 +5,7 @@ import { ITEMS, isItem } from '../shared/items';
 import type { Atlas } from './atlas';
 import { buildCubeGeo } from './blockgeo';
 import { extrudeItem, itemImage } from './itemgeo';
-import { MODEL_SCALE, TEXTURED, VARIANT_SKINS, armorParts, partGeom, type TPart, type TexName } from './mobmodels';
+import { MODEL_SCALE, TEXTURED, TINT, VARIANT_SKINS, armorParts, partGeom, type TPart, type TexName } from './mobmodels';
 
 /**
  * A mobok megjelenítése: a háziállatok a Good Vibes csomag lény-skinjeivel textúrázott dobozmodellek (mobmodels.ts),
@@ -211,6 +211,11 @@ export function createMobView(scene: THREE.Scene, base: string = import.meta.env
           v.root.rotation.order = 'YXZ';
           v.root.rotation.set(cur, m.yaw, 0);
         }
+        if (m.def.hop) {
+          // a nyálka a földön összenyomódik, ugrás közben megnyúlik
+          const base = MODEL_SCALE[m.kind] ?? 1, sy = m.onGround ? 0.85 : 1.2, sxz = 1 / Math.sqrt(sy);
+          v.root.scale.set(base * sxz, base * sy, base * sxz);
+        }
 
         // járás: a lábak a megtett úttal lendülnek, a szárnyak csapkodnak, ha a csirke a levegőben van
         const speed = Math.min(1, Math.hypot(m.vx, m.vz, m.climb ? m.vy : 0) / 2.5);
@@ -259,6 +264,8 @@ export function createMobView(scene: THREE.Scene, base: string = import.meta.env
         const base = m.exposed ? 1 : 0.55;
         let r = Math.max(light[0] * base, 0.3), g = Math.max(light[1] * base, 0.3), b = Math.max(light[2] * base, 0.34);
         if (m.hurtT > 0 || m.dead) { g *= 0.4; b *= 0.4; r = Math.min(1.2, r * 1.3 + 0.1); }
+        const tn = TINT[m.kind];
+        if (tn !== undefined) { r *= ((tn >> 16) & 255) / 255; g *= ((tn >> 8) & 255) / 255; b *= (tn & 255) / 255; }
         for (const mt of v.mats) mt.color.setRGB(r, g, b);
       }
       for (const [id, v] of views) {
