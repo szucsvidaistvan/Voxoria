@@ -75,4 +75,35 @@ ok(mobDrops('rabbit', () => 0.99).some((d) => d.id === EXTRA_ID.rabbit), 'a nyú
     for (const f of fishes) mm.mobs.splice(mm.mobs.indexOf(f), 1);
   }
 }
+
+// ---- ellenségek: nyálka ugrál és szétesik, szellem üldöz és csap, husk/fulladt/tarantula létezik ----
+{
+  for (const k of ['husk', 'drowned', 'tarantula', 'ghost', 'slime', 'slimelet'] as MobKind[]) ok(MOB_DEFS[k].hostile, `${k} ellenséges`);
+  ok(mobDrops('husk', () => 0.99).length > 0 && mobDrops('tarantula', () => 0.99).length > 0, 'husk és tarantula ejt');
+  const w = new World(1);
+  for (let cx = -2; cx <= 2; cx++) for (let cz = -2; cz <= 2; cz++) w.ensureChunk(cx, cz);
+  for (let x = -20; x < 20; x++) for (let z = -20; z < 20; z++) for (let y = 90; y <= 120; y++) w.setBlock(x, y, z, y < 100 ? B.STONE : 0);
+  const mm = new MobManager(w);
+  let hits = 0;
+  const player = { x: 8.5, y: 100, z: 0.5, target: true, hurt: () => { hits++; } };
+  const ctx = { players: [player], day: false, onDie: () => {} };
+  const sl = mm.spawn('slime', 0.5, 100, 0.5);
+  let airT = 0;
+  for (let i = 0; i < 60 * 12; i++) { mm.update(1 / 60, ctx); if (!sl.onGround) airT++; }
+  ok(sl.x > 3, `a nyálka a játékos felé ugrál (x=${sl.x.toFixed(1)})`);
+  ok(airT > 60 && airT < 60 * 10, `a nyálka ugrál, nem folyamatosan a levegőben (${airT} tick)`);
+  ok(hits > 0, 'a nyálka megüti a játékost');
+  sl.hurt(100, 0, 0);
+  for (let i = 0; i < 60 * 2; i++) mm.update(1 / 60, ctx);
+  ok(mm.countKind('slimelet') >= 2 && mm.countKind('slime') === 0, `a nagy nyálka kis nyálkákra esik szét (${mm.countKind('slimelet')})`);
+  const g = mm.spawn('ghost', 0.5, 104, 0.5);
+  hits = 0;
+  for (let i = 0; i < 60 * 10; i++) mm.update(1 / 60, ctx);
+  ok(Math.hypot(g.x - player.x, g.z - player.z) < 3 && hits > 0, `a szellem a játékoshoz száll és csap (${hits} találat)`);
+  const w2 = mm.spawn('ghost', 0.5, 104, 0.5);
+  w2.hp = 100;
+  ctx.day = true; player.target = false;
+  for (let i = 0; i < 60 * 3; i++) mm.update(1 / 60, ctx);
+  ok(w2.hp < 100, 'a szellem napfényben ég');
+}
 if (fails) { console.error(fails, 'hiba'); process.exit(1); }

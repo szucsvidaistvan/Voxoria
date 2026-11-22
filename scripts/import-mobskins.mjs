@@ -19,6 +19,7 @@ const MAP = [
   ...['black', 'brown', 'chestnut', 'creamy', 'darkbrown', 'gray', 'white'].map((c) => [`horse_${c}`, `horse/horse_${c}.png`]),
   ['donkey', 'horse/donkey.png'], ['mule', 'horse/mule.png'], ['turtle', 'turtle/big_sea_turtle.png'], ['bat', 'bat.png'], ['squid', 'squid.png'],
   ['fish_cod', 'fish/cod.png'], ['fish_salmon', 'fish/salmon.png'], ['fish_puffer', 'fish/pufferfish.png'],
+  ['husk', 'zombie/husk.png'], ['drowned', 'zombie/drowned.png'], ['tarantula', 'spider/cave_spider.png'], ['ghost', 'phantom.png'], ['slime', 'slime/slime.png'],
 ];
 let n = 0;
 for (const [to, from] of MAP) {

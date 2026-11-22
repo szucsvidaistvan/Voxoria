@@ -10,7 +10,8 @@ import { biomeAt } from './worldgen';
  */
 
 export type MobKind = 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'skeleton' | 'wolf' | 'polarbear' | 'horse' | 'spider'
-  | 'rabbit' | 'cat' | 'parrot' | 'llama' | 'donkey' | 'mule' | 'turtle' | 'bat' | 'squid' | 'cod' | 'salmon' | 'pufferfish';
+  | 'rabbit' | 'cat' | 'parrot' | 'llama' | 'donkey' | 'mule' | 'turtle' | 'bat' | 'squid'
+  | 'husk' | 'drowned' | 'tarantula' | 'ghost' | 'slime' | 'slimelet' | 'cod' | 'salmon' | 'pufferfish';
 
 export interface MobDef {
   name: string;
@@ -34,6 +35,8 @@ export interface MobDef {
   swim?: boolean;
   /** hal: csoportban úszik, a horgászcsalihoz úszik, a játékos elől elmenekül */
   fish?: boolean;
+  /** ugrálva halad (nyálka) */
+  hop?: boolean;
 }
 
 export const MOB_DEFS: Record<MobKind, MobDef> = {
@@ -58,6 +61,12 @@ export const MOB_DEFS: Record<MobKind, MobDef> = {
   cod: { name: 'Cod', hostile: false, hp: 3, speed: 1.6, hw: 0.25, h: 0.3, swim: true, fish: true },
   salmon: { name: 'Salmon', hostile: false, hp: 3, speed: 1.8, hw: 0.3, h: 0.35, swim: true, fish: true },
   pufferfish: { name: 'Pufferfish', hostile: false, hp: 3, speed: 1.0, hw: 0.25, h: 0.3, swim: true, fish: true },
+  husk: { name: 'Husk', hostile: true, hp: 20, speed: 2.4, hw: 0.3, h: 1.95 },
+  drowned: { name: 'Drowned', hostile: true, hp: 20, speed: 2.2, hw: 0.3, h: 1.95 },
+  tarantula: { name: 'Tarantula', hostile: true, hp: 10, speed: 3.4, hw: 0.4, h: 0.6, dmg: 2 },
+  ghost: { name: 'Ghost', hostile: true, hp: 12, speed: 3.2, hw: 0.45, h: 0.5, dmg: 3, fly: true },
+  slime: { name: 'Slime', hostile: true, hp: 16, speed: 2.6, hw: 0.4, h: 0.8, dmg: 3, hop: true },
+  slimelet: { name: 'Slimelet', hostile: true, hp: 4, speed: 2.8, hw: 0.2, h: 0.4, dmg: 1, hop: true },
   squid: { name: 'Squid', hostile: false, hp: 10, speed: 1.2, hw: 0.45, h: 0.95, swim: true },
 };
 // a lóból több színváltozat van
@@ -65,6 +74,9 @@ MOB_DEFS.horse.variants = 8;
 
 /** Lebegő mobok (denevér, polip): saját létszámkerettel, nem számítanak a szárazföldi állatok közé */
 export const isFloater = (d: MobDef): boolean => !!(d.fly || d.swim);
+
+/** Pók-e (falat mászik, nappal nem támad)? */
+export const isSpider = (k: MobKind): boolean => k === 'spider' || k === 'tarantula';
 
 export const PASSIVE_KINDS: MobKind[] = ['pig', 'cow', 'sheep', 'chicken'];
 
@@ -85,6 +97,8 @@ export function mobDrops(kind: MobKind, rand: () => number = Math.random): { id:
     case 'cow': add(I.RAW_BEEF, r(1, 3)); add(EXTRA_ID.leather, r(0, 2)); break;
     case 'chicken': add(I.RAW_CHICKEN, 1); add(EXTRA_ID.feather, r(0, 2)); add(EXTRA_ID.egg, r(0, 1)); break;
     case 'sheep': add(blockId('white_wool'), 1); add(I.RAW_MUTTON, r(1, 2)); add(EXTRA_ID.leather, r(0, 1)); break;
+    case 'husk': case 'drowned': add(I.ROTTEN_FLESH, r(0, 2)); break;
+    case 'tarantula': add(EXTRA_ID.string, r(0, 2)); break;
     case 'zombie': add(I.ROTTEN_FLESH, r(0, 2)); add(EXTRA_ID.carrot, r(0, 39) === 0 ? 1 : 0); add(EXTRA_ID.potato, r(0, 39) === 0 ? 1 : 0); break; // ritkán murok/krumpli is (2,5%)
     case 'spider': add(EXTRA_ID.string, r(0, 2)); break;
     case 'cod': add(EXTRA_ID.cod, 1); break;
@@ -164,6 +178,8 @@ export class Mob {
   variant = 0;
   /** lebegő mobnál a kívánt magasság (a ténylegesen tartott y) */
   wy = 0;
+  /** nyálka: ugrás utáni várakozás és az ugrás iránya */
+  hopT = 0; hx = 0; hz = 0;
 
   constructor(readonly kind: MobKind, x: number, y: number, z: number) {
     this.def = MOB_DEFS[kind];
@@ -264,7 +280,7 @@ function physics(world: World, m: Mob, dt: number): void {
   // akadály (egy blokk magas lépcső, fal) előtt: ha akar menni, ugrik
   const want = Math.hypot(m.wx, m.wz) > 0.1;
   // a pók a fal felé haladva mászik (a következő lépésben nincs gravitáció), mások ugranak
-  m.climb = m.kind === 'spider' && wall && want;
+  m.climb = isSpider(m.kind) && wall && want;
   if (wall && want && m.onGround && !m.climb) m.vy = JUMP;
   if (m.def.swim && !m.inWater && m.onGround) m.hp -= 2 * dt; // a partra vetett polip lassan elpusztul
   if (m.y < -20) m.hp = 0; // kiesett a világból
@@ -329,7 +345,7 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
 
   if (isFloater(def)) { floatStep(world, m, dt, pl, dist, ctx.lure ?? null); return; }
 
-  const aggressive = m.angry || (def.hostile && !(m.kind === 'spider' && ctx.day));
+  const aggressive = m.angry || (def.hostile && !(isSpider(m.kind) && ctx.day));
   if (aggressive && pl && dist < 24 && Math.abs(dy) < 12) {
     // üldözés
     lookAt(m, pl.x, pl.z);
@@ -381,6 +397,15 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
     priv.wz = free ? fz * speed : 0;
     if (!free) { priv.wanderT = 0; }
   } else { priv.wx = 0; priv.wz = 0; }
+
+  if (def.hop) {
+    // a nyálka ugrálva halad: a földön áll és vár, ugráskor a levegőben viszi a lendület
+    priv.hopT -= dt;
+    if (m.onGround) {
+      if (speed > 0 && priv.hopT <= 0) { m.vy = 7.5; priv.hopT = 0.6 + Math.random() * 0.5; priv.hx = priv.wx; priv.hz = priv.wz; }
+      priv.wx = 0; priv.wz = 0;
+    } else { priv.wx = priv.hx; priv.wz = priv.hz; }
+  }
 }
 
 /**
@@ -429,6 +454,16 @@ function floatStep(world: World, m: Mob, dt: number, pl: MobPlayer | null, dist:
   const def = m.def;
   const swim = !!def.swim;
   if (def.fish) { fishStep(world, m, dt, pl, dist, lure); return; }
+  if (def.hostile && pl && dist < 28 && Math.abs(pl.y - m.y) < 24) {
+    // a szellem a játékos felé száll (3D-ben), közel érve csap
+    lookAt(m, pl.x, pl.z);
+    m.wy = Math.max(-3, Math.min(3, pl.y + 1.0 - m.y)) * 1.2;
+    const near = dist < 1.1;
+    m.wx = near ? 0 : -Math.sin(m.yaw) * def.speed;
+    m.wz = near ? 0 : -Math.cos(m.yaw) * def.speed;
+    if (dist < 1.5 && Math.abs(pl.y + 0.9 - m.y) < 1.8 && m.atkCd <= 0) { m.atkCd = 1; pl.hurt(def.dmg ?? 3, m.x, m.z); }
+    return;
+  }
   if (m.panicT > 0) {
     m.panicT -= dt;
     m.yaw = m.panicYaw;
@@ -565,7 +600,14 @@ export class MobManager {
 
       if (m.dead) {
         m.deadT += dt;
-        if (m.deadT > 0.8) this.mobs.splice(i, 1);
+        if (m.deadT > 0.8) {
+          this.mobs.splice(i, 1);
+          // a nagy nyálka szétesik két-három kicsire
+          if (m.kind === 'slime') for (let k = 0, n = 2 + Math.floor(Math.random() * 2); k < n; k++) {
+            const c = this.spawn('slimelet', m.x + (Math.random() - 0.5) * 0.6, m.y + 0.1, m.z + (Math.random() - 0.5) * 0.6);
+            c.vx = (Math.random() - 0.5) * 4; c.vz = (Math.random() - 0.5) * 4; c.vy = 4;
+          }
+        }
         continue;
       }
       const priv = m;
@@ -579,7 +621,7 @@ export class MobManager {
         }
       }
       // a zombi napfényben ég
-      if ((m.kind === 'zombie' || m.kind === 'skeleton') && ctx.day && m.exposed && !m.inWater) {
+      if ((m.kind === 'zombie' || m.kind === 'skeleton' || m.kind === 'ghost') && ctx.day && m.exposed && !m.inWater) {
         priv.burnT += dt;
         if (priv.burnT >= 1) { priv.burnT -= 1; m.hp -= 2; m.hurtT = 0.3; }
       }
@@ -611,9 +653,14 @@ export class MobManager {
     if (this.countKind('bat') < 4 * scale && Math.random() < 0.25) this.trySpawn(players, px, pz, 'bat', 20, 36, 'cave', py);
     if (this.countKind('squid') < 5 * scale && Math.random() < 0.3) this.trySpawn(players, px, pz, 'squid', 16, 40, 'water');
     if (this.countFish() < 12 * scale && Math.random() < 0.35) this.trySpawn(players, px, pz, 'fish', 14, 38, 'water');
+    if (hostileAllowed && night) {
+      // éjjel: szellemek az égből, fulladtak a vízből
+      if (this.countKind('ghost') < 3 * scale && Math.random() < 0.12) this.trySpawn(players, px, pz, 'ghost', 24, 40, 'surface', py);
+      if (this.countKind('drowned') < 3 * scale && Math.random() < 0.2) this.trySpawn(players, px, pz, 'drowned', 24, 44, 'water');
+    }
     if (hostileAllowed && this.count(true) < capH) {
       const roll = Math.random();
-      const kind: MobKind = roll < 0.45 ? 'zombie' : roll < 0.75 ? 'skeleton' : 'spider';
+      const kind: MobKind = roll < 0.35 ? 'zombie' : roll < 0.6 ? 'skeleton' : roll < 0.75 ? 'spider' : roll < 0.87 ? 'tarantula' : 'slime';
       // a szörnyek a játékostól legalább 24 blokkra jönnek elő (nem a szeme előtt), és ritkán
       if (Math.random() < 0.5) {
         if (night) this.trySpawn(players, px, pz, kind, 24, 44, 'surface', py);
@@ -650,12 +697,14 @@ export class MobManager {
     const x = Math.floor(px + Math.cos(a) * r), z = Math.floor(pz + Math.sin(a) * r);
     if (!w.isLoaded(x, z)) return;
     let y: number;
-    if (where === 'surface') y = w.heightAt(x, z) + 1;
+    if (where === 'surface') y = w.heightAt(x, z) + 1 + (want === 'ghost' ? 8 + Math.floor(Math.random() * 10) : 0);
     else if (where === 'water') {
-      // tengerben: a talaj a tengerszint alatt, a polip a vízoszlop közepén
+      // tengerben: a talaj a tengerszint alatt, a polip a vízoszlop közepén, a fulladt a felszínen
       const floor = w.heightAt(x, z);
-      if (floor > SEA_LEVEL - (want === 'fish' ? 2 : 4)) return;
-      y = want === 'fish' ? floor + 1 + Math.floor(Math.random() * (SEA_LEVEL - floor - 2)) : floor + 2 + Math.floor(Math.random() * (SEA_LEVEL - floor - 3));
+      if (floor > SEA_LEVEL - (want === 'drowned' || want === 'fish' ? 2 : 4)) return;
+      if (want === 'drowned') y = SEA_LEVEL - 1;
+      else if (want === 'fish') y = floor + 1 + Math.floor(Math.random() * (SEA_LEVEL - floor - 2));
+      else y = floor + 2 + Math.floor(Math.random() * (SEA_LEVEL - floor - 3));
     } else {
       const top = w.heightAt(x, z);
       if (top < 14) return;
@@ -674,23 +723,26 @@ export class MobManager {
       const r = Math.random();
       kind = r < 0.5 ? 'cod' : r < 0.85 ? 'salmon' : 'pufferfish';
     } else kind = want;
+    if (kind === 'zombie' && biomeAt(w.seed, x, z, w.heightAt(x, z)) === 'desert') kind = 'husk';
+    if (kind === 'slime' && where === 'surface' && biomeAt(w.seed, x, z, w.heightAt(x, z)) !== 'swamp') return; // a felszínen csak mocsárban
     if (where === 'water') {
       if (fluidKind(w.getBlock(x, y, z)) !== FLUID_WATER || fluidKind(w.getBlock(x, y + 1, z)) !== FLUID_WATER) return;
       if (players.some((q) => Math.hypot(q.x - (x + 0.5), q.z - (z + 0.5)) < minR * 0.85)) return;
-      const group = MOB_DEFS[kind].fish ? 3 + Math.floor(Math.random() * 3) : 1 + Math.floor(Math.random() * 2); // a halak rajban
+      if (MOB_DEFS[kind].hostile && !this.dark(x, y, z, false)) return;
+      const group = MOB_DEFS[kind].fish ? 3 + Math.floor(Math.random() * 3) : MOB_DEFS[kind].hostile ? 1 : 1 + Math.floor(Math.random() * 2); // a halak rajban
       for (let i = 0; i < group; i++) {
         const sx = x + 0.5 + (Math.random() - 0.5) * 4, sz = z + 0.5 + (Math.random() - 0.5) * 4;
         if (fluidKind(w.getBlock(Math.floor(sx), y, Math.floor(sz))) === FLUID_WATER && !boxBlocked(w, sx, y, sz, MOB_DEFS[kind].hw, MOB_DEFS[kind].h)) this.spawn(kind, sx, y, sz).wy = 0;
       }
       return;
     }
-    if (kind === 'bat') {
-      // a denevér a barlang üres terében lebeg (nem kell talaj)
-      if (w.getBlock(x, y, z) !== 0 || w.getBlock(x, y + 1, z) !== 0 || w.heightAt(x, z) - y < 5) return;
+    if (kind === 'bat' || kind === 'ghost') {
+      // a denevér a barlang üres terében, a szellem a nyílt ég alatt lebeg (nem kell talaj)
+      if (w.getBlock(x, y, z) !== 0 || w.getBlock(x, y + 1, z) !== 0 || (kind === 'bat' && w.heightAt(x, z) - y < 5)) return;
       if (players.some((q) => Math.hypot(q.x - (x + 0.5), q.z - (z + 0.5)) < minR * 0.85)) return;
-      for (let i = 0; i < 1 + Math.floor(Math.random() * 3); i++) {
+      for (let i = 0; i < (kind === 'ghost' ? 1 : 1 + Math.floor(Math.random() * 3)); i++) {
         const sx = x + 0.5 + (Math.random() - 0.5) * 2, sz = z + 0.5 + (Math.random() - 0.5) * 2;
-        if (!boxBlocked(w, sx, y, sz, MOB_DEFS.bat.hw, MOB_DEFS.bat.h)) this.spawn('bat', sx, y, sz);
+        if (!boxBlocked(w, sx, y, sz, MOB_DEFS[kind].hw, MOB_DEFS[kind].h)) this.spawn(kind, sx, y, sz);
       }
       return;
     }
