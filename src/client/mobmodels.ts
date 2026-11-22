@@ -36,6 +36,10 @@ export interface TPart {
   child?: boolean;
   /** célzáskor ez a dőlés az x tengely körül (a csontváz íjat tartó karja) */
   aim?: number;
+  /** egyedi animáció: polipcsáp (tent), teknős mellső (fflip) és hátsó (hflip) uszonya */
+  anim?: 'tent' | 'fflip' | 'hflip';
+  /** az oldala (+1: x>0, −1: x<0) az uszonyokhoz */
+  side?: 1 | -1;
 }
 
 /** A textúrák mérete pixelben */
@@ -257,10 +261,10 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'turtle', px: [6, 5, 6], uv: [3, 0], p: [0, 3.5, -10] },
     { tex: 'turtle', px: [19, 20, 6], uv: [7, 37], p: [0, 6, 3], rot: true },
     { tex: 'turtle', px: [11, 18, 3], uv: [31, 1], p: [0, 1.5, 2], rot: true },
-    { tex: 'turtle', px: [4, 1, 10], uv: [1, 23], p: [-3.5, 1.5, 16] },
-    { tex: 'turtle', px: [4, 1, 10], uv: [1, 12], p: [3.5, 1.5, 16] },
-    { tex: 'turtle', px: [13, 1, 5], uv: [27, 30], p: [-11.5, 2.5, -3.5] },
-    { tex: 'turtle', px: [13, 1, 5], uv: [27, 24], p: [11.5, 2.5, -3.5] },
+    { tex: 'turtle', px: [4, 1, 10], uv: [1, 23], p: [-3.5, 1.5, 16], pivot: [-3.5, 1.5, 11], anim: 'hflip', side: -1 },
+    { tex: 'turtle', px: [4, 1, 10], uv: [1, 12], p: [3.5, 1.5, 16], pivot: [3.5, 1.5, 11], anim: 'hflip', side: 1 },
+    { tex: 'turtle', px: [13, 1, 5], uv: [27, 30], p: [-11.5, 2.5, -3.5], pivot: [-5, 2.5, -3.5], anim: 'fflip', side: -1 },
+    { tex: 'turtle', px: [13, 1, 5], uv: [27, 24], p: [11.5, 2.5, -3.5], pivot: [5, 2.5, -3.5], anim: 'fflip', side: 1 },
   ],
   // a denevér (64x64): vízszintes törzs, két lapos szárny (a vállukon csapkodnak), a végük a szárny gyereke
   bat: [
@@ -273,12 +277,12 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'bat', px: [10, 16, 1], uv: [42, 0], p: [-8, 10, 2], pivot: [-3, 10, 2], flap: -1, rot: true },
     { tex: 'bat', px: [8, 12, 1], uv: [24, 16], p: [-17, 10, 3], pivot: [-13, 10, 2], flap: -0.6, rot: true, child: true },
   ],
-  // a polip/tintahal (64x32): álló test, nyolc csáp a gyűrűn, kis ellentétes lengéssel
+  // a polip/tintahal (64x32): álló test, nyolc csáp a gyűrűn; a csápok együtt nyílnak (a lüktetés fázisából)
   squid: [
     { tex: 'squid', px: [12, 16, 12], uv: [0, 0], p: [0, 26, 0] },
     ...Array.from({ length: 8 }, (_, i): TPart => {
       const a = (i / 8) * Math.PI * 2;
-      return { tex: 'squid', px: [2, 18, 2], uv: [48, 0], p: [Math.cos(a) * 5, 9, Math.sin(a) * 5], pivot: [Math.cos(a) * 5, 18, Math.sin(a) * 5], swing: i % 2 ? 1.5 : -1.5 };
+      return { tex: 'squid', px: [2, 18, 2], uv: [48, 0], p: [Math.cos(a) * 5, 9, Math.sin(a) * 5], pivot: [Math.cos(a) * 5, 18, Math.sin(a) * 5], ry: -(a + Math.PI / 2), anim: 'tent' };
     }),
   ],
   // a szellem (64x64): lapos test, fej, két szárny (vállon csapkodnak, a végük a gyerekük), farok
