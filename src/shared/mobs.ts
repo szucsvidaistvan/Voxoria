@@ -32,6 +32,8 @@ export interface MobDef {
   fly?: boolean;
   /** vízi: csak vízben él, ott lebeg; szárazon fuldoklik (polip) */
   swim?: boolean;
+  /** kétéltű: szárazon jár, vízben úszik (teknős) */
+  amph?: boolean;
 }
 
 export const MOB_DEFS: Record<MobKind, MobDef> = {
@@ -51,7 +53,7 @@ export const MOB_DEFS: Record<MobKind, MobDef> = {
   llama: { name: 'Llama', hostile: false, hp: 22, speed: 1.8, hw: 0.45, h: 1.9, variants: 3 },
   donkey: { name: 'Donkey', hostile: false, hp: 20, speed: 2.0, hw: 0.6, h: 1.45 },
   mule: { name: 'Mule', hostile: false, hp: 24, speed: 2.1, hw: 0.6, h: 1.5 },
-  turtle: { name: 'Turtle', hostile: false, hp: 6, speed: 0.7, hw: 0.5, h: 0.45 },
+  turtle: { name: 'Turtle', hostile: false, hp: 6, speed: 0.7, hw: 0.5, h: 0.45, amph: true },
   bat: { name: 'Bat', hostile: false, hp: 6, speed: 3, hw: 0.25, h: 0.6, fly: true },
   squid: { name: 'Squid', hostile: false, hp: 10, speed: 1.2, hw: 0.45, h: 0.95, swim: true },
 };
@@ -156,6 +158,8 @@ export class Mob {
   variant = 0;
   /** lebegő mobnál a kívánt magasság (a ténylegesen tartott y) */
   wy = 0;
+  /** polip: a lüktetés fázisa (0..1), ciklushossza (mp), pillanatnyi tolóereje (0..1) és az úszás iránya */
+  swPh = 0; swCycle = 4; swSpd = 0; swX = 1; swY = 0; swZ = 0;
 
   constructor(readonly kind: MobKind, x: number, y: number, z: number) {
     this.def = MOB_DEFS[kind];
@@ -225,7 +229,7 @@ function physics(world: World, m: Mob, dt: number): void {
   if (fluidKind(body) === FLUID_LAVA) m.hp -= 4 * dt; // a láva árt
 
   // a vízszintes sebesség a kívánt felé tart (a lökés így fokozatosan elhal)
-  const a = Math.min(1, dt * (m.onGround ? 9 : 2.5));
+  const a = Math.min(1, dt * (m.onGround ? 9 : m.def.swim || (m.def.amph && m.inWater) ? 5 : 2.5));
   m.vx += (m.wx - m.vx) * a;
   m.vz += (m.wz - m.vz) * a;
 
@@ -237,7 +241,8 @@ function physics(world: World, m: Mob, dt: number): void {
     else if (m.def.swim) {
       if (m.inWater) m.vy += (m.wy - m.vy) * Math.min(1, hh * 3);
       else m.vy = Math.max(m.vy - GRAVITY * hh, -50); // szárazon leesik
-    } else if (m.inWater) m.vy = Math.max(m.vy - 6 * hh, -2) + (m.vy < 1.2 ? 14 * hh : 0); // lassan feljön a felszínre
+    } else if (m.inWater && m.def.amph) m.vy += (m.wy - m.vy) * Math.min(1, hh * 3); // a teknős úszik
+    else if (m.inWater) m.vy = Math.max(m.vy - 6 * hh, -2) + (m.vy < 1.2 ? 14 * hh : 0); // lassan feljön a felszínre
     else if (m.climb) m.vy = CLIMB; // a pók a falon felmászik (a gravitáció nem húzza vissza)
     else m.vy = Math.max(m.vy - GRAVITY * hh, m.kind === 'chicken' || m.kind === 'parrot' ? -2.2 : -50);
     const nx = m.x + m.vx * hh;
@@ -318,6 +323,7 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
   const dy = pl ? pl.y - m.y : 0;
 
   if (isFloater(def)) { floatStep(world, m, dt, pl, dist); return; }
+  if (def.amph && m.inWater) { turtleSwim(world, m, dt); return; }
 
   const aggressive = m.angry || (def.hostile && !(m.kind === 'spider' && ctx.day));
   if (aggressive && pl && dist < 24 && Math.abs(dy) < 12) {
@@ -373,10 +379,75 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
   } else { priv.wx = 0; priv.wz = 0; }
 }
 
+/**
+ * A polip úszása: Minecraft-szerű lüktetés. Egy ciklus első felében a csápok kinyílnak, a nyitás végén (a ciklus 37–50%-ánál)
+ * sugárhajtás-lökés jön a választott irányba (tolóerő 1), utána a tolóerő gyorsan elhal; közben lassan süllyed.
+ * A ciklus fázisát a `variant` mezőben küldjük a vendégeknek (0..255), a csápok animációja ebből számolódik.
+ */
+function squidStep(world: World, m: Mob, dt: number): void {
+  if (m.panicT > 0) {
+    m.panicT -= dt;
+    const [fx, fz] = forward(m.panicYaw);
+    m.swX = fx; m.swZ = fz; m.swY = 0.1; m.swSpd = 1;
+  } else {
+    m.swPh += dt / m.swCycle;
+    if (m.swPh >= 1) {
+      m.swPh -= 1;
+      m.swCycle = 3 + Math.random() * 3;
+      const a = Math.random() * Math.PI * 2;
+      m.swX = Math.cos(a); m.swZ = Math.sin(a); m.swY = Math.random() - 0.5;
+    }
+    const f = m.swPh * 2;
+    if (f > 0.75 && f < 1) m.swSpd = 1;
+    else m.swSpd *= Math.pow(0.9, dt * 20);
+  }
+  m.variant = Math.min(255, Math.floor(m.swPh * 256));
+  // ha a haladási irányban nincs víz, megfordul (a lökés a másik irányba visz)
+  const nb = world.getBlock(Math.floor(m.x + m.swX * 1.0), Math.floor(m.y + m.def.h * 0.5), Math.floor(m.z + m.swZ * 1.0));
+  if (fluidKind(nb) !== FLUID_WATER) { m.swX = -m.swX; m.swZ = -m.swZ; }
+  const k = m.panicT > 0 ? 6 : 4;
+  m.wx = m.swX * k * m.swSpd;
+  m.wz = m.swZ * k * m.swSpd;
+  m.wy = m.swY * k * m.swSpd - 0.3 * (1 - m.swSpd);
+  const above = world.getBlock(Math.floor(m.x), Math.floor(m.y + m.def.h + 0.4), Math.floor(m.z));
+  if (fluidKind(above) !== FLUID_WATER && m.wy > 0) m.wy = -0.3;
+  if (m.swSpd > 0.15) {
+    // a test a haladás irányába fordul
+    const target = Math.atan2(-m.swX, -m.swZ);
+    let d = target - m.yaw;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    m.yaw += d * Math.min(1, dt * 4);
+  }
+}
+
+/** A teknős úszása vízben: lassú, egyenletes 3D-s kószálás, a víz alatt marad (a felszínt és a partot kerüli) */
+function turtleSwim(world: World, m: Mob, dt: number): void {
+  const def = m.def;
+  if (m.panicT > 0) { m.panicT -= dt; m.yaw = m.panicYaw; }
+  else {
+    m.wanderT -= dt;
+    if (m.wanderT <= 0) {
+      m.wanderT = 2 + Math.random() * 4;
+      m.idle = Math.random() < 0.2;
+      m.yaw = Math.random() * Math.PI * 2;
+      m.wy = (Math.random() - 0.55) * 0.9;
+    }
+  }
+  const sp = def.speed * (m.panicT > 0 ? 1.8 : 1.2);
+  const [fx, fz] = forward(m.yaw);
+  const nb = world.getBlock(Math.floor(m.x + fx * 0.9), Math.floor(m.y + def.h * 0.5), Math.floor(m.z + fz * 0.9));
+  if (fluidKind(nb) !== FLUID_WATER) { m.yaw += Math.PI * (0.6 + Math.random() * 0.8); m.wanderT = 1.5; m.wx = 0; m.wz = 0; return; }
+  m.wx = m.idle && m.panicT <= 0 ? 0 : fx * sp;
+  m.wz = m.idle && m.panicT <= 0 ? 0 : fz * sp;
+  const above = world.getBlock(Math.floor(m.x), Math.floor(m.y + def.h + 0.5), Math.floor(m.z));
+  if (fluidKind(above) !== FLUID_WATER && m.wy > 0) m.wy = -0.3;
+}
+
 /** Lebegő mobok (denevér, polip) AI-ja: lassan kószál, közben magasságot vált; sebzéskor menekül. A kívánt irányt és magasságot (wx, wz, wy) adja. */
 function floatStep(world: World, m: Mob, dt: number, pl: MobPlayer | null, dist: number): void {
   const def = m.def;
   const swim = !!def.swim;
+  if (m.kind === 'squid') { squidStep(world, m, dt); return; }
   if (m.panicT > 0) {
     m.panicT -= dt;
     m.yaw = m.panicYaw;
@@ -421,7 +492,7 @@ function dropAhead(world: World, m: Mob, fx: number, fz: number): boolean {
     const id = world.getBlock(x, y - d, z);
     if (isSolid(id)) return false;
     if (fluidKind(id) === FLUID_LAVA) return true;
-    if (fluidKind(id) === FLUID_WATER) return true;
+    if (fluidKind(id) === FLUID_WATER) return !m.def.amph; // a teknős bemegy a vízbe
   }
   return true;
 }

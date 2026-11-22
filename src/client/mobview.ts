@@ -20,7 +20,7 @@ interface View {
   root: THREE.Group;
   /** a lény anyagai (a textúrázottak textúránként egy; a színes részeké `plain`); mind kapja a napszak-színezést */
   mats: THREE.MeshBasicMaterial[];
-  limbs: { g: THREE.Group; swing: number; tilt: number; flap: number; aim: number; rz: number; ry: number; wag: number; lift: number }[];
+  limbs: { g: THREE.Group; swing: number; tilt: number; flap: number; aim: number; rz: number; ry: number; wag: number; lift: number; anim?: TPart['anim']; side: number }[];
   /** az íj (a csontváz kezében): a mob célzás-állapotához */
   bow?: THREE.Mesh;
   /** egy rész hozzáadása a modellhez; visszaadja az eltávolítóját */
@@ -85,7 +85,7 @@ function buildView(kind: string, scene: THREE.Scene, base: string): View {
       return m;
     };
     /** a rész a (pivot) csomóponton lóg, a doboz a közepénél van */
-    const attach = (mesh: THREE.Mesh, p: V3, pivot: V3 | undefined, tilt: number | undefined, swing: number | undefined, flap: number | undefined, aim?: number, st?: { rz?: number; ry?: number; wag?: number; lift?: number }, parent?: THREE.Group): THREE.Group | undefined => {
+    const attach = (mesh: THREE.Mesh, p: V3, pivot: V3 | undefined, tilt: number | undefined, swing: number | undefined, flap: number | undefined, aim?: number, st?: { rz?: number; ry?: number; wag?: number; lift?: number; anim?: TPart['anim']; side?: number }, parent?: THREE.Group): THREE.Group | undefined => {
       mesh.frustumCulled = false;
       if (pivot || tilt || st?.rz || st?.ry) {
         const pv = pivot ?? p;
@@ -98,7 +98,7 @@ function buildView(kind: string, scene: THREE.Scene, base: string): View {
         const rz = st?.rz ?? 0, ry = st?.ry ?? 0;
         g.rotation.z = rz;
         g.rotation.y = ry;
-        if (swing !== undefined || flap !== undefined || tilt || rz || ry) limbs.push({ g, swing: swing ?? 0, tilt: tilt ?? 0, flap: flap ?? 0, aim: aim ?? tilt ?? 0, rz, ry, wag: st?.wag ?? 0, lift: st?.lift ?? 0 });
+        if (swing !== undefined || flap !== undefined || tilt || rz || ry || st?.anim) limbs.push({ g, swing: swing ?? 0, tilt: tilt ?? 0, flap: flap ?? 0, aim: aim ?? tilt ?? 0, rz, ry, wag: st?.wag ?? 0, lift: st?.lift ?? 0, anim: st?.anim, side: st?.side ?? 1 });
         return g;
       }
       mesh.position.set(...p);
@@ -189,11 +189,55 @@ export function createMobView(scene: THREE.Scene, base: string = import.meta.env
         const hop = m.kind === 'rabbit' && m.onGround ? Math.abs(Math.sin(m.walk * 3.2)) * 0.2 * Math.min(1, Math.hypot(m.vx, m.vz) / 1.5) : 0;
         v.root.position.set(m.x, m.y + hop, m.z);
         v.root.rotation.y = m.yaw;
+        const dtv = Math.min(0.1, Math.max(0, time - ((v.root.userData.t as number | undefined) ?? time)));
+        v.root.userData.t = time;
+        if (m.kind === 'squid' && !m.dead) {
+          // a test a haladás irányába dől (a csápok húzódnak utána), lassan áll vissza függőlegesbe; a test közepe körül
+          const th = Math.atan2(Math.hypot(m.vx, m.vz), Math.max(0.4, 1.5 + m.vy * 0.5));
+          const prev = (v.root.userData.th as number | undefined) ?? 0;
+          const cur = prev + (th - prev) * Math.min(1, dtv * 5);
+          v.root.userData.th = cur;
+          v.root.rotation.order = 'YXZ';
+          v.root.rotation.set(-cur, m.yaw, 0);
+          const c = new THREE.Vector3(0, 0.55, 0);
+          const rc = c.clone().applyQuaternion(v.root.quaternion);
+          v.root.position.set(m.x + c.x - rc.x, m.y + c.y - rc.y, m.z + c.z - rc.z);
+        } else if (m.kind === 'turtle' && m.inWater && !m.dead) {
+          // vízben az orra a mozgás irányába billen
+          const want = Math.max(-0.5, Math.min(0.5, m.vy * 0.5));
+          const prev = (v.root.userData.th as number | undefined) ?? 0;
+          const cur = prev + (want - prev) * Math.min(1, dtv * 4);
+          v.root.userData.th = cur;
+          v.root.rotation.order = 'YXZ';
+          v.root.rotation.set(cur, m.yaw, 0);
+        }
 
         // járás: a lábak a megtett úttal lendülnek, a szárnyak csapkodnak, ha a csirke a levegőben van
         const speed = Math.min(1, Math.hypot(m.vx, m.vz, m.climb ? m.vy : 0) / 2.5);
         const sw = Math.sin(m.walk * 3.2) * 0.85 * speed;
         for (const l of v.limbs) {
+          if (l.anim === 'tent') {
+            // a polipcsápok együtt nyílnak a lüktetés fázisa szerint (Minecraft: sin(f²π)·π/4 a ciklus első felében), majd lecsukódnak
+            const rot = ((m.variant + 0.5) / 256) * Math.PI * 2;
+            const f = rot / Math.PI;
+            l.g.rotation.order = 'YXZ';
+            l.g.rotation.set(rot < Math.PI ? Math.sin(f * f * Math.PI) * Math.PI * 0.25 : 0, l.ry, 0);
+            continue;
+          }
+          if (l.anim) {
+            // a teknős uszonyai: szárazon kúsznak (mellső: legyezés, hátsó: lépés), vízben csapkodnak
+            const sp = Math.min(1, Math.hypot(m.vx, m.vz) / 0.5);
+            const ph = m.walk * 2.2 + (l.side > 0 ? 0 : Math.PI);
+            if (m.inWater) {
+              const stroke = Math.sin(time * 5 + (l.anim === 'hflip' ? 1.2 : 0));
+              l.g.rotation.set(0, l.anim === 'fflip' ? -l.side * 0.35 * stroke * (0.4 + 0.6 * sp) : 0, l.side * (l.anim === 'fflip' ? 0.7 : 0.25) * stroke * (0.5 + 0.5 * sp));
+            } else if (l.anim === 'fflip') {
+              l.g.rotation.set(0, l.side * Math.sin(ph) * 0.8 * sp, 0);
+            } else {
+              l.g.rotation.set(Math.sin(ph + Math.PI) * 0.5 * sp, 0, 0);
+            }
+            continue;
+          }
           l.g.rotation.x = (m.aim > 0 ? l.aim : l.tilt) + (m.aim > 0 ? 0 : sw * l.swing);
           if (l.flap) l.g.rotation.z = l.flap * (m.onGround ? 0.1 : 0.9 + Math.sin(time * 30) * 0.5);
           if (l.lift) {

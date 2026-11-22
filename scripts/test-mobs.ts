@@ -52,5 +52,24 @@ ok(mobDrops('rabbit', () => 0.99).some((d) => d.id === EXTRA_ID.rabbit), 'a nyú
   for (let i = 0; i < 60 * 8; i++) mm.update(1 / 60, ctx);
   ok(dry.hp < dry.def.hp, 'a szárazra vetett polip sérül');
   ok(mm.count(false) === 0, 'a lebegő mobok nem számítanak a szárazföldi állatok közé');
+  // polip: lüktetve úszik (lökések és szinte megállás váltják egymást), a fázis a variantban van
+  const sq2 = mm.spawn('squid', 0, 103, 0);
+  let vMax = 0, vMin = 99, phMin = 999, phMax = -1;
+  for (let i = 0; i < 60 * 40; i++) {
+    mm.update(1 / 60, ctx);
+    if (i > 60 * 8) { const v = Math.hypot(sq2.vx, sq2.vz); vMax = Math.max(vMax, v); vMin = Math.min(vMin, v); }
+    phMin = Math.min(phMin, sq2.variant); phMax = Math.max(phMax, sq2.variant);
+  }
+  ok(vMax > 2 && vMin < 0.6, `a polip lüktetve úszik (sebesség ${vMin.toFixed(2)}..${vMax.toFixed(2)} b/s)`);
+  ok(phMax > 200 && phMin < 20, 'a lüktetés fázisa a variantban halad');
+  // teknős: vízben úszik (nem a felszínre lebeg), szárazon jár
+  const tu = mm.spawn('turtle', -3, 102, 3);
+  let ty0 = 999, ty1 = -999, tmoved = 0;
+  for (let i = 0; i < 60 * 30; i++) {
+    mm.update(1 / 60, ctx);
+    ty0 = Math.min(ty0, tu.y); ty1 = Math.max(ty1, tu.y); tmoved = Math.max(tmoved, Math.hypot(tu.x + 3, tu.z - 3));
+  }
+  ok(!tu.dead && tmoved > 2, `a teknős vízben mozog (${tmoved.toFixed(1)} blokk)`);
+  ok(tu.inWater || tu.y > 100, 'a teknős a víztartályban vagy a parton marad');
 }
 if (fails) { console.error(fails, 'hiba'); process.exit(1); }

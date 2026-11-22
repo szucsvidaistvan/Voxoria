@@ -13,11 +13,14 @@ for (let dx = -3; dx <= 10; dx++) for (let dz = -6; dz <= 6; dz++) await t.setBl
 const files = [];
 for (let i = 0; i < specs.length; i++) {
   const s = specs[i];
+  if (process.env.WATER) await t.page.evaluate(() => { window.__water = true; });
   const h = await t.page.evaluate(([s, X, Y, Z]) => {
     const v = window.__voxoria;
     for (const m of [...v.mobs.mobs]) v.mobs.mobs.splice(v.mobs.mobs.indexOf(m), 1);
     const m = v.mobs.spawn(s.k, X + 0.5, Y + 1, Z + 0.5);
     m.noAI = true; m.wanderT = 1e9; m.idle = true; m.hp = 999; m.yaw = s.yaw; if (s.v !== undefined) m.variant = s.v;
+    if (m.kind === 'squid') { m.swPh = (s.v || 0) / 256; m.swCycle = 1e9; m.swSpd = 0; }
+    if (window.__water) for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (let dy = 0; dy <= 3; dy++) v.setBlock(X + dx, Y + dy, Z + dz, 9);
     return m.def.h;
   }, [s, X, Y, Z]);
   const d = Number(process.env.DIST) || Math.min(10, 2.6 + h * 2.6);
