@@ -72,6 +72,24 @@ ok(mobDrops('rabbit', () => 0.99).some((d) => d.id === EXTRA_ID.rabbit), 'a nyú
     ok(d0 > 2.5, `a hal elmenekül a játékos elől (${d0.toFixed(1)} blokk)`);
     ok(mobDrops('cod', () => 0).some((d) => d.n > 0) && mobDrops('salmon', () => 0).length === 1, 'a halak ejtenek (hal)');
     ok(mm.count(false) === 0 && mm.countFish() >= 3, 'a halak nem számítanak a szárazföldi állatok közé');
+    // gömbhal: ha ember vagy más hal a közelében van, felfúvódik (variant=1) és érintésre sebez; távolabb visszafogy
+    const pf = mm.spawn('pufferfish', 0.5, 102, 0.5);
+    const far = { players: [{ x: 10, y: 102, z: 10, target: true, hurt: () => {} }], day: true, onDie: () => {} };
+    for (let i = 0; i < 60; i++) mm.update(1 / 60, far);
+    ok(pf.variant === 0, 'a gömbhal nyugodtan kicsi, ha nincs a közelben senki');
+    let pdmg = 0;
+    const pl1 = { x: pf.x + 1.2, y: 101.1, z: pf.z, target: true, hurt: () => { pdmg++; } };
+    mm.update(1 / 60, { players: [pl1], day: true, onDie: () => {} });
+    ok(pf.variant === 1, 'a gömbhal felfúvódik az ember közelében');
+    const pl2 = { x: pf.x + 0.4, y: 101.1, z: pf.z, target: true, hurt: () => { pdmg++; } };
+    mm.update(1 / 60, { players: [pl2], day: true, onDie: () => {} });
+    ok(pdmg >= 1 && pdmg <= 2, 'a felfúvódott gömbhal érintésre sebez (nem minden tickben)');
+    for (let i = 0; i < 60 * 6; i++) mm.update(1 / 60, far);
+    ok(pf.variant === 0, 'a veszély elmúltával a gömbhal visszafogy');
+    const other = mm.spawn('cod', pf.x + 1, pf.y, pf.z);
+    for (let i = 0; i < 5; i++) mm.update(1 / 60, far);
+    ok(pf.variant === 1, 'a gömbhal más hal közelében is felfúvódik');
+    mm.mobs.splice(mm.mobs.indexOf(other), 1); mm.mobs.splice(mm.mobs.indexOf(pf), 1);
     // fal mellett nem vibrál: a fal felé néző hal ritkán fordul (nem minden tickben új irány)
     const wf = mm.spawn('cod', 5.2, 102, 0);
     wf.yaw = -Math.PI / 2; // +x felé néz, a tartály fala x=6.5-nél van

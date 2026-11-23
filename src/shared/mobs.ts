@@ -184,6 +184,8 @@ export class Mob {
   swPh = 0; swCycle = 4; swSpd = 0; swX = 1; swY = 0; swZ = 0;
   /** nyálka: ugrás utáni várakozás és az ugrás iránya */
   hopT = 0; hx = 0; hz = 0;
+  /** gömbhal: ennyi ideig marad még felfúvódva (mp) */
+  puffT = 0;
 
   constructor(readonly kind: MobKind, x: number, y: number, z: number) {
     this.def = MOB_DEFS[kind];
@@ -500,7 +502,7 @@ function fishStep(world: World, m: Mob, dt: number, pl: MobPlayer | null, dist: 
     m.panicT -= dt;
     m.yaw = m.panicYaw;
     sp = def.speed * 1.8;
-  } else if (pl && dist < 3.5) {
+  } else if (pl && dist < 3.5 && m.kind !== 'pufferfish') { // a gömbhal nem menekül, felfúvódik
     m.panicT = 0.8;
     m.panicYaw = Math.atan2(m.x - pl.x, m.z - pl.z) + Math.PI + (Math.random() - 0.5) * 0.8;
   } else {
@@ -513,6 +515,7 @@ function fishStep(world: World, m: Mob, dt: number, pl: MobPlayer | null, dist: 
     }
     if (m.idle) sp = 0;
   }
+  if (m.variant && m.kind === 'pufferfish') sp *= 0.4; // felfúvódva lomha
   const [fx, fz] = forward(m.yaw);
   // a haladási irányban (a testméretnél kicsit előrébb) víz kell, különben megáll/elfordul
   const ax = m.x + fx * (def.hw + 0.5), az = m.z + fz * (def.hw + 0.5);
@@ -672,6 +675,31 @@ export class MobManager {
     return m;
   }
 
+  /**
+   * A gömbhal védekezése: ha ember vagy bármely más (nem gömbhal) mob a közelébe ér, felfúvódik (variant = 1, ~4 mp-ig),
+   * és ilyenkor érintésre sebez (a játékost); felfúvódva lassabb és nem menekül.
+   */
+  private pufferStep(m: Mob, dt: number, ctx: MobCtx): void {
+    let threat = false;
+    for (const p of ctx.players) if (Math.hypot(p.x - m.x, p.z - m.z) < 3.2 && Math.abs(p.y + 0.9 - m.y) < 2.5) { threat = true; break; }
+    if (!threat) {
+      for (const o of this.mobs) {
+        if (o === m || o.dead || o.kind === 'pufferfish') continue;
+        if (Math.hypot(o.x - m.x, o.z - m.z) < 2.6 && Math.abs(o.y - m.y) < 2) { threat = true; break; }
+      }
+    }
+    m.puffT = threat ? 4 : Math.max(0, m.puffT - dt);
+    m.variant = m.puffT > 0 ? 1 : 0;
+    if (m.variant && m.atkCd <= 0) {
+      for (const p of ctx.players) {
+        if (!p.target || Math.hypot(p.x - m.x, p.z - m.z) > m.def.hw + 0.7 || Math.abs(p.y + 0.9 - m.y) > 1.3) continue;
+        p.hurt(1, m.x, m.z);
+        m.atkCd = 1.5;
+        break;
+      }
+    }
+  }
+
   update(dt: number, ctx: MobCtx): void {
     this.updateArrows(dt, ctx);
     for (let i = this.mobs.length - 1; i >= 0; i--) {
@@ -684,6 +712,7 @@ export class MobManager {
       if (m.def.hostile && !m.dead && far > 40 && Math.random() < dt * 0.1) { this.mobs.splice(i, 1); continue; }
       if (!this.world.isLoaded(m.x, m.z)) continue; // betöltetlen terepen megállnak
       m.hurtT = Math.max(0, m.hurtT - dt);
+      if (m.kind === 'pufferfish' && !m.dead) this.pufferStep(m, dt, ctx);
 
       if (m.dead) {
         m.deadT += dt;
