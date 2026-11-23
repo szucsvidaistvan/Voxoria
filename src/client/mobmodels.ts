@@ -6,7 +6,7 @@ import { boxGeom, type BoxGeom } from './boxuv';
  */
 export type ArmorTex = `armor_${'leather' | 'iron' | 'golden' | 'diamond'}_${1 | 2}`;
 export type TexName = 'pig' | 'cow' | 'sheep' | 'sheep_fur' | 'chicken' | 'player' | 'skeleton' | 'zombie' | 'wolf' | 'wolf_angry' | 'spider' | 'polarbear' | 'horse'
-  | 'rabbit_brown' | 'cat_ocelot' | 'parrot_blue' | 'llama_brown' | 'donkey' | 'mule' | 'turtle' | 'bat' | 'squid' | 'husk' | 'drowned' | 'tarantula' | 'ghost' | 'slime' | ArmorTex;
+  | 'rabbit_brown' | 'cat_ocelot' | 'parrot_blue' | 'llama_brown' | 'donkey' | 'mule' | 'turtle' | 'bat' | 'squid' | 'husk' | 'drowned' | 'tarantula' | 'ghost' | 'slime' | 'fish_cod' | 'fish_salmon' | 'fish_puffer' | ArmorTex;
 
 export interface TPart {
   tex: TexName;
@@ -48,6 +48,7 @@ export const TEX_SIZE = {
   wolf: [64, 32], wolf_angry: [64, 32], spider: [64, 32], polarbear: [128, 64], horse: [64, 64],
   rabbit_brown: [64, 32], cat_ocelot: [64, 32], parrot_blue: [32, 32], llama_brown: [128, 64], donkey: [64, 64], mule: [64, 64], turtle: [128, 64], bat: [64, 64], squid: [64, 32],
   husk: [64, 64], drowned: [64, 64], tarantula: [64, 32], ghost: [64, 64], slime: [64, 32],
+  fish_cod: [32, 32], fish_salmon: [32, 32], fish_puffer: [32, 32],
 } as Record<TexName, [number, number]>;
 for (const m of ['leather', 'iron', 'golden', 'diamond']) for (const l of [1, 2]) TEX_SIZE[`armor_${m}_${l}` as ArmorTex] = [64, 32];
 
@@ -277,6 +278,37 @@ export const TEXTURED: Partial<Record<string, TPart[]>> = {
     { tex: 'bat', px: [10, 16, 1], uv: [42, 0], p: [-8, 10, 2], pivot: [-3, 10, 2], flap: -1, rot: true },
     { tex: 'bat', px: [8, 12, 1], uv: [24, 16], p: [-17, 10, 3], pivot: [-13, 10, 2], flap: -0.6, rot: true, child: true },
   ],
+  // a tőkehal (32x32): test, kétrészes fej, hasi és hátúszó, két mellúszó, a farok csapkod
+  cod: [
+    { tex: 'fish_cod', px: [2, 4, 7], uv: [0, 0], p: [0, 2, -1] },
+    { tex: 'fish_cod', px: [0.01, 1, 6], uv: [20, -6], p: [0, 4.5, -2.5] },
+    { tex: 'fish_cod', px: [0.01, 1, 2], uv: [22, -1], p: [0, -0.5, -1.5] },
+    { tex: 'fish_cod', px: [2, 3, 1], uv: [0, 0], p: [0, 2.5, -8] },
+    { tex: 'fish_cod', px: [2, 4, 3], uv: [11, 0], p: [0, 2, -6] },
+    { tex: 'fish_cod', px: [2, 1, 2], uv: [24, 4], p: [2, 0.5, -4.5], pivot: [1, 1, -5.5], rz: -0.61 },
+    { tex: 'fish_cod', px: [2, 1, 2], uv: [24, 1], p: [-2, 0.5, -4.5], pivot: [-1, 1, -5.5], rz: 0.61 },
+    { tex: 'fish_cod', px: [0.01, 4, 6], uv: [20, 1], p: [0, 2, 5.5], pivot: [0, 2, 2.5], wag: 0.7 },
+  ],
+  // a lazac (32x32): hosszú, kétrészes test (a hátsó fele és a farok csapkod), hátúszók, fej, mellúszók
+  salmon: [
+    { tex: 'fish_salmon', px: [3, 5, 8], uv: [0, 0], p: [0, 6, -5.5] },
+    { tex: 'fish_salmon', px: [3, 5, 8], uv: [0, 13], p: [0, 6, 2.5], pivot: [0, 6, -1.5], wag: 0.3 },
+    { tex: 'fish_salmon', px: [0.01, 5, 6], uv: [20, 10], p: [0, 6, 9.5], pivot: [0, 6, 6.5], wag: 0.5, child: true },
+    { tex: 'fish_salmon', px: [0.01, 2, 2], uv: [4, 2], p: [0, 9.5, -2.5] },
+    { tex: 'fish_salmon', px: [0.01, 2, 3], uv: [2, 3], p: [0, 9.5, 0] },
+    { tex: 'fish_salmon', px: [2, 4, 3], uv: [22, 0], p: [0, 6.5, -11] },
+    { tex: 'fish_salmon', px: [2, 0.01, 2], uv: [2, 0], p: [2, 4.2, -8.5], pivot: [1.5, 4.2, -8.5], rz: -0.6 },
+    { tex: 'fish_salmon', px: [2, 0.01, 2], uv: [-2, 0], p: [-2, 4.2, -8.5], pivot: [-1.5, 4.2, -8.5], rz: 0.6 },
+  ],
+  // a gömbhal (32x32, kicsi alak): test, két szem, csapkodó farok és mellúszók
+  pufferfish: [
+    { tex: 'fish_puffer', px: [3, 2, 3], uv: [0, 27], p: [0, 1, 0] },
+    { tex: 'fish_puffer', px: [1, 1, 1], uv: [24, 6], p: [1, 2.5, -1] },
+    { tex: 'fish_puffer', px: [1, 1, 1], uv: [28, 6], p: [-1, 2.5, -1] },
+    { tex: 'fish_puffer', px: [3, 0.01, 3], uv: [-3, 0], p: [0, 1, 3], pivot: [0, 1, 1.5], wag: 0.8 },
+    { tex: 'fish_puffer', px: [1, 1, 2], uv: [25, 0], p: [2, 0.5, -0.5], pivot: [1.5, 0.5, -0.5], flap: 0.5 },
+    { tex: 'fish_puffer', px: [1, 1, 2], uv: [25, 0], p: [-2, 0.5, -0.5], pivot: [-1.5, 0.5, -0.5], flap: -0.5 },
+  ],
   // a polip/tintahal (64x32): álló test, nyolc csáp a gyűrűn; a csápok együtt nyílnak (a lüktetés fázisából)
   squid: [
     { tex: 'squid', px: [12, 16, 12], uv: [0, 0], p: [0, 26, 0] },
@@ -321,7 +353,7 @@ for (const t of ['donkey', 'mule'] as const) {
 }
 
 /** A modell mérete a ló modelljéhez képest (a szamár és az öszvér kisebb) */
-export const MODEL_SCALE: Partial<Record<string, number>> = { donkey: 0.88, mule: 0.94, bat: 0.3, squid: 0.5, ghost: 0.7, slime: 2.1, slimelet: 1.05, tarantula: 0.6 };
+export const MODEL_SCALE: Partial<Record<string, number>> = { donkey: 0.88, mule: 0.94, bat: 0.3, squid: 0.5, ghost: 0.7, slime: 2.1, slimelet: 1.05, tarantula: 0.6, pufferfish: 1.6 };
 
 /** Színezés: a szürke (színezésre szánt) skinek szorzószíne */
 export const TINT: Partial<Record<string, number>> = { tarantula: 0x4fb0a8 };

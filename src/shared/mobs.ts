@@ -11,7 +11,7 @@ import { biomeAt } from './worldgen';
 
 export type MobKind = 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'skeleton' | 'wolf' | 'polarbear' | 'horse' | 'spider'
   | 'rabbit' | 'cat' | 'parrot' | 'llama' | 'donkey' | 'mule' | 'turtle' | 'bat' | 'squid'
-  | 'husk' | 'drowned' | 'tarantula' | 'ghost' | 'slime' | 'slimelet';
+  | 'husk' | 'drowned' | 'tarantula' | 'ghost' | 'slime' | 'slimelet' | 'cod' | 'salmon' | 'pufferfish';
 
 export interface MobDef {
   name: string;
@@ -37,6 +37,8 @@ export interface MobDef {
   amph?: boolean;
   /** ugrálva halad (nyálka) */
   hop?: boolean;
+  /** hal: csoportban úszik, a horgászcsalihoz úszik, a játékos elől elmenekül */
+  fish?: boolean;
 }
 
 export const MOB_DEFS: Record<MobKind, MobDef> = {
@@ -64,6 +66,9 @@ export const MOB_DEFS: Record<MobKind, MobDef> = {
   ghost: { name: 'Ghost', hostile: true, hp: 12, speed: 3.2, hw: 0.45, h: 0.5, dmg: 3, fly: true },
   slime: { name: 'Slime', hostile: true, hp: 16, speed: 2.6, hw: 0.4, h: 0.8, dmg: 3, hop: true },
   slimelet: { name: 'Slimelet', hostile: true, hp: 4, speed: 2.8, hw: 0.2, h: 0.4, dmg: 1, hop: true },
+  cod: { name: 'Cod', hostile: false, hp: 3, speed: 1.6, hw: 0.25, h: 0.3, swim: true, fish: true },
+  salmon: { name: 'Salmon', hostile: false, hp: 3, speed: 1.8, hw: 0.3, h: 0.35, swim: true, fish: true },
+  pufferfish: { name: 'Pufferfish', hostile: false, hp: 3, speed: 1.0, hw: 0.25, h: 0.3, swim: true, fish: true },
   squid: { name: 'Squid', hostile: false, hp: 10, speed: 1.2, hw: 0.45, h: 0.95, swim: true },
 };
 // a lóból több színváltozat van
@@ -98,6 +103,9 @@ export function mobDrops(kind: MobKind, rand: () => number = Math.random): { id:
     case 'tarantula': add(EXTRA_ID.string, r(0, 2)); break;
     case 'zombie': add(I.ROTTEN_FLESH, r(0, 2)); add(EXTRA_ID.carrot, r(0, 39) === 0 ? 1 : 0); add(EXTRA_ID.potato, r(0, 39) === 0 ? 1 : 0); break; // ritkán murok/krumpli is (2,5%)
     case 'spider': add(EXTRA_ID.string, r(0, 2)); break;
+    case 'cod': add(EXTRA_ID.cod, 1); break;
+    case 'salmon': add(EXTRA_ID.salmon, 1); break;
+    case 'pufferfish': add(EXTRA_ID.bone, r(0, 1)); break;
     case 'horse': case 'donkey': case 'mule': case 'llama': add(EXTRA_ID.leather, r(0, 2)); break;
     case 'rabbit': add(EXTRA_ID.rabbit, r(0, 1)); add(EXTRA_ID.leather, r(0, 1)); break;
     case 'cat': add(EXTRA_ID.string, r(0, 2)); break;
@@ -300,6 +308,8 @@ export interface MobCtx {
   /** süt a nap (a zombik égnek) */
   day: boolean;
   onDie(m: Mob): void;
+  /** a vízbe dobott horgászcsali (a halak odaúsznak) */
+  lure?: { x: number; y: number; z: number } | null;
 }
 
 /** A mobhoz legközelebbi támadható játékos (vagy null) és a vízszintes távolsága. */
@@ -338,7 +348,7 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
   const dist = near?.dist ?? Infinity;
   const dy = pl ? pl.y - m.y : 0;
 
-  if (isFloater(def)) { floatStep(world, m, dt, pl, dist); return; }
+  if (isFloater(def)) { floatStep(world, m, dt, pl, dist, ctx.lure ?? null); return; }
   if (def.amph && m.inWater) { turtleSwim(world, m, dt); return; }
 
   const aggressive = m.angry || (def.hostile && !(isSpider(m.kind) && ctx.day));
@@ -468,10 +478,52 @@ function turtleSwim(world: World, m: Mob, dt: number): void {
   if (fluidKind(above) !== FLUID_WATER && m.wy > 0) m.wy = -0.3;
 }
 
+/**
+ * A hal AI-ja: a csalihoz úszik (ha a közelben, 10 blokkon belül van, és vízben), különben kószál; a játékos elől elmenekül.
+ * A csali körül lebeg (a horgászat ezt veszi észre).
+ */
+function fishStep(world: World, m: Mob, dt: number, pl: MobPlayer | null, dist: number, lure: { x: number; y: number; z: number } | null): void {
+  const def = m.def;
+  const lureD = lure ? Math.hypot(lure.x - m.x, lure.y - (m.y + def.h * 0.5), lure.z - m.z) : Infinity;
+  let sp = def.speed * 0.6;
+  if (lure && lureD < 10) {
+    if (lureD > 0.5) {
+      lookAt(m, lure.x, lure.z);
+      m.wy = Math.max(-1.2, Math.min(1.2, (lure.y - 0.3 - (m.y + def.h * 0.5)) * 1.5));
+      sp = def.speed * 0.8;
+    } else { sp = 0; m.wy = 0; }
+  } else if (m.panicT > 0) {
+    m.panicT -= dt;
+    m.yaw = m.panicYaw;
+    sp = def.speed * 1.8;
+  } else if (pl && dist < 3.5) {
+    m.panicT = 0.8;
+    m.panicYaw = Math.atan2(m.x - pl.x, m.z - pl.z) + Math.PI + (Math.random() - 0.5) * 0.8;
+  } else {
+    m.wanderT -= dt;
+    if (m.wanderT <= 0) {
+      m.wanderT = 1.5 + Math.random() * 3.5;
+      m.idle = Math.random() < 0.15;
+      m.yaw = Math.random() * Math.PI * 2;
+      m.wy = (Math.random() - 0.5) * 0.9;
+    }
+    if (m.idle) sp = 0;
+  }
+  const [fx, fz] = forward(m.yaw);
+  // a következő cellában víz kell (különben új irány); a feje fölött is víz kell, hogy ne ugorjon ki
+  const nb = world.getBlock(Math.floor(m.x + fx * 0.8), Math.floor(m.y + def.h * 0.5), Math.floor(m.z + fz * 0.8));
+  if (fluidKind(nb) !== FLUID_WATER) { m.wanderT = 0; m.yaw += Math.PI * (0.6 + Math.random() * 0.8); m.wx = 0; m.wz = 0; return; }
+  m.wx = fx * sp;
+  m.wz = fz * sp;
+  const above = world.getBlock(Math.floor(m.x), Math.floor(m.y + def.h + 0.3), Math.floor(m.z));
+  if (fluidKind(above) !== FLUID_WATER && m.wy > 0) m.wy = -0.3;
+}
+
 /** Lebegő mobok (denevér, polip) AI-ja: lassan kószál, közben magasságot vált; sebzéskor menekül. A kívánt irányt és magasságot (wx, wz, wy) adja. */
-function floatStep(world: World, m: Mob, dt: number, pl: MobPlayer | null, dist: number): void {
+function floatStep(world: World, m: Mob, dt: number, pl: MobPlayer | null, dist: number, lure: { x: number; y: number; z: number } | null = null): void {
   const def = m.def;
   const swim = !!def.swim;
+  if (def.fish) { fishStep(world, m, dt, pl, dist, lure); return; }
   if (m.kind === 'squid') { squidStep(world, m, dt); return; }
   if (def.hostile && pl && dist < 28 && Math.abs(pl.y - m.y) < 24) {
     // a szellem a játékos felé száll (3D-ben), közel érve csap
@@ -548,6 +600,13 @@ export class MobManager {
   count(hostile: boolean): number {
     let n = 0;
     for (const m of this.mobs) if (m.def.hostile === hostile && !m.dead && !isFloater(m.def)) n++;
+    return n;
+  }
+
+  /** Hány élő hal van? */
+  countFish(): number {
+    let n = 0;
+    for (const m of this.mobs) if (m.def.fish && !m.dead) n++;
     return n;
   }
 
@@ -664,6 +723,7 @@ export class MobManager {
     // denevér a barlangokban, polip a tengerben (saját létszámkerettel)
     if (this.countKind('bat') < 4 * scale && Math.random() < 0.25) this.trySpawn(players, px, pz, 'bat', 20, 36, 'cave', py);
     if (this.countKind('squid') < 5 * scale && Math.random() < 0.3) this.trySpawn(players, px, pz, 'squid', 16, 40, 'water');
+    if (this.countFish() < 12 * scale && Math.random() < 0.35) this.trySpawn(players, px, pz, 'fish', 14, 38, 'water');
     if (hostileAllowed && night) {
       // éjjel: szellemek az égből, fulladtak a vízből
       if (this.countKind('ghost') < 3 * scale && Math.random() < 0.12) this.trySpawn(players, px, pz, 'ghost', 24, 40, 'surface', py);
@@ -702,7 +762,7 @@ export class MobManager {
   }
 
   /** Egy csoport (passzív: 1–3) leszállítása a játékostól minRange..maxRange távolságra */
-  private trySpawn(players: { x: number; y: number; z: number }[], px: number, pz: number, want: MobKind | 'fauna', minR: number, maxR: number, where: 'surface' | 'cave' | 'water', py = NaN): void {
+  private trySpawn(players: { x: number; y: number; z: number }[], px: number, pz: number, want: MobKind | 'fauna' | 'fish', minR: number, maxR: number, where: 'surface' | 'cave' | 'water', py = NaN): void {
     const w = this.world;
     const a = Math.random() * Math.PI * 2, r = minR + Math.random() * (maxR - minR);
     const x = Math.floor(px + Math.cos(a) * r), z = Math.floor(pz + Math.sin(a) * r);
@@ -712,8 +772,9 @@ export class MobManager {
     else if (where === 'water') {
       // tengerben: a talaj a tengerszint alatt, a polip a vízoszlop közepén, a fulladt a felszínen
       const floor = w.heightAt(x, z);
-      if (floor > SEA_LEVEL - (want === 'drowned' ? 2 : 4)) return;
+      if (floor > SEA_LEVEL - (want === 'drowned' || want === 'fish' ? 2 : 4)) return;
       if (want === 'drowned') y = SEA_LEVEL - 1;
+      else if (want === 'fish') y = floor + 1 + Math.floor(Math.random() * (SEA_LEVEL - floor - 2));
       else y = floor + 2 + Math.floor(Math.random() * (SEA_LEVEL - floor - 3));
     } else {
       const top = w.heightAt(x, z);
@@ -729,6 +790,9 @@ export class MobManager {
       if (!list) return;
       kind = list[Math.floor(Math.random() * list.length)];
       if ((kind === 'polarbear' || kind === 'mule') && Math.random() < 0.6) return; // ritka
+    } else if (want === 'fish') {
+      const r = Math.random();
+      kind = r < 0.5 ? 'cod' : r < 0.85 ? 'salmon' : 'pufferfish';
     } else kind = want;
     if (kind === 'zombie' && biomeAt(w.seed, x, z, w.heightAt(x, z)) === 'desert') kind = 'husk';
     if (kind === 'slime' && where === 'surface' && biomeAt(w.seed, x, z, w.heightAt(x, z)) !== 'swamp') return; // a felszínen csak mocsárban
@@ -736,9 +800,10 @@ export class MobManager {
       if (fluidKind(w.getBlock(x, y, z)) !== FLUID_WATER || fluidKind(w.getBlock(x, y + 1, z)) !== FLUID_WATER) return;
       if (players.some((q) => Math.hypot(q.x - (x + 0.5), q.z - (z + 0.5)) < minR * 0.85)) return;
       if (MOB_DEFS[kind].hostile && !this.dark(x, y, z, false)) return;
-      for (let i = 0; i < (MOB_DEFS[kind].hostile ? 1 : 1 + Math.floor(Math.random() * 2)); i++) {
-        const sx = x + 0.5 + (Math.random() - 0.5) * 3, sz = z + 0.5 + (Math.random() - 0.5) * 3;
-        if (!boxBlocked(w, sx, y, sz, MOB_DEFS[kind].hw, MOB_DEFS[kind].h)) this.spawn(kind, sx, y, sz).wy = 0;
+      const group = MOB_DEFS[kind].fish ? 3 + Math.floor(Math.random() * 3) : MOB_DEFS[kind].hostile ? 1 : 1 + Math.floor(Math.random() * 2); // a halak rajban
+      for (let i = 0; i < group; i++) {
+        const sx = x + 0.5 + (Math.random() - 0.5) * 4, sz = z + 0.5 + (Math.random() - 0.5) * 4;
+        if (fluidKind(w.getBlock(Math.floor(sx), y, Math.floor(sz))) === FLUID_WATER && !boxBlocked(w, sx, y, sz, MOB_DEFS[kind].hw, MOB_DEFS[kind].h)) this.spawn(kind, sx, y, sz).wy = 0;
       }
       return;
     }

@@ -1386,6 +1386,14 @@ async function main(): Promise<void> {
       if (caught) {
         const d = new THREE.Vector3(); camera.getWorldDirection(d);
         const p = camera.position;
+        // valódi hal: a kapó hal eltűnik a vízből, és az ő zsákmánya érkezik
+        const fm = caught.fish !== null ? mobs.mobs.find((q) => q.id === caught.fish && !q.dead) : undefined;
+        if (fm) {
+          const drops = mobDrops(fm.kind);
+          mobs.mobs.splice(mobs.mobs.indexOf(fm), 1);
+          if (drops.length) { caught.id = drops[0].id; caught.n = drops[0].n; }
+          else { caught.id = EXTRA_ID.cod; caught.n = 1; }
+        }
         spawnDrop(caught.id, caught.n, p.x + d.x * 1.2, p.y - 0.4, p.z + d.z * 1.2);
         showToast(`Caught: ${itemName(caught.id)}`, 1800);
         wearHeld(1);
@@ -1407,7 +1415,16 @@ async function main(): Promise<void> {
       fluidKind(world.getBlock(Math.floor(fishing.x), Math.floor(fishing.y - 0.1), Math.floor(fishing.z))) !== FLUID_WATER) {
       stopFishing(); return;
     }
-    const ev = fishing.update(dt);
+    // valódi hal mód: a csalinál lévő hal kap (vendégként nincsenek valódi halak a kezünkben: ott a régi véletlen kapás)
+    let fishId: number | null | undefined;
+    if (!guest) {
+      fishId = null;
+      for (const q of mobs.mobs) {
+        if (!q.def.fish || q.dead) continue;
+        if (Math.hypot(q.x - fishing.x, q.z - fishing.z) < 0.9 && Math.abs(q.y + q.def.h * 0.5 - fishing.y) < 1.3) { fishId = q.id; break; }
+      }
+    }
+    const ev = fishing.update(dt, fishId);
     if (ev === 'bite') showToast('Something bit! Right-click to reel in', 1400);
     // kapáskor a bója lemerül és remeg
     const dip = fishing.bite > 0 ? -0.18 + Math.sin(performance.now() / 40) * 0.04 : Math.sin(performance.now() / 600) * 0.02;
@@ -1643,6 +1660,7 @@ async function main(): Promise<void> {
     }],
     day: sky.elevation > 0.15,
     onDie: onMobDie,
+    lure: fishing.active ? { x: fishing.x, y: fishing.y, z: fishing.z } : null,
   });
 
   let lastAttack = 0;
@@ -1980,6 +1998,8 @@ async function main(): Promise<void> {
       setCam: (c: number[] | null) => { dbgCam = c; },
       setView: (m: 0 | 1 | 2) => { viewMode = m; thirdPerson = m > 0; },
       EXTRA_ID,
+      /** a horgászat állapota (teszthez) */
+      get fishing() { return fishing; },
       useAt: (x: number, y: number, z: number) => useItem({ x, y, z, px: x, py: y + 1, pz: z } as unknown as RayHit),
     };
   }
