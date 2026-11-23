@@ -133,6 +133,49 @@ export function createParticles(scene: THREE.Scene, atlas: Atlas) {
   };
 }
 
+// ---------- tintafelhő (a megütött polip) ----------
+
+/** Fekete, kitáguló és elhalványuló tintafelhő: apró kockák, amik szétúsznak és eltűnnek */
+export function createInk(scene: THREE.Scene) {
+  const N = 72, LIFE = 2.8;
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  const puffs: { m: THREE.Mesh; t: number; vx: number; vy: number; vz: number; s0: number }[] = [];
+  for (let i = 0; i < N; i++) {
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x07070c, transparent: true, opacity: 0, depthWrite: false }));
+    m.visible = false;
+    scene.add(m);
+    puffs.push({ m, t: LIFE, vx: 0, vy: 0, vz: 0, s0: 0.2 });
+  }
+  let next = 0;
+  return {
+    /** Tintafelhő a (x, y, z) pontnál */
+    burst(x: number, y: number, z: number) {
+      for (let k = 0; k < 18; k++) {
+        const p = puffs[next++ % N];
+        p.t = 0;
+        p.s0 = 0.15 + Math.random() * 0.2;
+        p.m.position.set(x + (Math.random() - 0.5) * 0.5, y + (Math.random() - 0.5) * 0.5, z + (Math.random() - 0.5) * 0.5);
+        p.vx = (Math.random() - 0.5) * 1.6; p.vy = (Math.random() - 0.5) * 0.8; p.vz = (Math.random() - 0.5) * 1.6;
+        p.m.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+        p.m.visible = true;
+      }
+    },
+    update(dt: number) {
+      for (const p of puffs) {
+        if (p.t >= LIFE) continue;
+        p.t += dt;
+        if (p.t >= LIFE) { p.m.visible = false; continue; }
+        const f = p.t / LIFE;
+        const drag = Math.max(0, 1 - dt * 1.5);
+        p.vx *= drag; p.vy *= drag; p.vz *= drag;
+        p.m.position.x += p.vx * dt; p.m.position.y += p.vy * dt; p.m.position.z += p.vz * dt;
+        p.m.scale.setScalar(p.s0 * (1 + f * 4));
+        (p.m.material as THREE.MeshBasicMaterial).opacity = 0.85 * (1 - f) * Math.min(1, f * 12);
+      }
+    },
+  };
+}
+
 // ---------- a földön heverő tárgyak ----------
 
 interface Drop {

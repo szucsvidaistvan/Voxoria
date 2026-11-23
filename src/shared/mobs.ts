@@ -485,11 +485,15 @@ function turtleSwim(world: World, m: Mob, dt: number): void {
 function fishStep(world: World, m: Mob, dt: number, pl: MobPlayer | null, dist: number, lure: { x: number; y: number; z: number } | null): void {
   const def = m.def;
   const lureD = lure ? Math.hypot(lure.x - m.x, lure.y - (m.y + def.h * 0.5), lure.z - m.z) : Infinity;
+  const toLure = !!lure && lureD < 10;
   let sp = def.speed * 0.6;
-  if (lure && lureD < 10) {
+  // hopT: ütközés utáni „elfordulás” ideje: közben nem dönt újra (különben egy helyben ide-oda forogna)
+  if (m.hopT > 0) {
+    m.hopT -= dt;
+  } else if (toLure) {
     if (lureD > 0.5) {
-      lookAt(m, lure.x, lure.z);
-      m.wy = Math.max(-1.2, Math.min(1.2, (lure.y - 0.3 - (m.y + def.h * 0.5)) * 1.5));
+      lookAt(m, lure!.x, lure!.z);
+      m.wy = Math.max(-1.2, Math.min(1.2, (lure!.y - 0.3 - (m.y + def.h * 0.5)) * 1.5));
       sp = def.speed * 0.8;
     } else { sp = 0; m.wy = 0; }
   } else if (m.panicT > 0) {
@@ -510,9 +514,21 @@ function fishStep(world: World, m: Mob, dt: number, pl: MobPlayer | null, dist: 
     if (m.idle) sp = 0;
   }
   const [fx, fz] = forward(m.yaw);
-  // a következő cellában víz kell (különben új irány); a feje fölött is víz kell, hogy ne ugorjon ki
-  const nb = world.getBlock(Math.floor(m.x + fx * 0.8), Math.floor(m.y + def.h * 0.5), Math.floor(m.z + fz * 0.8));
-  if (fluidKind(nb) !== FLUID_WATER) { m.wanderT = 0; m.yaw += Math.PI * (0.6 + Math.random() * 0.8); m.wx = 0; m.wz = 0; return; }
+  // a haladási irányban (a testméretnél kicsit előrébb) víz kell, különben megáll/elfordul
+  const ax = m.x + fx * (def.hw + 0.5), az = m.z + fz * (def.hw + 0.5);
+  const ay = Math.floor(m.y + def.h * 0.5);
+  const clear = fluidKind(world.getBlock(Math.floor(ax), ay, Math.floor(az))) === FLUID_WATER;
+  if (!clear && sp > 0) {
+    m.wx = 0; m.wz = 0;
+    if (!toLure && m.hopT <= 0) {
+      // fal: elfordul egy új irányba és ~1 mp-ig tartja (nem dönt újra, nem vibrál); a hal addig is mozog a szabad irányba
+      m.yaw += Math.PI * (0.6 + Math.random() * 0.8);
+      m.hopT = 0.8 + Math.random() * 0.8;
+      m.panicT = 0;
+      m.wanderT = m.hopT + 0.5;
+    }
+    return;
+  }
   m.wx = fx * sp;
   m.wz = fz * sp;
   const above = world.getBlock(Math.floor(m.x), Math.floor(m.y + def.h + 0.3), Math.floor(m.z));
@@ -792,7 +808,13 @@ export class MobManager {
       if ((kind === 'polarbear' || kind === 'mule') && Math.random() < 0.6) return; // ritka
     } else if (want === 'fish') {
       const r = Math.random();
-      kind = r < 0.5 ? 'cod' : r < 0.85 ? 'salmon' : 'pufferfish';
+      kind = r < 0.4 ? 'cod' : r < 0.75 ? 'salmon' : 'pufferfish';
+      // egyik faj sem szaporodhat el a többi rovására: ha ebből már sok van, a legritkábbat választja
+      const cap = 5;
+      if (this.countKind(kind) >= cap) {
+        const kinds: MobKind[] = ['cod', 'salmon', 'pufferfish'];
+        kind = kinds.reduce((best, k) => (this.countKind(k) < this.countKind(best) ? k : best), kinds[0]);
+      }
     } else kind = want;
     if (kind === 'zombie' && biomeAt(w.seed, x, z, w.heightAt(x, z)) === 'desert') kind = 'husk';
     if (kind === 'slime' && where === 'surface' && biomeAt(w.seed, x, z, w.heightAt(x, z)) !== 'swamp') return; // a felszínen csak mocsárban

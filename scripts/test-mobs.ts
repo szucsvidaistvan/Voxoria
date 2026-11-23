@@ -72,6 +72,18 @@ ok(mobDrops('rabbit', () => 0.99).some((d) => d.id === EXTRA_ID.rabbit), 'a nyú
     ok(d0 > 2.5, `a hal elmenekül a játékos elől (${d0.toFixed(1)} blokk)`);
     ok(mobDrops('cod', () => 0).some((d) => d.n > 0) && mobDrops('salmon', () => 0).length === 1, 'a halak ejtenek (hal)');
     ok(mm.count(false) === 0 && mm.countFish() >= 3, 'a halak nem számítanak a szárazföldi állatok közé');
+    // fal mellett nem vibrál: a fal felé néző hal ritkán fordul (nem minden tickben új irány)
+    const wf = mm.spawn('cod', 5.2, 102, 0);
+    wf.yaw = -Math.PI / 2; // +x felé néz, a tartály fala x=6.5-nél van
+    let turns = 0, last = wf.yaw;
+    const chase = { players: [{ x: 3.7, y: 102, z: 0, target: true, hurt: () => {} }], day: true, onDie: () => {} }; // a játékos a fal felé hajtja
+    for (let i = 0; i < 60 * 10; i++) {
+      mm.update(1 / 60, chase);
+      if (Math.abs(wf.yaw - last) > 0.15) turns++;
+      last = wf.yaw;
+    }
+    ok(turns < 40 && !wf.dead, `a fal mellett nem vibrál a hal (${turns} irányváltás 10 mp alatt)`);
+    mm.mobs.splice(mm.mobs.indexOf(wf), 1);
     for (const f of fishes) mm.mobs.splice(mm.mobs.indexOf(f), 1);
   }
   // polip: lüktetve úszik (lökések és szinte megállás váltják egymást), a fázis a variantban van

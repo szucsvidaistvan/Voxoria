@@ -39,7 +39,7 @@ import { findTree, isLogBlock } from '../shared/tree';
 import { BagUI, HOTBAR_SIZE, Inventory, SlotView, createItemPainter } from './inventory';
 import { Health, createStatBars } from './health';
 import { createNameplates } from './nameplates';
-import { createCracks, createDrops, createParticles } from './effects';
+import { createCracks, createDrops, createInk, createParticles } from './effects';
 import { createBlockIcons } from './icons';
 import { Input } from './input';
 import { buildChunkGeometry } from './mesher';
@@ -109,6 +109,8 @@ async function main(): Promise<void> {
 
   const cracks = createCracks(scene);
   const particles = createParticles(scene, atlas);
+  const ink = createInk(scene);
+  const inkSeen = new WeakMap<object, number>();
 
   // a láva világít: nem sötétedik az éjszakával
   const lavaMaterial = new THREE.MeshBasicMaterial({ map: atlas.anim.texture, vertexColors: true });
@@ -1944,6 +1946,14 @@ async function main(): Promise<void> {
         }
       }
       particles.update(dt);
+      // a megütött polip tintafelhőt lő (a sérülés villanásának kezdetén; vendégnél is látszik)
+      for (const q of mobs.mobs) {
+        if (q.kind !== 'squid') continue;
+        const prev = inkSeen.get(q) ?? 0;
+        if (q.hurtT > 0.25 && prev <= 0.25) ink.burst(q.x, q.y + 0.5, q.z);
+        inkSeen.set(q, q.hurtT);
+      }
+      ink.update(dt);
       drops.update(dt, world, player.pos.x, player.pos.y, player.pos.z, (id, n, uid, dmg) => {
         // vendégként a host adja oda (és veszi el a földről): csak kérjük
         if (guest) { guest.sendPickup(uid); return n; }
