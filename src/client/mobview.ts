@@ -211,6 +211,13 @@ export function createMobView(scene: THREE.Scene, base: string = import.meta.env
           v.root.rotation.order = 'YXZ';
           v.root.rotation.set(cur, m.yaw, 0);
         }
+        if (m.kind === 'pufferfish') {
+          // védekezés: ha fenyegetés van a közelben (variant = 1), a gömbhal felfúvódik, utána lassan visszafogy
+          const prev = (v.root.userData.pf as number | undefined) ?? 1;
+          const cur = prev + ((m.variant ? 2 : 1) - prev) * Math.min(1, dtv * 7);
+          v.root.userData.pf = cur;
+          v.root.scale.setScalar((MODEL_SCALE.pufferfish ?? 1) * cur);
+        }
         if (m.def.hop) {
           // a nyálka a földön összenyomódik, ugrás közben megnyúlik
           const base = MODEL_SCALE[m.kind] ?? 1, sy = m.onGround ? 0.85 : 1.2, sxz = 1 / Math.sqrt(sy);
