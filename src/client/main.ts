@@ -412,6 +412,8 @@ async function main(): Promise<void> {
     });
     sim = simulation.fluids; crops = simulation.crops; gravity = simulation.gravity;
     mobs = new MobManager(world);
+    if (save) mobs.importPersistent(save.mobs, save.pop);
+    world.onChunkLoad = (cx, cz) => { if (!guest) mobs.chunkLoaded(cx, cz); };
     mobView.clear();
     dirty.clear();
     drops.clear();
@@ -456,7 +458,7 @@ async function main(): Promise<void> {
     const p = player.pos;
     writeSave(current.id, {
       name: current.name, created: current.created, seed: world.seed, edits: world.exportEdits(), pos: [p.x, p.y, p.z], yaw: player.yaw, pitch: player.pitch,
-      time: timeOfDay, day: dayCount, furnaces: [...furnaces].map(([k, f]) => [...k.split(',').map(Number), ...f.toFlat()]), chests: [...chests].map(([k, c]) => [...k.split(',').map(Number), ...c.toFlat()]), mode, hp: health.hp, food: health.food, sat: health.saturation, inv: inv.toFlat(), arm: inv.armorFlat(),
+      time: timeOfDay, day: dayCount, furnaces: [...furnaces].map(([k, f]) => [...k.split(',').map(Number), ...f.toFlat()]), chests: [...chests].map(([k, c]) => [...k.split(',').map(Number), ...c.toFlat()]), mode, hp: health.hp, food: health.food, sat: health.saturation, inv: inv.toFlat(), arm: inv.armorFlat(), mobs: mobs.exportPersistent(), pop: [...mobs.populated],
     });
   };
 

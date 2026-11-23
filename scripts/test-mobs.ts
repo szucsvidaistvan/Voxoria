@@ -1,5 +1,5 @@
 /** Új állatok: változatok, drop, pillanatkép-jelzők. `npx tsx scripts/test-mobs.ts` */
-import { MOB_DEFS, Mob, MobManager, mobDrops, type MobKind } from '../src/shared/mobs';
+import { MOB_DEFS, Mob, MobManager, mobDrops, catOf, type MobKind } from '../src/shared/mobs';
 import { World } from '../src/shared/world';
 import { B } from '../src/shared/blocks';
 import { EXTRA_ID } from '../src/shared/items';
@@ -136,5 +136,59 @@ ok(mobDrops('rabbit', () => 0.99).some((d) => d.id === EXTRA_ID.rabbit), 'a nyú
   ctx.day = true; player.target = false;
   for (let i = 0; i < 60 * 3; i++) mm.update(1 / 60, ctx);
   ok(w2.hp < 100, 'a szellem napfényben ég');
+}
+
+// ---- spawn/perzisztencia rework: távoli mobok ritkított frissítése, tartós mobok, mentés ----
+{
+  const w = new World(1);
+  for (let cx = -8; cx <= 8; cx++) for (let cz = -8; cz <= 8; cz++) w.ensureChunk(cx, cz);
+  const mm = new MobManager(w);
+  const top = w.heightAt(0, 0) + 1;
+  const player = { x: 0, y: top, z: 0, target: true, hurt: () => {} };
+  const ctx = { players: [player], day: true, onDie: () => {} };
+  const near = mm.spawn('pig', 4.5, top, 4.5), far = mm.spawn('pig', 50.5, top, 0.5);
+  const farStart = [far.x, far.z];
+  let farUpdates = 0;
+  for (let i = 0; i < 60 * 20; i++) {
+    mm.update(1 / 60, ctx);
+    if (far.lodT === 0) farUpdates++;
+  }
+  ok(farUpdates > 60 * 20 / 9 && farUpdates < 60 * 20 / 3, `a távoli mob ritkítva frissül (${farUpdates} / 1200 tick)`);
+  ok(Math.hypot(far.x - farStart[0], far.z - farStart[1]) > 0.5 || far.idle || far.wanderT > 0, 'a távoli mob így is él és mozog');
+  ok(near.lodT === 0, 'a közeli mob minden tickben frissül');
+  // szárazföldi állat soha nem tűnik el; a szörny messziről igen; a tartós nem számít a létszámba
+  const pers = mm.spawn('wolf', 100.5, top, 0.5); pers.persistent = true;
+  const pig2 = mm.spawn('pig', 100.5, top, 2.5);
+  const zom = mm.spawn('zombie', 100.5, top, 4.5);
+  for (let i = 0; i < 60; i++) mm.update(1 / 60, ctx);
+  ok(mm.mobs.includes(pers) && mm.mobs.includes(pig2) && !mm.mobs.includes(zom), 'állat és tartós mob messziről sem tűnik el, a szörny igen (80+ blokk)');
+  const t0 = (mm as any).tally();
+  ok(t0.cat.creature === 2 && t0.of('wolf') === 0, 'a távoli (96+) állat és a tartós mob nem számít a létszámba');
+  // véletlen eltűnés: 30 mp élet és 32+ blokk után lassan
+  const z2 = mm.spawn('zombie', 50.5, top, 6.5);
+  for (let i = 0; i < 60 * 20; i++) mm.update(1 / 60, ctx);
+  ok(mm.mobs.includes(z2), '30 mp előtt a távoli szörny nem tűnik el');
+  for (let i = 0; i < 60 * 400 && mm.mobs.includes(z2); i++) mm.update(1 / 30, ctx);
+  ok(!mm.mobs.includes(z2), '30 mp után a távoli szörny idővel eltűnik');
+  // mentés-visszatöltés (a tartós és az állatok maradnak, a szörnyek nem)
+  pers.hp = 5; pers.variant = 1; pers.yaw = 1.5;
+  const saved = JSON.parse(JSON.stringify(mm.exportPersistent()));
+  const mm2 = new MobManager(w);
+  mm2.importPersistent([...saved, { k: 'nincs_ilyen', x: 0, y: 0, z: 0, yaw: 0, hp: 1, v: 0 }], ['1,2']);
+  const back = mm2.mobs.find((m) => m.kind === 'wolf');
+  ok(!!back && back.persistent && back.hp === 5 && back.variant === 1 && Math.abs(back.x - 100.5) < 0.01, 'a tartós mob mentésből visszatöltődik (ismeretlen fajt kihagy)');
+  ok(mm2.mobs.every((m) => catOf(m.kind) === 'creature') && mm2.mobs.length === saved.length && mm2.populated.has('1,2'), 'csak állatok mentődnek, a populált chunkok is');
+  // létszámkeret a betöltött chunkok számával nő
+  ok(mm.capFor('monster') > mm.capFor('creature') && new MobManager(new World(2)).capFor('creature') === 1, 'a létszámkeret a chunkok számával skálázódik');
+  // chunk-populálás: egyszer, ~10% eséllyel; újratöltéskor nem újra
+  const w3 = new World(7); const mm3 = new MobManager(w3);
+  w3.onChunkLoad = (cx, cz) => mm3.chunkLoaded(cx, cz);
+  for (let cx = 0; cx < 14; cx++) for (let cz = 0; cz < 14; cz++) w3.ensureChunk(cx, cz);
+  const n1 = mm3.mobs.length;
+  const groups = n1 / 2.5;
+  ok(mm3.populated.size === 196 && groups > 4 && groups < 60 && mm3.mobs.every((m) => catOf(m.kind) === 'creature'), `a chunkok létrejöttekor állatcsoportok születnek (${n1} állat 196 chunkon)`);
+  w3.chunks.clear();
+  for (let cx = 0; cx < 14; cx++) for (let cz = 0; cz < 14; cz++) w3.ensureChunk(cx, cz);
+  ok(mm3.mobs.length === n1, 'a már benépesített chunk újratöltéskor nem szül újra');
 }
 if (fails) { console.error(fails, 'hiba'); process.exit(1); }

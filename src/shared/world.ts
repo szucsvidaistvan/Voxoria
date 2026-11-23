@@ -40,6 +40,8 @@ export class World {
 
   /** minden setBlock után hívódik (a játékszerver ebből gyűjti a szétküldendő módosításokat) */
   onEdit?: (x: number, y: number, z: number, id: number) => void;
+  /** egy chunk létrejötte (betöltése) után hívódik (a mobok innen népesítik be a területet) */
+  onChunkLoad?: (cx: number, cz: number) => void;
 
   constructor(public seed: number) {}
 
@@ -57,6 +59,7 @@ export class World {
       c = new Chunk(cx, cz);
       this.generate(c);
       this.chunks.set(World.key(cx, cz), c);
+      this.onChunkLoad?.(cx, cz);
     }
     return c;
   }

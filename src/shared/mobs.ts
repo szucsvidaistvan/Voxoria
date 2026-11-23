@@ -184,6 +184,14 @@ export class Mob {
   swPh = 0; swCycle = 4; swSpd = 0; swX = 1; swY = 0; swZ = 0;
   /** nyálka: ugrás utáni várakozás és az ugrás iránya */
   hopT = 0; hx = 0; hz = 0;
+  /** tartós mob (szelídített, elnevezett): nem tűnik el, nem számít a létszámkeretbe, mentésben megmarad */
+  persistent = false;
+  /** hány másodperce él (a véletlen eltűnés csak 30 mp után indul) */
+  lived = 0;
+  /** a legközelebbi játékostól mért távolság az utolsó frissítéskor */
+  far = 0;
+  /** távoli mobok ritkított frissítése: a két frissítés között összegyűlt idő */
+  lodT = 0;
 
   constructor(readonly kind: MobKind, x: number, y: number, z: number) {
     this.def = MOB_DEFS[kind];
@@ -295,6 +303,9 @@ function physics(world: World, m: Mob, dt: number): void {
 // ---------- AI ----------
 
 /** Egy játékos a mobok szemszögéből (egyjátékosnál egy elem, co-opban mindenki). */
+/** Egy mentett tartós mob */
+export interface SavedMob { k: string; x: number; y: number; z: number; yaw: number; hp: number; v: number; p?: 1 }
+
 export interface MobPlayer {
   /** a lábpozíció */
   x: number; y: number; z: number;
@@ -602,12 +613,62 @@ function dropAhead(world: World, m: Mob, fx: number, fz: number): boolean {
 
 // ---------- kezelő ----------
 
-export const MOB_CAP_PASSIVE = 14;
-export const MOB_CAP_HOSTILE = 8;
+/** ennél távolabbi mobok ritkítva frissülnek (blokk, mp) */
+export const LOD_DIST = 36;
+export const LOD_STEP = 0.1;
+
+/** Létszámkategóriák (a szerint, ahogy a hasonló sandbox játékok csinálják) */
+export type MobCat = 'monster' | 'creature' | 'ambient' | 'water' | 'waterAmbient';
+
+/**
+ * Kategóriánkénti alap-létszámkeret egy 17×17 chunkos (289) betöltött területre; a tényleges keret
+ * = alap × betöltött chunkok / 289 × MOB_PERF. Több játékos → több betöltött chunk → nagyobb keret.
+ */
+export const MOB_CAP_BASE: Record<MobCat, number> = { monster: 70, creature: 10, ambient: 15, water: 5, waterAmbient: 20 };
+/** teljesítmény-szorzó (telefonon kevesebb mob fér el): 1 = az alapértékek */
+export const MOB_PERF = 0.6;
+/** ennél messzebb eltűnik minden, ami eltűnhet (blokk) */
+export const DESPAWN_FAR = 80;
+/** ettől a távolságtól (blokk) és 30 mp élet után véletlenszerűen eltűnhet (átlag ~40 mp alatt) */
+export const DESPAWN_NEAR = 32;
+/** a szárazföldi állatok csak ennyi blokkon belül számítanak bele a létszámkeretbe */
+export const COUNT_RANGE = 96;
+/** szárazföldi állatok (creature) újraszületési ciklusa, mp */
+export const CREATURE_CYCLE = 20;
+/** egy chunk keletkezésekor ekkora eséllyel kap állatcsoportot */
+export const CHUNK_POP_CHANCE = 0.1;
+/** legfeljebb ennyi mobot ment el a világgal (a tartósak előnyben) */
+export const SAVE_MOB_LIMIT = 500;
+
+/** Melyik létszámkategóriába tartozik a faj? */
+export function catOf(kind: MobKind): MobCat {
+  const d = MOB_DEFS[kind];
+  if (d.hostile) return 'monster';
+  if (d.fish) return 'waterAmbient';
+  if (kind === 'squid') return 'water';
+  if (kind === 'bat') return 'ambient';
+  return 'creature';
+}
+
+/** Egy csoport mérete fajonként [min, max] (ismert arányok szerint: a rajhalak, lovak, farkasok, lámák csoportban élnek) */
+const PACK: Partial<Record<MobKind, [number, number]>> = {
+  pig: [2, 4], cow: [2, 4], sheep: [2, 4], chicken: [3, 4], horse: [2, 6], donkey: [1, 3], mule: [1, 1], llama: [4, 6],
+  wolf: [3, 5], rabbit: [2, 3], cat: [1, 1], parrot: [1, 2], turtle: [2, 5], polarbear: [1, 2],
+  cod: [3, 6], salmon: [2, 5], pufferfish: [1, 3], squid: [1, 4], bat: [1, 3],
+};
+function packSize(kind: MobKind): number {
+  const [a, b] = PACK[kind] ?? [1, 1];
+  return a + Math.floor(Math.random() * (b - a + 1));
+}
+/** háromszög-eloszlású eltolás (−r..r, a közép felé sűrűsödve): a csoport tagjai egymás közelében jelennek meg */
+const tri = (r: number): number => (Math.random() - Math.random()) * r;
 
 export class MobManager {
   mobs: Mob[] = [];
   private spawnT = 0;
+  private creatureT = CREATURE_CYCLE;
+  /** a már benépesített chunkok (a mentéssel együtt marad, hogy újratöltéskor ne szülessenek újra az állatok) */
+  populated = new Set<string>();
 
   constructor(private world: World) {}
 
@@ -615,21 +676,21 @@ export class MobManager {
 
   count(hostile: boolean): number {
     let n = 0;
-    for (const m of this.mobs) if (m.def.hostile === hostile && !m.dead && !isFloater(m.def)) n++;
+    for (const m of this.mobs) if (m.def.hostile === hostile && !m.dead && !m.persistent && !isFloater(m.def)) n++;
     return n;
   }
 
   /** Hány élő hal van? */
   countFish(): number {
     let n = 0;
-    for (const m of this.mobs) if (m.def.fish && !m.dead) n++;
+    for (const m of this.mobs) if (m.def.fish && !m.dead && !m.persistent) n++;
     return n;
   }
 
   /** Hány élő mob van ebből a fajtából? */
   countKind(kind: MobKind): number {
     let n = 0;
-    for (const m of this.mobs) if (m.kind === kind && !m.dead) n++;
+    for (const m of this.mobs) if (m.kind === kind && !m.dead && !m.persistent) n++;
     return n;
   }
 
@@ -679,11 +740,22 @@ export class MobManager {
       // a legközelebbi játékostól mért távolság (játékos nélkül nem tűnik el semmi)
       let far = ctx.players.length ? Infinity : 0;
       for (const p of ctx.players) far = Math.min(far, Math.hypot(m.x - p.x, m.z - p.z));
-      if (far > 80 && !m.dead) { this.mobs.splice(i, 1); continue; }
-      // a messze maradt ellenséges mobok lassan eltűnnek (nem torlaszolják el a létszámkeretet)
-      if (m.def.hostile && !m.dead && far > 40 && Math.random() < dt * 0.1) { this.mobs.splice(i, 1); continue; }
+      m.far = far;
+      // a szárazföldi állatok soha nem tűnnek el (a tartósak sem); a többi messze azonnal, közelebb 30 mp után lassan
+      if (!m.dead && !m.persistent && catOf(m.kind) !== 'creature') {
+        if (far > DESPAWN_FAR) { this.mobs.splice(i, 1); continue; }
+        if (far > DESPAWN_NEAR && m.lived > 30 && Math.random() < dt * 0.025) { this.mobs.splice(i, 1); continue; }
+      }
       if (!this.world.isLoaded(m.x, m.z)) continue; // betöltetlen terepen megállnak
+      // a távoli (36+ blokk) élő mobok csak 10 Hz-en frissülnek (az összegyűlt idővel): a kamera messze van, a számítás hatoda
+      if (!m.dead && far > LOD_DIST && ctx.players.length) {
+        m.lodT += dt;
+        if (m.lodT < LOD_STEP) continue;
+        dt = Math.min(m.lodT, 0.25);
+        m.lodT = 0;
+      }
       m.hurtT = Math.max(0, m.hurtT - dt);
+      m.lived += dt;
 
       if (m.dead) {
         m.deadT += dt;
@@ -720,39 +792,111 @@ export class MobManager {
     }
   }
 
-  /** Új mobok a játékos környékén. `night`: sötét van a felszínen (ilyenkor jönnek a szörnyek). */
+  /** A létszámok egy menetben: kategóriánként és fajonként (tartós, elpusztult és túl messzi mob nélkül) */
+  private tally(): { cat: Record<MobCat, number>; of: (k: MobKind) => number } {
+    const by = new Map<MobKind, number>();
+    const cat: Record<MobCat, number> = { monster: 0, creature: 0, ambient: 0, water: 0, waterAmbient: 0 };
+    for (const m of this.mobs) {
+      if (m.dead || m.persistent || m.far > COUNT_RANGE) continue;
+      by.set(m.kind, (by.get(m.kind) ?? 0) + 1);
+      cat[catOf(m.kind)]++;
+    }
+    return { cat, of: (k) => by.get(k) ?? 0 };
+  }
+
+  /** Létszámkeret egy kategóriára a betöltött chunkok száma szerint */
+  capFor(c: MobCat): number {
+    return Math.max(1, Math.round((MOB_CAP_BASE[c] * Math.min(this.world.chunks.size, 600) * MOB_PERF) / 289));
+  }
+
+  /** A világgal mentett mobok: a tartósak (megszelídítettek) és a szárazföldi állatok; a többi úgyis újra születik */
+  exportPersistent(): SavedMob[] {
+    const keep = this.mobs.filter((m) => !m.dead && (m.persistent || catOf(m.kind) === 'creature'));
+    keep.sort((a, b) => Number(b.persistent) - Number(a.persistent));
+    return keep.slice(0, SAVE_MOB_LIMIT).map((m) => {
+      const e: SavedMob = { k: m.kind, x: +m.x.toFixed(2), y: +m.y.toFixed(2), z: +m.z.toFixed(2), yaw: +m.yaw.toFixed(2), hp: m.hp, v: m.variant };
+      if (m.persistent) e.p = 1;
+      return e;
+    });
+  }
+
+  /** A mentett mobok visszatöltése (ismeretlen fajt kihagy) */
+  importPersistent(list: SavedMob[] | undefined, populated?: string[]): void {
+    for (const k of populated ?? []) this.populated.add(k);
+    for (const e of list ?? []) {
+      if (!(e.k in MOB_DEFS)) continue;
+      const m = this.spawn(e.k as MobKind, e.x, e.y, e.z);
+      m.yaw = e.yaw; m.hp = Math.min(e.hp, m.def.hp); m.variant = e.v; m.persistent = !!e.p;
+    }
+  }
+
+  /**
+   * Egy chunk betöltődött: ha még sosem volt benépesítve, kis eséllyel állatcsoport kerül bele
+   * (a szárazföldi állatok így a terep létrejöttekor születnek, nem a játékos szeme láttára).
+   */
+  chunkLoaded(cx: number, cz: number): void {
+    const key = `${cx},${cz}`;
+    if (this.populated.has(key)) return;
+    this.populated.add(key);
+    if (Math.random() >= CHUNK_POP_CHANCE) return;
+    const x = cx * 16 + 2 + Math.floor(Math.random() * 12), z = cz * 16 + 2 + Math.floor(Math.random() * 12);
+    const kind = this.pickLandKind(x, z);
+    if (kind) this.trySpawn([], 0, 0, kind, 0, 0, 'surface', NaN, { x, z });
+  }
+
+  /** Szárazföldi állatfaj a (x, z) biomjához */
+  private pickLandKind(x: number, z: number): MobKind | null {
+    const w = this.world;
+    const list = BIOME_FAUNA[biomeAt(w.seed, x, z, w.heightAt(x, z))];
+    const pool: MobKind[] = [...PASSIVE_KINDS, ...(list ?? [])];
+    const kind = pool[Math.floor(Math.random() * pool.length)];
+    if ((kind === 'polarbear' || kind === 'mule') && Math.random() < 0.6) return null; // ritka
+    return kind;
+  }
+
+  /** Új mobok a játékosok környékén (kategóriák, létszámkeretek és csoportok). `night`: sötét van a felszínen. */
   spawnTick(dt: number, players: { x: number; y: number; z: number }[], night: boolean, hostileAllowed: boolean): void {
     if (!players.length) return;
+    this.creatureT -= dt;
     this.spawnT -= dt;
     if (this.spawnT > 0) return;
-    // a létszámkeret a játékosokkal nő (legfeljebb 4-szeresig), a spawn egy véletlen játékos körül történik
-    const scale = Math.min(4, players.length);
-    const capP = MOB_CAP_PASSIVE * scale, capH = MOB_CAP_HOSTILE * scale;
-    const pp = players[Math.floor(Math.random() * players.length)];
-    const px = pp.x, py = pp.y, pz = pp.z;
-    const passiveN = this.count(false);
-    this.spawnT = passiveN < capP / 2 ? 0.4 : 2.5;
+    this.spawnT = 0.5;
+    const t = this.tally();
+    const cap = (c: MobCat) => this.capFor(c);
+    const pick = () => players[Math.floor(Math.random() * players.length)];
 
-    if (passiveN < capP) this.trySpawn(players, px, pz, PASSIVE_KINDS[Math.floor(Math.random() * PASSIVE_KINDS.length)], 20, 44, 'surface');
-    // a biomhoz illő állatok (ló, farkas, jegesmedve): ritkábban, a játékostól távolabb
-    if (passiveN < capP && Math.random() < 0.3) this.trySpawn(players, px, pz, 'fauna', 24, 48, 'surface');
-    // denevér a barlangokban, polip a tengerben (saját létszámkerettel)
-    if (this.countKind('bat') < 4 * scale && Math.random() < 0.25) this.trySpawn(players, px, pz, 'bat', 20, 36, 'cave', py);
-    if (this.countKind('squid') < 5 * scale && Math.random() < 0.3) this.trySpawn(players, px, pz, 'squid', 16, 40, 'water');
-    if (this.countFish() < 12 * scale && Math.random() < 0.35) this.trySpawn(players, px, pz, 'fish', 14, 38, 'water');
-    if (hostileAllowed && night) {
-      // éjjel: szellemek az égből, fulladtak a vízből
-      if (this.countKind('ghost') < 3 * scale && Math.random() < 0.12) this.trySpawn(players, px, pz, 'ghost', 24, 40, 'surface', py);
-      if (this.countKind('drowned') < 3 * scale && Math.random() < 0.2) this.trySpawn(players, px, pz, 'drowned', 24, 44, 'water');
+    // szárazföldi állatok: csak 20 mp-enként (és a chunk keletkezésekor), legfeljebb 3 csoport egy ciklusban
+    if (this.creatureT <= 0) {
+      this.creatureT = CREATURE_CYCLE;
+      let n = t.cat.creature;
+      for (let i = 0; i < 3 && n < cap('creature'); i++) {
+        const p = pick(), a = Math.random() * Math.PI * 2, r = 24 + Math.random() * 20;
+        const x = Math.floor(p.x + Math.cos(a) * r), z = Math.floor(p.z + Math.sin(a) * r);
+        if (!this.world.isLoaded(x, z)) continue;
+        const kind = this.pickLandKind(x, z);
+        if (!kind) continue;
+        const before = this.mobs.length;
+        this.trySpawn(players, p.x, p.z, kind, 24, 44, 'surface', NaN, { x, z });
+        n += this.mobs.length - before;
+      }
     }
-    if (hostileAllowed && this.count(true) < capH) {
+    const pp = pick(), px = pp.x, py = pp.y, pz = pp.z;
+    // denevér a barlangokban, polip a tengerben, halak (a játékostól 64 blokkon belül)
+    if (t.cat.ambient < cap('ambient') && Math.random() < 0.3) this.trySpawn(players, px, pz, 'bat', 24, 36, 'cave', py);
+    if (t.cat.water < cap('water') && Math.random() < 0.3) this.trySpawn(players, px, pz, 'squid', 24, 40, 'water');
+    if (t.cat.waterAmbient < cap('waterAmbient') && Math.random() < 0.4) this.trySpawn(players, px, pz, 'fish', 24, 40, 'water');
+    if (!hostileAllowed) return;
+    const sub = Math.max(1, Math.round(cap('monster') / 4));
+    if (night) {
+      // éjjel: szellemek az égből, fulladtak a vízből
+      if (t.of('ghost') < sub && Math.random() < 0.12) this.trySpawn(players, px, pz, 'ghost', 24, 40, 'surface', py);
+      if (t.of('drowned') < sub && Math.random() < 0.2) this.trySpawn(players, px, pz, 'drowned', 24, 44, 'water');
+    }
+    if (t.cat.monster < cap('monster') && Math.random() < 0.5) {
       const roll = Math.random();
       const kind: MobKind = roll < 0.35 ? 'zombie' : roll < 0.6 ? 'skeleton' : roll < 0.75 ? 'spider' : roll < 0.87 ? 'tarantula' : 'slime';
-      // a szörnyek a játékostól legalább 24 blokkra jönnek elő (nem a szeme előtt), és ritkán
-      if (Math.random() < 0.5) {
-        if (night) this.trySpawn(players, px, pz, kind, 24, 44, 'surface', py);
-        else if (Math.random() < 0.35) this.trySpawn(players, px, pz, kind, 24, 36, 'cave', py); // barlangokban nappal is
-      }
+      if (night) this.trySpawn(players, px, pz, kind, 24, 44, 'surface', py);
+      else if (Math.random() < 0.35) this.trySpawn(players, px, pz, kind, 24, 36, 'cave', py); // barlangokban nappal is
     }
   }
 
@@ -778,10 +922,10 @@ export class MobManager {
   }
 
   /** Egy csoport (passzív: 1–3) leszállítása a játékostól minRange..maxRange távolságra */
-  private trySpawn(players: { x: number; y: number; z: number }[], px: number, pz: number, want: MobKind | 'fauna' | 'fish', minR: number, maxR: number, where: 'surface' | 'cave' | 'water', py = NaN): void {
+  private trySpawn(players: { x: number; y: number; z: number }[], px: number, pz: number, want: MobKind | 'fauna' | 'fish', minR: number, maxR: number, where: 'surface' | 'cave' | 'water', py = NaN, at?: { x: number; z: number }): void {
     const w = this.world;
     const a = Math.random() * Math.PI * 2, r = minR + Math.random() * (maxR - minR);
-    const x = Math.floor(px + Math.cos(a) * r), z = Math.floor(pz + Math.sin(a) * r);
+    const x = at ? at.x : Math.floor(px + Math.cos(a) * r), z = at ? at.z : Math.floor(pz + Math.sin(a) * r);
     if (!w.isLoaded(x, z)) return;
     let y: number;
     if (where === 'surface') y = w.heightAt(x, z) + 1 + (want === 'ghost' ? 8 + Math.floor(Math.random() * 10) : 0);
@@ -820,11 +964,11 @@ export class MobManager {
     if (kind === 'slime' && where === 'surface' && biomeAt(w.seed, x, z, w.heightAt(x, z)) !== 'swamp') return; // a felszínen csak mocsárban
     if (where === 'water') {
       if (fluidKind(w.getBlock(x, y, z)) !== FLUID_WATER || fluidKind(w.getBlock(x, y + 1, z)) !== FLUID_WATER) return;
-      if (players.some((q) => Math.hypot(q.x - (x + 0.5), q.z - (z + 0.5)) < minR * 0.85)) return;
+      if (players.some((q) => Math.hypot(q.x - (x + 0.5), q.z - (z + 0.5)) < minR)) return;
       if (MOB_DEFS[kind].hostile && !this.dark(x, y, z, false)) return;
-      const group = MOB_DEFS[kind].fish ? 3 + Math.floor(Math.random() * 3) : MOB_DEFS[kind].hostile ? 1 : 1 + Math.floor(Math.random() * 2); // a halak rajban
+      const group = MOB_DEFS[kind].hostile ? 1 : packSize(kind); // a halak rajban
       for (let i = 0; i < group; i++) {
-        const sx = x + 0.5 + (Math.random() - 0.5) * 4, sz = z + 0.5 + (Math.random() - 0.5) * 4;
+        const sx = x + 0.5 + (i ? tri(5) : 0), sz = z + 0.5 + (i ? tri(5) : 0);
         if (fluidKind(w.getBlock(Math.floor(sx), y, Math.floor(sz))) === FLUID_WATER && !boxBlocked(w, sx, y, sz, MOB_DEFS[kind].hw, MOB_DEFS[kind].h)) this.spawn(kind, sx, y, sz).wy = 0;
       }
       return;
@@ -832,9 +976,9 @@ export class MobManager {
     if (kind === 'bat' || kind === 'ghost') {
       // a denevér a barlang üres terében, a szellem a nyílt ég alatt lebeg (nem kell talaj)
       if (w.getBlock(x, y, z) !== 0 || w.getBlock(x, y + 1, z) !== 0 || (kind === 'bat' && w.heightAt(x, z) - y < 5)) return;
-      if (players.some((q) => Math.hypot(q.x - (x + 0.5), q.z - (z + 0.5)) < minR * 0.85)) return;
-      for (let i = 0; i < (kind === 'ghost' ? 1 : 1 + Math.floor(Math.random() * 3)); i++) {
-        const sx = x + 0.5 + (Math.random() - 0.5) * 2, sz = z + 0.5 + (Math.random() - 0.5) * 2;
+      if (players.some((q) => Math.hypot(q.x - (x + 0.5), q.z - (z + 0.5)) < minR)) return;
+      for (let i = 0, n = kind === 'ghost' ? 1 : packSize(kind); i < n; i++) {
+        const sx = x + 0.5 + (i ? tri(3) : 0), sz = z + 0.5 + (i ? tri(3) : 0);
         if (!boxBlocked(w, sx, y, sz, MOB_DEFS[kind].hw, MOB_DEFS[kind].h)) this.spawn(kind, sx, y, sz);
       }
       return;
@@ -846,17 +990,23 @@ export class MobManager {
     // ellenséges mob nem jelenhet meg a játékos látóterében (szabad rálátás 40 blokkon belül)
     if (MOB_DEFS[kind].hostile && !isNaN(py) && players.some((q) => clearShot(w, q.x, q.y + 1.6, q.z, x + 0.5, y + 1, z + 0.5))) return;
     // egyik játékoshoz sem jöhet túl közel (a többiek közelében sem)
-    if (players.some((q) => Math.hypot(q.x - (x + 0.5), q.z - (z + 0.5)) < minR * 0.85)) return;
+    if (players.some((q) => Math.hypot(q.x - (x + 0.5), q.z - (z + 0.5)) < minR)) return;
     // szörny csak sötétben: fedett barlangban (fa lombja alatt nem), vagy éjjel a szabadban, és nem fáklya mellett
     if (MOB_DEFS[kind].hostile && !this.dark(x, y, z, where === 'cave')) return;
     // állatok csak füvön; a felszíni szörnyek bárhol, ahol szilárd a talaj
     const sandy = (kind === 'rabbit' || kind === 'turtle') && below === B.SAND; // a nyúl a sivatagban, a teknős a partokon is megél
     if (!MOB_DEFS[kind].hostile && below !== B.GRASS && !sandy && !(kind === 'polarbear' && fluidKind(below) === 0)) return;
-    const n = MOB_DEFS[kind].hostile ? 1 : 1 + Math.floor(Math.random() * 3);
+    const n = MOB_DEFS[kind].hostile ? 1 : packSize(kind);
     for (let i = 0; i < n; i++) {
-      const sx = x + 0.5 + (Math.random() - 0.5) * 3, sz = z + 0.5 + (Math.random() - 0.5) * 3;
-      if (boxBlocked(w, sx, y, sz, MOB_DEFS[kind].hw, MOB_DEFS[kind].h)) continue;
-      this.spawn(kind, sx, y, sz);
+      // a csoport tagjai az első körül ±5 blokkon belül, mindegyik a saját oszlopa talajára (és ugyanolyan talajra)
+      const sx = x + 0.5 + (i ? tri(5) : 0), sz = z + 0.5 + (i ? tri(5) : 0);
+      const cx = Math.floor(sx), cz = Math.floor(sz);
+      if (!w.isLoaded(cx, cz)) continue;
+      const sy = i === 0 || where !== 'surface' ? y : w.heightAt(cx, cz) + 1;
+      const under = w.getBlock(cx, sy - 1, cz);
+      if (i && !(under === below || (under === B.GRASS && !MOB_DEFS[kind].hostile))) continue;
+      if (boxBlocked(w, sx, sy, sz, MOB_DEFS[kind].hw, MOB_DEFS[kind].h)) continue;
+      this.spawn(kind, sx, sy, sz);
     }
   }
 

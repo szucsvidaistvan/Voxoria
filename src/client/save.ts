@@ -37,6 +37,10 @@ export interface SaveData {
   arm?: number[];
   /** a tároló: [id, darab, id, darab, ...] 36 helyre */
   inv?: number[];
+  /** a tartós mobok (szelídített, elnevezett), a régi mentésekben nincs */
+  mobs?: { k: string; x: number; y: number; z: number; yaw: number; hp: number; v: number; p?: 1 }[];
+  /** a már benépesített chunkok ("cx,cz"), hogy újratöltéskor ne szülessenek újra az állatok */
+  pop?: string[];
 }
 
 export interface Settings {
