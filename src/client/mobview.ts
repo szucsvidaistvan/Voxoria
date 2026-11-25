@@ -290,6 +290,7 @@ export function createMobView(scene: THREE.Scene, base: string = import.meta.env
         let g = arrowViews.get(a.id);
         if (!g) { g = makeArrow(); scene.add(g); arrowViews.set(a.id, g); }
         g.position.set(a.x, a.y, a.z);
+        g.scale.setScalar(a.spit ? 0.45 : 1); // a láma köpése kisebb
         const len = Math.hypot(a.vx, a.vy, a.vz);
         if (len > 0.01) g.quaternion.setFromUnitVectors(FWD, dir.set(a.vx / len, a.vy / len, a.vz / len));
       }

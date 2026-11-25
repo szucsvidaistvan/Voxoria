@@ -211,3 +211,52 @@ ok(mobDrops('rabbit', () => 0.99).some((d) => d.id === EXTRA_ID.rabbit), 'a nyú
   ok(mm3.mobs.length === n1, 'a már benépesített chunk újratöltéskor nem szül újra');
 }
 if (fails) { console.error(fails, 'hiba'); process.exit(1); }
+
+// ---- viselkedések: farkasfalka, láma köpése, papagáj csípése, macska sprint ----
+{
+  const w = new World(1);
+  for (let cx = -3; cx <= 3; cx++) for (let cz = -3; cz <= 3; cz++) w.ensureChunk(cx, cz);
+  const mm = new MobManager(w);
+  // lapos aréna a levegőben (a fák és a domborzat ne zavarjon): kő padló y=200-on, fölötte üres tér
+  for (let x = -12; x <= 48; x++) for (let z = -12; z <= 12; z++) { w.setBlock(x, 200, z, B.STONE); for (let y = 201; y < 212; y++) w.setBlock(x, y, z, 0); }
+  const top = 201;
+  let howls = 0;
+  const noPl = { players: [] as any[], day: true, onDie: () => {}, onHowl: () => { howls++; } };
+  const w1 = mm.spawn('wolf', 0.5, top, 0.5), w2 = mm.spawn('wolf', 6.5, top, 0.5), w3 = mm.spawn('wolf', 40.5, top, 0.5);
+  w1.hurt(1, -5, 0);
+  mm.update(1 / 60, noPl);
+  ok(w1.angry && w2.angry && !w3.angry, 'a megsebzett farkas falkatársai (20 blokkon belül) haragra gerjednek, a távoliak nem');
+  ok(w1.boostT > 3 && w2.boostT > 3 && howls === 1, 'a falka rohamoz (gyorsul) és a farkas vonyít (egyszer)');
+  for (let i = 0; i < 60 * 6; i++) mm.update(1 / 60, noPl);
+  ok(w1.boostT <= 0, 'a rohamozás néhány másodperc után véget ér');
+  for (let i = 0; i < 60 * 30; i++) mm.update(1 / 30, noPl);
+  ok(!w1.angry && !w2.angry, 'a harag idővel elmúlik');
+
+  // láma: megsebezve köp (1 sebzés), nem harap
+  let hits = 0, dmgs = 0;
+  const pl = { x: 8.5, y: top, z: 0.5, target: true, hurt: (d: number) => { hits++; dmgs += d; } };
+  const ctx = { players: [pl], day: true, onDie: () => {} };
+  const lla = mm.spawn('llama', 0.5, top + 0.1, 0.5);
+  lla.hurt(1, -3, 0.5);
+  let sawSpit = false;
+  for (let i = 0; i < 60 * 25; i++) { mm.update(1 / 60, ctx); if (mm.arrows.some((a) => a.spit)) sawSpit = true; }
+  ok(sawSpit, 'a megsebzett láma köp');
+  ok(hits >= 1 && dmgs === hits, `a köpés eltalálja a játékost, találatonként 1 sebzés (${hits} találat)`);
+
+  // papagáj: megsebezve csip, nagyon kicsit (1)
+  const mm2 = new MobManager(w);
+  let pd = 0, pn = 0;
+  const pl2 = { x: 0.5, y: top, z: 0.5, target: true, hurt: (d: number) => { pd = d; pn++; } };
+  const par = mm2.spawn('parrot', 1.1, top, 0.5);
+  par.hurt(1, 5, 0.5);
+  for (let i = 0; i < 60 * 8; i++) mm2.update(1 / 60, { players: [pl2], day: true, onDie: () => {} });
+  ok(pn >= 1 && pd === 1, `a megsebzett papagáj csíp (1 sebzés, ${pn} csípés)`);
+
+  // macska és nyúl: néha rövid sprintet futnak
+  const mm3 = new MobManager(w);
+  const cat = mm3.spawn('cat', 0.5, top, 0.5);
+  let boosted = 0;
+  for (let i = 0; i < 60 * 120; i++) { mm3.update(1 / 30, { players: [], day: true, onDie: () => {} }); if (cat.boostT > 0) boosted++; }
+  ok(boosted > 0, 'a macska időnként sprintel');
+  ok(MOB_DEFS.turtle.speed < MOB_DEFS.pig.speed * 0.8, 'a teknős lassú');
+}
