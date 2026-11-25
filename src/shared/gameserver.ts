@@ -311,7 +311,8 @@ export class GameServer {
     if (![...this.remotes.values()].some((r) => r.joined)) return;
     const clock = this.hooks.clock();
     const players = this.allPlayers();
-    const mobs = this.mobs.mobs.map((m) => this.mobState(m));
+    // csak a játékosok körüli 112 blokkon belüli mobok mennek át (a messzi, mozdulatlan állatokat nem érdemes küldeni)
+    const mobs = this.mobs.mobs.filter((m) => m.far <= 112).map((m) => this.mobState(m));
     for (const r of this.remotes.values()) {
       if (!r.joined) continue;
       // mindenki mást lát, magát nem (a vendég a saját helyét maga számolja)
