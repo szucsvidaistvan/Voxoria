@@ -54,8 +54,8 @@ export const MOB_DEFS: Record<MobKind, MobDef> = {
   spider: { name: 'Spider', hostile: true, hp: 16, speed: 3, hw: 0.6, h: 0.9, dmg: 2 },
   rabbit: { name: 'Rabbit', hostile: false, hp: 6, speed: 2.6, hw: 0.25, h: 0.5, variants: 7 },
   cat: { name: 'Cat', hostile: false, hp: 10, speed: 2.4, hw: 0.3, h: 0.7, variants: 4 },
-  parrot: { name: 'Parrot', hostile: false, hp: 6, speed: 1.6, hw: 0.2, h: 0.6, variants: 5 },
-  llama: { name: 'Llama', hostile: false, hp: 22, speed: 1.8, hw: 0.45, h: 1.9, variants: 3 },
+  parrot: { name: 'Parrot', hostile: false, neutral: true, dmg: 1, hp: 6, speed: 1.6, hw: 0.2, h: 0.6, variants: 5 },
+  llama: { name: 'Llama', hostile: false, neutral: true, dmg: 1, hp: 22, speed: 1.8, hw: 0.45, h: 1.9, variants: 3 },
   donkey: { name: 'Donkey', hostile: false, hp: 20, speed: 2.0, hw: 0.6, h: 1.45 },
   mule: { name: 'Mule', hostile: false, hp: 24, speed: 2.1, hw: 0.6, h: 1.5 },
   turtle: { name: 'Turtle', hostile: false, hp: 6, speed: 0.7, hw: 0.5, h: 0.45, amph: true },
@@ -125,20 +125,31 @@ export interface Arrow {
   age: number;
   /** −1: repül; különben ennyi másodperce áll a blokkban */
   stuck: number;
+  /** láma köpése: kicsi, lassabb, kevésbé esik, 1 sebzést okoz */
+  spit?: boolean;
 }
 const ARROW_SPEED = 15;
 const ARROW_GRAVITY = 12;
+const SPIT_SPEED = 10;
+const SPIT_GRAVITY = 4;
+/** a megsebzett semleges mob ennyi másodpercig haragszik (aztán megnyugszik) */
+const ANGER_TIME = 30;
+/** a farkasfalka riadójának hatótávja (blokk), a rohamozás ideje (mp) és sebesség-szorzója */
+const PACK_RANGE = 20;
+const BOOST_TIME = 5;
+const BOOST_MUL = 1.6;
 let nextArrowId = 1;
 
 /** Nyíl kilövése az (x, y, z) pontból a (tx, ty, tz) felé: a gravitáció és egy kis pontatlanság figyelembevételével */
-function fireArrow(arrows: Arrow[], x: number, y: number, z: number, tx: number, ty: number, tz: number): void {
+function fireArrow(arrows: Arrow[], x: number, y: number, z: number, tx: number, ty: number, tz: number, spit = false): void {
   const err = 0.05;
   const dx = tx - x + (Math.random() - 0.5) * err * 2 * Math.hypot(tx - x, tz - z);
   const dy = ty - y + (Math.random() - 0.5) * err * 2 * 4;
   const dz = tz - z + (Math.random() - 0.5) * err * 2 * Math.hypot(tx - x, tz - z);
   const d = Math.hypot(dx, dy, dz) || 1;
-  const t = d / ARROW_SPEED;
-  arrows.push({ id: nextArrowId++, x, y, z, vx: dx / t, vy: dy / t + 0.5 * ARROW_GRAVITY * t, vz: dz / t, age: 0, stuck: -1 });
+  const g = spit ? SPIT_GRAVITY : ARROW_GRAVITY;
+  const t = d / (spit ? SPIT_SPEED : ARROW_SPEED);
+  arrows.push({ id: nextArrowId++, x, y, z, vx: dx / t, vy: dy / t + 0.5 * g * t, vz: dz / t, age: 0, stuck: -1, spit });
 }
 
 let nextId = 1;
@@ -174,6 +185,12 @@ export class Mob {
   expT = 0;
   /** megsebezték: a semleges mob mostantól üldöz és támad */
   angry = false;
+  /** meddig haragszik még (mp) */
+  angerT = 0;
+  /** rohamozás: ennyi ideig gyorsabb (mp) */
+  boostT = 0;
+  /** megsebezték a falka tagját: riasztani kell a többit */
+  alert = false;
   /** a csontváz célzása: 0: nem céloz, különben eltelt másodperc a lövésig */
   aim = 0;
   /** melyik megjelenés (skin) a def.variants közül */
@@ -213,7 +230,7 @@ export class Mob {
     this.vx = ((this.x - fx) / d) * 5;
     this.vz = ((this.z - fz) / d) * 5;
     if (this.onGround) this.vy = 5;
-    if (this.def.neutral) this.angry = true;
+    if (this.def.neutral) { this.angry = true; this.angerT = ANGER_TIME; if (this.kind === 'wolf') this.alert = true; }
     else if (!this.def.hostile) {
       this.panicT = 4;
       this.panicYaw = Math.atan2(-(this.x - fx), -(this.z - fz)); // a sebzőtől elfelé
@@ -323,6 +340,8 @@ export interface MobCtx {
   onDie(m: Mob): void;
   /** a vízbe dobott horgászcsali (a halak odaúsznak) */
   lure?: { x: number; y: number; z: number } | null;
+  /** a farkas vonyít (a falka riadója) */
+  onHowl?(m: Mob): void;
 }
 
 /** A mobhoz legközelebbi támadható játékos (vagy null) és a vízszintes távolsága. */
@@ -353,6 +372,7 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
   const priv = m;
   const def = m.def;
   priv.atkCd = Math.max(0, priv.atkCd - dt);
+  if (m.angry && def.neutral && (m.angerT -= dt) <= 0) m.angry = false; // a harag idővel elmúlik
   let speed = 0;
 
   // a legközelebbi támadható játékos a célpont
@@ -383,6 +403,12 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
         m.aim = 0;
         speed = dist > 7 || !canShoot ? def.speed : 0;
       }
+    } else if (m.kind === 'llama') {
+      // a láma köp: 3 és 12 blokk között megáll és lő, közelebb hátrál, messzebb közelít
+      const canSpit = dist < 12 && Math.abs(dy) < 6 && clearShot(world, m.x, m.y + 1.6, m.z, pl.x, pl.y + 1.3, pl.z);
+      if (dist < 3) { m.yaw += Math.PI; speed = def.speed; }
+      else speed = canSpit ? 0 : def.speed;
+      if (canSpit && dist >= 3 && priv.atkCd <= 0) { priv.atkCd = 2.5; fireArrow(arrows, m.x, m.y + 1.6, m.z, pl.x, pl.y + 1.3, pl.z, true); }
     } else {
       speed = dist > 0.9 ? def.speed : 0;
       if (dist < 1.4 && Math.abs(dy) < 1.8 && priv.atkCd <= 0) {
@@ -404,9 +430,12 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
         priv.wanderT = priv.idle ? 1.5 + Math.random() * 4 : 1 + Math.random() * 3;
         if (!priv.idle) m.yaw = Math.random() * Math.PI * 2;
       }
+      // a macska és a nyúl néha hirtelen kiszalad (rövid sprint)
+      if (!priv.idle && (m.kind === 'cat' || m.kind === 'rabbit') && priv.boostT <= 0 && Math.random() < dt * 0.15) priv.boostT = 1.2;
       speed = priv.idle ? 0 : def.speed * 0.6;
     }
   }
+  if (priv.boostT > 0) { priv.boostT -= dt; speed *= BOOST_MUL; }
 
   if (speed > 0) {
     const [fx, fz] = forward(m.yaw);
@@ -715,13 +744,13 @@ export class MobManager {
       const h = dt / n;
       for (let k = 0; k < n && !gone && a.stuck < 0; k++) {
         a.x += a.vx * h; a.y += a.vy * h; a.z += a.vz * h;
-        a.vy -= ARROW_GRAVITY * h;
+        a.vy -= (a.spit ? SPIT_GRAVITY : ARROW_GRAVITY) * h;
         if (isSolid(this.world.getBlock(Math.floor(a.x), Math.floor(a.y), Math.floor(a.z)))) {
           a.stuck = 0;
         } else {
           const hitP = ctx.players.find((p) => p.target && Math.abs(a.x - p.x) < 0.45 && Math.abs(a.z - p.z) < 0.45 && a.y > p.y - 0.1 && a.y < p.y + 1.85);
           if (hitP) {
-            hitP.hurt(3, a.x - a.vx * 0.05, a.z - a.vz * 0.05);
+            hitP.hurt(a.spit ? 1 : 3, a.x - a.vx * 0.05, a.z - a.vz * 0.05);
             gone = true;
           }
         }
@@ -814,11 +843,23 @@ export class MobManager {
         if (priv.burnT >= 1) { priv.burnT -= 1; m.hp -= 2; m.hurtT = 0.3; }
       }
 
+      if (m.alert) { m.alert = false; this.alertPack(m, ctx); }
       aiStep(this.world, m, dt, ctx, this.arrows);
       if (m.dead) { this.mobs.splice(i, 1); continue; } // felrobbant
       physics(this.world, m, dt);
       if (m.hp <= 0 && !m.dead) { m.deadT = 0; ctx.onDie(m); }
     }
+  }
+
+  /** A megsebzett farkas vonyít: a közeli falkatársak is haragra gerjednek és egy ideig gyorsabban rohamoznak */
+  private alertPack(m: Mob, ctx: MobCtx): void {
+    m.boostT = BOOST_TIME;
+    for (const o of this.mobs) {
+      if (o === m || o.kind !== 'wolf' || o.dead || o.angry) continue;
+      if (Math.hypot(o.x - m.x, o.z - m.z) > PACK_RANGE) continue;
+      o.angry = true; o.angerT = ANGER_TIME; o.boostT = BOOST_TIME;
+    }
+    ctx.onHowl?.(m);
   }
 
   /** A létszámok egy menetben: kategóriánként és fajonként (tartós, elpusztult és túl messzi mob nélkül) */
