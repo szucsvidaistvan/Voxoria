@@ -51,6 +51,7 @@ export class GuestClient {
   sendState(p: Omit<PlayerState, 'id' | 'name'>): void { this.send({ t: 'state', p }, false); }
   sendEdit(x: number, y: number, z: number, id: number): void { this.send({ t: 'edit', edits: [{ x, y, z, id }] }); }
   sendAttack(mob: number, damage: number): void { this.send({ t: 'attack', mob, damage }); }
+  sendInteract(mob: number, item: string | null): void { this.send({ t: 'interact', mob, item }); }
   sendSleep(on: boolean): void { this.send({ t: 'sleep', on }); }
   sendDropReq(item: number, n: number, x: number, y: number, z: number, opt: { d?: number; vx?: number; vy?: number; vz?: number; wait?: number } = {}): void {
     this.send({ t: 'dropReq', item, n, x, y, z, ...opt });

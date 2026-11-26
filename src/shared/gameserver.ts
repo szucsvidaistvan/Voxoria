@@ -146,6 +146,7 @@ export class GameServer {
       }
       case 'edit': this.edit(connId, r, msg.edits); break;
       case 'attack': this.attack(r, msg.mob, msg.damage); break;
+      case 'interact': this.interact(r, msg.mob, msg.item); break;
       case 'chat': {
         const text = String(msg.text).slice(0, 200).trim();
         if (!text) break;
@@ -251,6 +252,14 @@ export class GameServer {
   /** A host kidöntött egy fát: mindenki látja az összeomlást. */
   fell(cells: FellCell[], ox: number, oz: number): void { this.pendingFell.push({ cells, ox, oz, except: -1 }); }
 
+  /** Vendég rákattintott egy mobra (szelídítés, etetés, ültetés): a host dönt */
+  private interact(r: Remote, mobId: number, item: string | null): void {
+    const m = this.mobs.mobs.find((q) => q.id === mobId && !q.dead);
+    if (!m || (item !== null && typeof item !== 'string')) return;
+    if (Math.hypot(m.x - r.state.x, m.y - r.state.y, m.z - r.state.z) > 7) return;
+    this.mobs.interact(m, item);
+  }
+
   private attack(r: Remote, mobId: number, damage: number): void {
     const m = this.mobs.mobs.find((q) => q.id === mobId && !q.dead);
     if (!m || !Number.isFinite(damage)) return;
@@ -298,7 +307,7 @@ export class GameServer {
   private mobState(m: Mob): MobState {
     return {
       id: m.id, kind: m.kind, x: m.x, y: m.y, z: m.z, yaw: m.yaw, walk: m.walk, speed: Math.hypot(m.vx, m.vz), hp: m.hp,
-      flags: (m.hurtT > 0 ? 1 : 0) | (m.climb ? 2 : 0) | (m.dead ? 4 : 0) | (m.angry ? 8 : 0) | (m.inWater ? 16 : 0) | (m.variant << 8),
+      flags: (m.hurtT > 0 ? 1 : 0) | (m.climb ? 2 : 0) | (m.dead ? 4 : 0) | (m.angry ? 8 : 0) | (m.inWater ? 16 : 0) | (m.tamed ? 32 : 0) | (m.sitting ? 64 : 0) | (m.variant << 8),
     };
   }
 

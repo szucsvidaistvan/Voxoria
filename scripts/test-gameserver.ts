@@ -85,6 +85,24 @@ m.x = 50;
 a.send({ t: 'attack', mob: m.id, damage: 3 });
 ok(log.attacks.length === 1, 'messzi mob nem támadható');
 
+// szelídítés vendégként: a host dönt, a jelző a pillanatképben utazik
+{
+  const wolf = new Mob('wolf' as never, 2, 70, 2);
+  mobs.mobs.push(wolf);
+  a.send({ t: 'interact', mob: wolf.id, item: 'cod' });
+  ok(!wolf.tamed, 'rossz tárggyal nem szelídül');
+  const orig = Math.random; Math.random = () => 0;
+  a.send({ t: 'interact', mob: wolf.id, item: 'bone' });
+  Math.random = orig;
+  ok(wolf.tamed && wolf.persistent, 'a vendég csonttal megszelídíti a farkast');
+  a.send({ t: 'interact', mob: wolf.id, item: null });
+  ok(wolf.sitting, 'a vendég leülteti a szelídített mobot');
+  wolf.x = 90;
+  a.send({ t: 'interact', mob: wolf.id, item: null });
+  ok(wolf.sitting, 'messzi mobbal nem lehet interakcióba lépni');
+  mobs.mobs.splice(mobs.mobs.indexOf(wolf), 1);
+}
+
 // mob sebzi a játékost
 const ps = server.mobPlayers();
 ok(ps.length === 3, 'mobPlayers: host + 2 vendég');
