@@ -50,6 +50,8 @@ export type ClientMsg =
   | { t: 'edit'; edits: BlockEdit[] }
   /** mob megütése */
   | { t: 'attack'; mob: number; damage: number }
+  /** rákattintás egy mobra a kézben tartott tárggyal (szelídítés / etetés / ültetés; a host dönt) */
+  | { t: 'interact'; mob: number; item: string | null }
   | { t: 'chat'; text: string }
   /** a játékos lefeküdt / felkelt (alvás-szavazás) */
   | { t: 'sleep'; on: boolean }

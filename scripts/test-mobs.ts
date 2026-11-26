@@ -260,3 +260,54 @@ if (fails) { console.error(fails, 'hiba'); process.exit(1); }
   ok(boosted > 0, 'a macska időnként sprintel');
   ok(MOB_DEFS.turtle.speed < MOB_DEFS.pig.speed * 0.8, 'a teknős lassú');
 }
+
+// ---- szelídítés ----
+{
+  const w = new World(1);
+  for (let cx = -3; cx <= 3; cx++) for (let cz = -3; cz <= 3; cz++) w.ensureChunk(cx, cz);
+  for (let x = -12; x <= 48; x++) for (let z = -12; z <= 12; z++) { w.setBlock(x, 200, z, B.STONE); for (let y = 201; y < 212; y++) w.setBlock(x, y, z, 0); }
+  const top = 201;
+  const mm = new MobManager(w);
+  const wolf = mm.spawn('wolf', 0.5, top, 0.5);
+  ok(mm.interact(wolf, 'bone', () => 0.99) === 'failed' && !wolf.tamed, 'a szelídítés esélyre sikertelen is lehet');
+  ok(mm.interact(wolf, 'cod', () => 0) === 'none', 'rossz tárgy nem szelídít');
+  ok(mm.interact(mm.spawn('pig', 3.5, top, 0.5), 'bone') === 'none', 'a disznó nem szelídíthető');
+  ok(mm.interact(wolf, 'bone', () => 0) === 'tamed' && wolf.tamed && wolf.persistent && !wolf.angry, 'a szelídítés sikerül, a mob tartós lesz');
+  wolf.hurt(1, 5, 5);
+  ok(!wolf.angry && !wolf.alert, 'a szelídített farkas a sebzéstől nem haragszik és nem riaszt');
+  const cat = mm.spawn('cat', 2.5, top, 0.5), par = mm.spawn('parrot', 2.5, top, 2.5), hor = mm.spawn('horse', 5.5, top, 2.5);
+  ok(mm.interact(cat, 'salmon', () => 0) === 'tamed' && mm.interact(par, 'wheat_seeds', () => 0) === 'tamed' && mm.interact(hor, 'apple', () => 0) === 'tamed', 'macska hallal, papagáj maggal, ló almával szelídül');
+
+  // követés
+  const pl = { x: 20.5, y: top, z: 0.5, target: true, hurt: () => {} };
+  const ctx = { players: [pl], day: true, onDie: () => {} };
+  const d0 = Math.hypot(wolf.x - pl.x, wolf.z - pl.z);
+  for (let i = 0; i < 60 * 8; i++) mm.update(1 / 60, ctx);
+  const d1 = Math.hypot(wolf.x - pl.x, wolf.z - pl.z);
+  ok(d0 > 15 && d1 < 5, `a szelídített farkas követi a játékost (${d0.toFixed(0)} → ${d1.toFixed(1)} blokk)`);
+  // ülve marad
+  ok(mm.interact(wolf, null) === 'sit' && wolf.sitting, 'jobb klikk leülteti');
+  pl.x = 30.5;
+  const sx = wolf.x;
+  for (let i = 0; i < 60 * 3; i++) mm.update(1 / 60, ctx);
+  ok(Math.abs(wolf.x - sx) < 0.5, 'az ülő mob nem követ');
+  ok(mm.interact(wolf, null) === 'stand' && !wolf.sitting, 'újabb klikk feláll');
+  // teleport, ha túl messze marad
+  pl.x = 46.5;
+  mm.update(1 / 60, ctx);
+  ok(Math.hypot(wolf.x - pl.x, wolf.z - pl.z) < 3, 'a túl messzi szelídített mob a gazdához teleportál');
+  // etetés gyógyít
+  wolf.hp = 5;
+  ok(mm.interact(wolf, 'bone') === 'fed' && wolf.hp === 9, 'a csont gyógyítja a szelídített farkast');
+  // mentés
+  wolf.sitting = true;
+  const saved = JSON.parse(JSON.stringify(mm.exportPersistent()));
+  const mm2 = new MobManager(w); mm2.importPersistent(saved);
+  const wb = mm2.mobs.find((m) => m.kind === 'wolf');
+  ok(!!wb && wb.tamed && wb.sitting && wb.persistent, 'a szelídített, ülő mob mentésből visszatöltődik');
+  // nem szelídített mob messziről eltűnik, a szelídített nem
+  const far = { players: [{ x: 300, y: top, z: 0.5, target: true, hurt: () => {} }], day: true, onDie: () => {} };
+  const z = mm.spawn('zombie', 0.5, top, 0.5);
+  mm.update(1 / 60, far);
+  ok(mm.mobs.includes(wolf) && !mm.mobs.includes(z), 'a szelídített mob messziről sem tűnik el');
+}

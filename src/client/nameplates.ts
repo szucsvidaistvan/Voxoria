@@ -47,7 +47,8 @@ export function createNameplates(root: HTMLElement, occluded: (m: Mob) => boolea
         if (m !== target && occluded(m)) continue; // blokk takarja
         const p = pool[used++];
         p.el.hidden = false;
-        if (p.kind !== m.kind) { p.name.textContent = m.def.name; p.kind = m.kind; }
+        const key = m.kind + (m.tamed ? (m.sitting ? '+z' : '+') : '');
+        if (p.kind !== key) { p.name.textContent = m.def.name + (m.tamed ? (m.sitting ? ' ♥ (sitting)' : ' ♥') : ''); p.kind = key; }
         p.el.classList.toggle('hostile', m.def.hostile);
         p.fill.style.width = `${Math.max(0, Math.min(1, m.hp / m.def.hp)) * 100}%`;
         const s = Math.max(0.6, Math.min(1.15, 9 / Math.max(d, 1)));

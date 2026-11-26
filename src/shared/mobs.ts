@@ -132,6 +132,18 @@ const ARROW_SPEED = 15;
 const ARROW_GRAVITY = 12;
 const SPIT_SPEED = 10;
 const SPIT_GRAVITY = 4;
+/** Szelídítés: a faj elfogadott tárgyai (EXTRA_ID kulcs, vagy 'apple') és a siker esélye egy etetésre */
+export const TAME: Partial<Record<MobKind, { items: string[]; chance: number }>> = {
+  wolf: { items: ['bone'], chance: 1 / 3 },
+  cat: { items: ['cod', 'salmon'], chance: 1 / 3 },
+  parrot: { items: ['wheat_seeds'], chance: 1 / 3 },
+  horse: { items: ['wheat', 'apple'], chance: 1 / 3 }, donkey: { items: ['wheat', 'apple'], chance: 1 / 3 },
+  mule: { items: ['wheat', 'apple'], chance: 1 / 3 }, llama: { items: ['wheat'], chance: 1 / 3 },
+};
+/** a gazdától ennél messzebb a szelídített mob odateleportál */
+const TAME_TELEPORT = 20;
+/** a szelídített mob ennél közelebb áll meg a gazdánál; ennél messzebbről rohan */
+const TAME_STOP = 3, TAME_RUN = 10;
 /** a megsebzett semleges mob ennyi másodpercig haragszik (aztán megnyugszik) */
 const ANGER_TIME = 30;
 /** a farkasfalka riadójának hatótávja (blokk), a rohamozás ideje (mp) és sebesség-szorzója */
@@ -191,6 +203,10 @@ export class Mob {
   boostT = 0;
   /** megsebezték a falka tagját: riasztani kell a többit */
   alert = false;
+  /** szelídített: követi a játékost, nem tűnik el, mentődik */
+  tamed = false;
+  /** a szelídített mob ül (nem követ) */
+  sitting = false;
   /** a csontváz célzása: 0: nem céloz, különben eltelt másodperc a lövésig */
   aim = 0;
   /** melyik megjelenés (skin) a def.variants közül */
@@ -230,7 +246,7 @@ export class Mob {
     this.vx = ((this.x - fx) / d) * 5;
     this.vz = ((this.z - fz) / d) * 5;
     if (this.onGround) this.vy = 5;
-    if (this.def.neutral) { this.angry = true; this.angerT = ANGER_TIME; if (this.kind === 'wolf') this.alert = true; }
+    if (this.def.neutral && !this.tamed) { this.angry = true; this.angerT = ANGER_TIME; if (this.kind === 'wolf') this.alert = true; }
     else if (!this.def.hostile) {
       this.panicT = 4;
       this.panicYaw = Math.atan2(-(this.x - fx), -(this.z - fz)); // a sebzőtől elfelé
@@ -323,7 +339,7 @@ function physics(world: World, m: Mob, dt: number): void {
 
 /** Egy játékos a mobok szemszögéből (egyjátékosnál egy elem, co-opban mindenki). */
 /** Egy mentett tartós mob */
-export interface SavedMob { k: string; x: number; y: number; z: number; yaw: number; hp: number; v: number; p?: 1 }
+export interface SavedMob { k: string; x: number; y: number; z: number; yaw: number; hp: number; v: number; p?: 1; t?: 1; s?: 1 }
 
 export interface MobPlayer {
   /** a lábpozíció */
@@ -384,8 +400,26 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
   if (isFloater(def)) { floatStep(world, m, dt, pl, dist, ctx.lure ?? null); return; }
   if (def.amph && m.inWater) { turtleSwim(world, m, dt); return; }
 
-  const aggressive = m.angry || (def.hostile && !(isSpider(m.kind) && ctx.day));
-  if (aggressive && pl && dist < 24 && Math.abs(dy) < 12) {
+  const aggressive = !m.tamed && (m.angry || (def.hostile && !(isSpider(m.kind) && ctx.day)));
+  if (m.tamed) {
+    // szelídített: a legközelebbi játékost követi (ülve megáll); túl messziről odateleportál
+    if (pl && !m.sitting && dist > TAME_TELEPORT && !priv.inWater) {
+      const tx = pl.x + 1.2, tz = pl.z + 0.4;
+      if (!boxBlocked(world, tx, pl.y, tz, def.hw, def.h)) { m.x = tx; m.z = tz; m.y = pl.y; m.vy = 0; m.vx = 0; m.vz = 0; }
+    }
+    if (m.sitting) { speed = 0; priv.idle = true; }
+    else if (pl && dist > TAME_STOP && dist <= 40) {
+      lookAt(m, pl.x, pl.z);
+      speed = def.speed * (dist > TAME_RUN ? 1.5 : 0.9);
+    } else if (pl && dist <= TAME_STOP) {
+      speed = 0;
+      if (dist > 0.8) lookAt(m, pl.x, pl.z);
+    } else {
+      priv.wanderT -= dt;
+      if (priv.wanderT <= 0) { priv.idle = Math.random() < 0.6; priv.wanderT = 1.5 + Math.random() * 3; if (!priv.idle) m.yaw = Math.random() * Math.PI * 2; }
+      speed = priv.idle ? 0 : def.speed * 0.5;
+    }
+  } else if (aggressive && pl && dist < 24 && Math.abs(dy) < 12) {
     // üldözés
     lookAt(m, pl.x, pl.z);
     if (m.kind === 'skeleton') {
@@ -851,6 +885,27 @@ export class MobManager {
     }
   }
 
+  /**
+   * A játékos rákattint a mobra a kezében tartott tárggyal (`itemKey`: EXTRA_ID kulcs, 'apple' vagy null).
+   * Szelídítetlen, elfogadott tárgy: esélyre szelídül ('tamed' / 'failed'); szelídített: elfogadott tárgy gyógyít ('fed'),
+   * különben leültet / feláltat ('sit' / 'stand'); egyébként 'none'.
+   */
+  interact(m: Mob, itemKey: string | null, rand: () => number = Math.random): 'tamed' | 'failed' | 'fed' | 'sit' | 'stand' | 'none' {
+    if (m.dead) return 'none';
+    const t = TAME[m.kind];
+    const likes = !!(t && itemKey && t.items.includes(itemKey));
+    if (!m.tamed) {
+      if (!likes || !t) return 'none';
+      if (rand() >= t.chance) return 'failed';
+      m.tamed = true; m.persistent = true; m.angry = false; m.sitting = false; m.panicT = 0;
+      return 'tamed';
+    }
+    if (likes && m.hp < m.def.hp) { m.hp = Math.min(m.def.hp, m.hp + 4); return 'fed'; }
+    if (!t) return 'none';
+    m.sitting = !m.sitting;
+    return m.sitting ? 'sit' : 'stand';
+  }
+
   /** A megsebzett farkas vonyít: a közeli falkatársak is haragra gerjednek és egy ideig gyorsabban rohamoznak */
   private alertPack(m: Mob, ctx: MobCtx): void {
     m.boostT = BOOST_TIME;
@@ -886,6 +941,8 @@ export class MobManager {
     return keep.slice(0, SAVE_MOB_LIMIT).map((m) => {
       const e: SavedMob = { k: m.kind, x: +m.x.toFixed(2), y: +m.y.toFixed(2), z: +m.z.toFixed(2), yaw: +m.yaw.toFixed(2), hp: m.hp, v: m.variant };
       if (m.persistent) e.p = 1;
+      if (m.tamed) e.t = 1;
+      if (m.sitting) e.s = 1;
       return e;
     });
   }
@@ -896,7 +953,7 @@ export class MobManager {
     for (const e of list ?? []) {
       if (!(e.k in MOB_DEFS)) continue;
       const m = this.spawn(e.k as MobKind, e.x, e.y, e.z);
-      m.yaw = e.yaw; m.hp = Math.min(e.hp, m.def.hp); m.variant = e.v; m.persistent = !!e.p;
+      m.yaw = e.yaw; m.hp = Math.min(e.hp, m.def.hp); m.variant = e.v; m.persistent = !!e.p; m.tamed = !!e.t; m.sitting = !!e.s;
     }
   }
 

@@ -27,7 +27,7 @@ import { createMobView, createPlayerView } from './mobview';
 import { EAT_TIME, createHandItem } from './handitem';
 import { createInventoryPreview } from './invpreview';
 import { createCollapse } from './collapse';
-import { Mob, MobManager, mobDrops, type MobCtx, type MobKind } from '../shared/mobs';
+import { Mob, MobManager, TAME, mobDrops, type MobCtx, type MobKind } from '../shared/mobs';
 import { GameServer } from '../shared/gameserver';
 import type { ClientMsg, MobState, PlayerState } from '../shared/protocol';
 import { createRemotePlayers } from './remoteplayers';
@@ -615,6 +615,8 @@ async function main(): Promise<void> {
       m.onGround = true;
       m.climb = !!(st.flags & 2);
       m.angry = !!(st.flags & 8);
+      m.tamed = !!(st.flags & 32);
+      m.sitting = !!(st.flags & 64);
       m.inWater = !!(st.flags & 16);
       m.variant = st.flags >> 8;
       m.vx = -Math.sin(st.yaw) * st.speed;
@@ -1667,6 +1669,33 @@ async function main(): Promise<void> {
     lure: fishing.active ? { x: fishing.x, y: fishing.y, z: fishing.z } : null,
   });
 
+  /** a kézben tartott tárgy kulcsa a szelídítéshez (EXTRA_ID kulcs vagy 'apple') */
+  const heldTameKey = (): string | null => {
+    const id = held()?.id;
+    if (id === undefined) return null;
+    if (id === I.APPLE) return 'apple';
+    return Object.keys(EXTRA_ID).find((k) => EXTRA_ID[k] === id) ?? null;
+  };
+  /** Jobb klikk egy mobra: szelídítés / etetés / ültetés. Igaz, ha a kattintást ez elhasználta. */
+  const consumeHeld = () => { inv.takeOne(input.hotbar); paintHotbar(); };
+  const interactMob = (m: Mob): boolean => {
+    const t = TAME[m.kind];
+    if (!t) return false;
+    const key = heldTameKey();
+    const likes = !!key && t.items.includes(key);
+    if (!m.tamed && !likes) return false;
+    if (guest) {
+      const sid = serverIdOf.get(m);
+      if (sid === undefined) return false;
+      guest.sendInteract(sid, key);
+      if (likes && !m.tamed && mode === 'survival') consumeHeld();
+      return true;
+    }
+    const res = mobs.interact(m, key);
+    if ((res === 'tamed' || res === 'failed' || res === 'fed') && mode === 'survival') consumeHeld();
+    return res !== 'none';
+  };
+
   let lastAttack = 0;
   /** A játékos ütése: a kézben tartott eszköz sebzése (kézzel 1), esés közben kritikus (1,5x); kreatívban egy ütés elég */
   const attackMob = (m: Mob) => {
@@ -1773,7 +1802,8 @@ async function main(): Promise<void> {
       if (mobFirst && mobHit!.mob.kind === 'cow' && held()?.id === I.BUCKET && EXTRA_ID['milk_bucket'] !== undefined) {
         if (mode === 'survival') swapHeld(EXTRA_ID['milk_bucket']);
         input.placeQueued = false;
-      } else useItem(hit);
+      } else if (mobFirst && interactMob(mobHit!.mob)) input.placeQueued = false;
+      else useItem(hit);
     }
     input.breakQueued = input.placeQueued = input.tapQueued = false;
   };
