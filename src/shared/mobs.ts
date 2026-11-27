@@ -63,7 +63,7 @@ export const MOB_DEFS: Record<MobKind, MobDef> = {
   husk: { name: 'Husk', hostile: true, hp: 20, speed: 2.4, hw: 0.3, h: 1.95 },
   drowned: { name: 'Drowned', hostile: true, hp: 20, speed: 2.2, hw: 0.3, h: 1.95 },
   tarantula: { name: 'Tarantula', hostile: true, hp: 10, speed: 3.4, hw: 0.4, h: 0.6, dmg: 2 },
-  ghost: { name: 'Ghost', hostile: true, hp: 12, speed: 3.2, hw: 0.45, h: 0.5, dmg: 3, fly: true },
+  ghost: { name: 'Ghost', hostile: true, hp: 12, speed: 3.2, hw: 0.45, h: 0.5, dmg: 2, fly: true },
   slime: { name: 'Slime', hostile: true, hp: 16, speed: 2.6, hw: 0.4, h: 0.8, dmg: 3, hop: true },
   slimelet: { name: 'Slimelet', hostile: true, hp: 4, speed: 2.8, hw: 0.2, h: 0.4, dmg: 1, hop: true },
   cod: { name: 'Cod', hostile: false, hp: 3, speed: 1.6, hw: 0.25, h: 0.3, swim: true, fish: true },
@@ -71,6 +71,10 @@ export const MOB_DEFS: Record<MobKind, MobDef> = {
   pufferfish: { name: 'Pufferfish', hostile: false, hp: 3, speed: 1.0, hw: 0.25, h: 0.3, swim: true, fish: true },
   squid: { name: 'Squid', hostile: false, hp: 10, speed: 1.2, hw: 0.45, h: 0.95, swim: true },
 };
+
+/** Játszhatóság: minden mob lassabb a nyers értékeknél (a szörnyek jobban, hogy el lehessen menekülni előlük) */
+export const SPEED_MUL = { hostile: 0.7, other: 0.8 };
+for (const d of Object.values(MOB_DEFS)) d.speed *= d.hostile ? SPEED_MUL.hostile : SPEED_MUL.other;
 // a lóból több színváltozat van
 MOB_DEFS.horse.variants = 8;
 
@@ -419,7 +423,7 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
       if (priv.wanderT <= 0) { priv.idle = Math.random() < 0.6; priv.wanderT = 1.5 + Math.random() * 3; if (!priv.idle) m.yaw = Math.random() * Math.PI * 2; }
       speed = priv.idle ? 0 : def.speed * 0.5;
     }
-  } else if (aggressive && pl && dist < 24 && Math.abs(dy) < 12) {
+  } else if (aggressive && pl && dist < (def.hostile ? 16 : 24) && Math.abs(dy) < 12) {
     // üldözés
     lookAt(m, pl.x, pl.z);
     if (m.kind === 'skeleton') {
@@ -446,7 +450,7 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
     } else {
       speed = dist > 0.9 ? def.speed : 0;
       if (dist < 1.4 && Math.abs(dy) < 1.8 && priv.atkCd <= 0) {
-        priv.atkCd = 1;
+        priv.atkCd = 1.6;
         pl.hurt(def.dmg ?? 3, m.x, m.z);
       }
     }
@@ -618,14 +622,14 @@ function floatStep(world: World, m: Mob, dt: number, pl: MobPlayer | null, dist:
   const swim = !!def.swim;
   if (def.fish) { fishStep(world, m, dt, pl, dist, lure); return; }
   if (m.kind === 'squid') { squidStep(world, m, dt); return; }
-  if (def.hostile && pl && dist < 28 && Math.abs(pl.y - m.y) < 24) {
+  if (def.hostile && pl && dist < 18 && Math.abs(pl.y - m.y) < 16) {
     // a szellem a játékos felé száll (3D-ben), közel érve csap
     lookAt(m, pl.x, pl.z);
     m.wy = Math.max(-3, Math.min(3, pl.y + 1.0 - m.y)) * 1.2;
     const near = dist < 1.1;
     m.wx = near ? 0 : -Math.sin(m.yaw) * def.speed;
     m.wz = near ? 0 : -Math.cos(m.yaw) * def.speed;
-    if (dist < 1.5 && Math.abs(pl.y + 0.9 - m.y) < 1.8 && m.atkCd <= 0) { m.atkCd = 1; pl.hurt(def.dmg ?? 3, m.x, m.z); }
+    if (dist < 1.5 && Math.abs(pl.y + 0.9 - m.y) < 1.8 && m.atkCd <= 0) { m.atkCd = 1.8; pl.hurt(def.dmg ?? 3, m.x, m.z); }
     return;
   }
   if (m.panicT > 0) {
@@ -690,7 +694,7 @@ export type MobCat = 'monster' | 'creature' | 'ambient' | 'water' | 'waterAmbien
  * Kategóriánkénti alap-létszámkeret egy 17×17 chunkos (289) betöltött területre; a tényleges keret
  * = alap × betöltött chunkok / 289 × MOB_PERF. Több játékos → több betöltött chunk → nagyobb keret.
  */
-export const MOB_CAP_BASE: Record<MobCat, number> = { monster: 70, creature: 10, ambient: 15, water: 5, waterAmbient: 20 };
+export const MOB_CAP_BASE: Record<MobCat, number> = { monster: 40, creature: 10, ambient: 15, water: 5, waterAmbient: 20 };
 /** teljesítmény-szorzó (telefonon kevesebb mob fér el): 1 = az alapértékek */
 export const MOB_PERF = 0.6;
 /** ennél messzebb eltűnik minden, ami eltűnhet (blokk) */
@@ -1013,17 +1017,17 @@ export class MobManager {
     if (t.cat.water < cap('water') && Math.random() < 0.3) this.trySpawn(players, px, pz, 'squid', 24, 40, 'water');
     if (t.cat.waterAmbient < cap('waterAmbient') && Math.random() < 0.4) this.trySpawn(players, px, pz, 'fish', 24, 40, 'water');
     if (!hostileAllowed) return;
-    const sub = Math.max(1, Math.round(cap('monster') / 4));
+    const sub = Math.max(1, Math.round(cap('monster') / 8));
     if (night) {
       // éjjel: szellemek az égből, fulladtak a vízből
-      if (t.of('ghost') < sub && Math.random() < 0.12) this.trySpawn(players, px, pz, 'ghost', 24, 40, 'surface', py);
-      if (t.of('drowned') < sub && Math.random() < 0.2) this.trySpawn(players, px, pz, 'drowned', 24, 44, 'water');
+      if (t.of('ghost') < sub && Math.random() < 0.04) this.trySpawn(players, px, pz, 'ghost', 32, 48, 'surface', py);
+      if (t.of('drowned') < sub && Math.random() < 0.1) this.trySpawn(players, px, pz, 'drowned', 32, 48, 'water');
     }
-    if (t.cat.monster < cap('monster') && Math.random() < 0.5) {
+    if (t.cat.monster < cap('monster') && Math.random() < 0.25) {
       const roll = Math.random();
       const kind: MobKind = roll < 0.35 ? 'zombie' : roll < 0.6 ? 'skeleton' : roll < 0.75 ? 'spider' : roll < 0.87 ? 'tarantula' : 'slime';
-      if (night) this.trySpawn(players, px, pz, kind, 24, 44, 'surface', py);
-      else if (Math.random() < 0.35) this.trySpawn(players, px, pz, kind, 24, 36, 'cave', py); // barlangokban nappal is
+      if (night) this.trySpawn(players, px, pz, kind, 32, 48, 'surface', py);
+      else if (Math.random() < 0.25) this.trySpawn(players, px, pz, kind, 28, 40, 'cave', py); // barlangokban nappal is
     }
   }
 
