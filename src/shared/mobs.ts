@@ -211,6 +211,9 @@ export class Mob {
   tamed = false;
   /** a szelídített mob ül (nem követ) */
   sitting = false;
+  /** a szelídített farkas épp ezt a szörnyet támadja (a gazdát védi) */
+  guard: Mob | null = null;
+  guardScan = 0;
   /** a csontváz célzása: 0: nem céloz, különben eltelt másodperc a lövésig */
   aim = 0;
   /** melyik megjelenés (skin) a def.variants közül */
@@ -405,7 +408,13 @@ function aiStep(world: World, m: Mob, dt: number, ctx: MobCtx, arrows: Arrow[]):
   if (def.amph && m.inWater) { turtleSwim(world, m, dt); return; }
 
   const aggressive = !m.tamed && (m.angry || (def.hostile && !(isSpider(m.kind) && ctx.day)));
-  if (m.tamed) {
+  if (m.tamed && m.kind === 'wolf' && m.guard && !m.guard.dead && !m.sitting) {
+    // a szelídített farkas megtámadja a gazdát fenyegető szörnyet (megáll, ha az már elesett)
+    const g = m.guard, gd = Math.hypot(g.x - m.x, g.z - m.z);
+    lookAt(m, g.x, g.z);
+    speed = gd > 1.2 ? def.speed * 1.3 : 0;
+    if (gd < 1.5 && Math.abs(g.y - m.y) < 1.8 && priv.atkCd <= 0) { priv.atkCd = 1.2; if (g.hurt(def.dmg ?? 3, m.x, m.z)) ctx.onDie(g); }
+  } else if (m.tamed) {
     // szelídített: a legközelebbi játékost követi (ülve megáll); túl messziről odateleportál
     if (pl && !m.sitting && dist > TAME_TELEPORT && !priv.inWater) {
       const tx = pl.x + 1.2, tz = pl.z + 0.4;
@@ -882,6 +891,7 @@ export class MobManager {
       }
 
       if (m.alert) { m.alert = false; this.alertPack(m, ctx); }
+      if (m.tamed && m.kind === 'wolf') this.scanGuard(m, dt, ctx);
       aiStep(this.world, m, dt, ctx, this.arrows);
       if (m.dead) { this.mobs.splice(i, 1); continue; } // felrobbant
       physics(this.world, m, dt);
@@ -908,6 +918,23 @@ export class MobManager {
     if (!t) return 'none';
     m.sitting = !m.sitting;
     return m.sitting ? 'sit' : 'stand';
+  }
+
+  /** A szelídített farkas félmásodpercenként keres szörnyet a gazda (a legközelebbi játékos) körül */
+  private scanGuard(m: Mob, dt: number, ctx: MobCtx): void {
+    if (m.guard && (m.guard.dead || !this.mobs.includes(m.guard))) m.guard = null;
+    m.guardScan -= dt;
+    if (m.guardScan > 0) return;
+    m.guardScan = 0.5;
+    let best: Mob | null = null, bd = 14;
+    for (const o of this.mobs) {
+      if (!o.def.hostile || o.dead || o.tamed) continue;
+      const d = Math.hypot(o.x - m.x, o.z - m.z);
+      if (d >= bd) continue;
+      if (ctx.players.length && !ctx.players.some((p) => Math.hypot(o.x - p.x, o.z - p.z) < 10)) continue;
+      best = o; bd = d;
+    }
+    m.guard = best;
   }
 
   /** A megsebzett farkas vonyít: a közeli falkatársak is haragra gerjednek és egy ideig gyorsabban rohamoznak */

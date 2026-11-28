@@ -311,3 +311,34 @@ if (fails) { console.error(fails, 'hiba'); process.exit(1); }
   mm.update(1 / 60, far);
   ok(mm.mobs.includes(wolf) && !mm.mobs.includes(z), 'a szelídített mob messziről sem tűnik el');
 }
+
+// ---- szelídített farkas véd ----
+{
+  const w = new World(1);
+  for (let cx = -3; cx <= 3; cx++) for (let cz = -3; cz <= 3; cz++) w.ensureChunk(cx, cz);
+  for (let x = -12; x <= 48; x++) for (let z = -12; z <= 12; z++) { w.setBlock(x, 200, z, B.STONE); for (let y = 201; y < 212; y++) w.setBlock(x, y, z, 0); }
+  const top = 201;
+  const mm = new MobManager(w);
+  const wolf = mm.spawn('wolf', 0.5, top, 0.5); mm.interact(wolf, 'bone', () => 0);
+  const pl = { x: 0.5, y: top, z: 2.5, target: true, hurt: () => {} };
+  const died: string[] = [];
+  const ctx = { players: [pl], day: false, onDie: (m: { kind: string }) => { died.push(m.kind); } };
+  const zom = mm.spawn('zombie', 8.5, top, 0.5);
+  for (let i = 0; i < 60 * 30 && !died.includes('zombie'); i++) mm.update(1 / 60, ctx);
+  ok(died.includes('zombie') && zom.hp <= 0, 'a szelídített farkas elintézi a gazdát fenyegető zombit');
+  // ülő farkas nem véd
+  const mm2 = new MobManager(w);
+  const w2 = mm2.spawn('wolf', 0.5, top, 0.5); mm2.interact(w2, 'bone', () => 0); mm2.interact(w2, null); // leül
+  const z2 = mm2.spawn('zombie', 6.5, top, 0.5);
+  const hp0 = z2.hp;
+  const pl2 = { x: 40.5, y: top, z: 8.5, target: true, hurt: () => {} };
+  for (let i = 0; i < 60 * 6; i++) mm2.update(1 / 60, { players: [pl2], day: false, onDie: () => {} });
+  ok(w2.sitting && z2.hp === hp0, 'az ülő farkas nem támad');
+  // a gazdától messzi szörnyet nem üldözi
+  const mm3 = new MobManager(w);
+  const w3 = mm3.spawn('wolf', 0.5, top, 0.5); mm3.interact(w3, 'bone', () => 0);
+  const z3 = mm3.spawn('zombie', 11.5, top, 8.5);
+  const pl3 = { x: -10.5, y: top, z: -9.5, target: true, hurt: () => {} };
+  for (let i = 0; i < 60; i++) mm3.update(1 / 60, { players: [pl3], day: false, onDie: () => {} });
+  ok(w3.guard === null, 'a gazdától távoli szörnyre nem indul támadásra');
+}
