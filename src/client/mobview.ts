@@ -224,6 +224,19 @@ export function createMobView(scene: THREE.Scene, base: string = import.meta.env
           v.root.scale.set(base * sxz, base * sy, base * sxz);
         }
 
+        if (m.tamed) {
+          // ülő póz: a szelídített mob lelapul és a mellső fele kissé megemelkedik (simítva)
+          const prev = (v.root.userData.sit as number | undefined) ?? 0;
+          const cur = prev + ((m.sitting ? 1 : 0) - prev) * Math.min(1, dtv * 8);
+          v.root.userData.sit = cur;
+          if (cur > 0.002) {
+            const base = MODEL_SCALE[m.kind] ?? 1;
+            v.root.scale.set(base, base * (1 - 0.25 * cur), base);
+            v.root.rotation.order = 'YXZ';
+            v.root.rotation.set(0.4 * cur, m.yaw, 0);
+          }
+        }
+
         // járás: a lábak a megtett úttal lendülnek, a szárnyak csapkodnak, ha a csirke a levegőben van
         const speed = Math.min(1, Math.hypot(m.vx, m.vz, m.climb ? m.vy : 0) / 2.5);
         const sw = Math.sin(m.walk * 3.2) * 0.85 * speed;
